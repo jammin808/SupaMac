@@ -73,6 +73,44 @@ jobs:
     - name: Audit Rust dependencies
       if: '!cancelled()'
       run: '"$RUNNER_TEMP/cargo-audit-x86_64-unknown-linux-gnu-v0.23.0/cargo-audit" audit --file Cargo.lock --deny warnings'
+  nix-dependencies:
+    name: Nix dependencies (${{ matrix.runner }}, ${{ matrix.package }})
+    runs-on: ${{ matrix.runner }}
+    env:
+      NIX_PACKAGE: ${{ matrix.package }}
+    timeout-minutes: 60
+    steps:
+    - name: Checkout
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      with:
+        clean: 'false'
+        persist-credentials: 'false'
+      env:
+        GIT_HTTP_LOW_SPEED_LIMIT: '10000'
+        GIT_HTTP_LOW_SPEED_TIME: '60'
+    - name: Install Nix
+      uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa
+      with:
+        determinate: 'false'
+        kvm: 'false'
+        diagnostic-endpoint: ''
+    - name: Verify locked dependency output
+      run: |
+        nix build --no-link --no-update-lock-file ".#$NIX_PACKAGE"
+        nix build --no-link --no-update-lock-file --rebuild ".#$NIX_PACKAGE"
+    - name: Build agent runtime against locked dependencies
+      if: matrix.package == 'macro-agent-node-modules'
+      run: nix build --no-link --no-update-lock-file .#macro-agent-runtime
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - runner: ubuntu-24.04
+          package: js-node-modules
+        - runner: macos-15
+          package: js-node-modules
+        - runner: ubuntu-24.04
+          package: macro-agent-node-modules
   codeql:
     name: CodeQL (${{ matrix.language }})
     runs-on: ubuntu-24.04

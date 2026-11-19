@@ -17,10 +17,10 @@ workspaces can share the same vulnerable dependency.
 
 | Lockfile root | High | Critical |
 | --- | ---: | ---: |
-| Main workspace | 73 | 17 |
+| Main workspace | 28 | 15 |
 | `apps/docs` | 77 | 2 |
 | `infra` | 14 | 0 |
-| `packages/starter-agent` | 1 | 0 |
+| `packages/starter-agent` | 0 | 0 |
 | `services/analytics-proxy` | 14 | 0 |
 | `services/cla-worker` | 8 | 0 |
 | `services/sync-service` | 20 | 0 |
@@ -31,15 +31,28 @@ findings remain relevant and are not a declaration of exploitability or safety.
 Refresh with `bun run supamac:audit`; a scanner/network/format failure is fatal,
 not a clean scan.
 
-RustSec `cargo-audit` 0.23.0 against the current advisory database found **21
+The initial main-workspace scan found 73 high and 17 critical matches. Compatible
+patches updated 25 packages, including DOMPurify, Handlebars, Axios, Hono and Zod.
+The independent agent lockfile is synchronized with its updated manifest.
+No scanner exceptions were added; remaining advisories still fail the gate.
+The editor/email parser suite passed 646 tests, the agent security suite passed
+86 (2 skipped for missing SOPS/age), and the code-mode SDK passed 13. The SDK
+build and agent/code-mode typechecks also passed.
+
+RustSec `cargo-audit` 0.23.0 against the current advisory database initially found **21
 vulnerability entries**, plus 1 notice, 12 unmaintained, 36 unsound and 3 yanked
 warnings. Affected packages include `h2`, `lettre`, `postgres-protocol`,
 `quinn-proto`, `quinn-udp`, `libsqlite3-sys`, `libz-sys`, `crypto-bigint` and `rsa`.
 The fork scan does not inherit the upstream `deny.toml` advisory exceptions.
 
-The compatible-range Bun refresh did not clear these inherited findings. Current
-release metadata confirms that some fixes require major-version migrations and
-some affected packages have no newer published release. Forcing global major
+Compatible lockfile updates to `lettre`, `libz-sys`, `postgres-protocol`,
+`quinn-proto` and `quinn-udp` reduced RustSec vulnerability entries to **4**:
+`crypto-bigint`, `h2`, `libsqlite3-sys` and `rsa`. Warning categories remain
+release-review work. These updates still need application-level Rust compilation
+and tests on a host with enough build storage.
+
+Current release metadata confirms that some remaining fixes require major-version
+migrations and some affected packages have no newer published release. Forcing global major
 overrides would not establish application compatibility. Remediate by dependency
 owner, check reachability and affected features, update compatible versions first,
 and test each required migration. Do not treat this report as a waiver.
@@ -73,6 +86,13 @@ Feature branches run through pull-request CI only. Push CI runs on `main`,
 avoiding duplicate full scans for the same pull-request update. Scheduled and
 manually requested analysis remain available. Source and advisory scans continue
 to report the inherited release blockers above.
+
+Nix dependency checks build and forcibly rebuild the JavaScript dependency output
+on Linux and macOS ARM, plus the agent's separate dependency output on Linux.
+The Linux agent check also builds the assembled runtime and SDK. These checks use
+standard GitHub-hosted runners, the tracked flake lock and no deployment credentials.
+Dependency-lock changes must carry the measured fixed-output hashes; a cached old
+output alone cannot establish reproducibility. Hosted results remain pending.
 
 This container lacks Nix and access to a Docker daemon. Full frontend typechecking
 also exceeded the container's available memory. A full Rust service build, live

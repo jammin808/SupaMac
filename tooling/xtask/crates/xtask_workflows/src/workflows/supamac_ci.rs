@@ -40,6 +40,7 @@ pub fn render() -> Result<String> {
         )
         .add_job("tooling", tooling())
         .add_job("dependencies", dependencies())
+        .add_job("nix-dependencies", nix_dependencies())
         .add_job("codeql", codeql())
         .add_job("secrets", secrets());
 
@@ -54,6 +55,9 @@ pub fn render() -> Result<String> {
     )?;
     value["jobs"]["codeql"]["timeout-minutes"] =
         serde_yaml::Value::String("${{ matrix.timeout }}".to_owned());
+    value["jobs"]["nix-dependencies"]["strategy"] = yaml_fragment(
+        "fail-fast: false\nmatrix:\n  include:\n    - runner: ubuntu-24.04\n      package: js-node-modules\n    - runner: macos-15\n      package: js-node-modules\n    - runner: ubuntu-24.04\n      package: macro-agent-node-modules\n",
+    )?;
     serde_yaml::to_string(&value).map_err(Into::into)
 }
 
@@ -94,6 +98,37 @@ fn dependencies() -> Job {
             Step::new("Audit Rust dependencies")
                 .run("\"$RUNNER_TEMP/cargo-audit-x86_64-unknown-linux-gnu-v0.23.0/cargo-audit\" audit --file Cargo.lock --deny warnings")
                 .if_condition(Expression::new("!cancelled()")),
+        )
+}
+
+fn nix_dependencies() -> Job {
+    Job::default()
+        .name("Nix dependencies (${{ matrix.runner }}, ${{ matrix.package }})")
+        .runs_on("${{ matrix.runner }}")
+        .timeout_minutes(60u32)
+        .add_env(("NIX_PACKAGE", "${{ matrix.package }}"))
+        .add_step(steps::checkout(false, false))
+        .add_step(
+            Step::new("Install Nix")
+                .uses(
+                    "DeterminateSystems",
+                    "nix-installer-action",
+                    "3138316df39ed29be04236d7ffc686fa525866aa",
+                ) // v23
+                .add_with(("determinate", false))
+                .add_with(("kvm", false))
+                .add_with(("diagnostic-endpoint", "")),
+        )
+        .add_step(
+            Step::new("Verify locked dependency output")
+                // Rebuild even a substituted output: its store path depends on
+                // the declared hash, so a cache hit alone cannot verify a new lock.
+                .run("nix build --no-link --no-update-lock-file \".#$NIX_PACKAGE\"\nnix build --no-link --no-update-lock-file --rebuild \".#$NIX_PACKAGE\"\n"),
+        )
+        .add_step(
+            Step::new("Build agent runtime against locked dependencies")
+                .run("nix build --no-link --no-update-lock-file .#macro-agent-runtime")
+                .if_condition(Expression::new("matrix.package == 'macro-agent-node-modules'")),
         )
 }
 

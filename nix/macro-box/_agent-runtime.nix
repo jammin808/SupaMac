@@ -73,6 +73,7 @@ pkgs.stdenvNoCC.mkDerivation {
     pkgs.bun
     pkgs.esbuild
   ];
+  passthru = { inherit thirdParty; };
   dontConfigure = true;
   buildPhase = ''
     runHook preBuild

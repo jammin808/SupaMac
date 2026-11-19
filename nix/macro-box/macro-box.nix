@@ -108,6 +108,7 @@ in
         macro-box-claude-code = box.claudeCode;
         macro-box-claude-agent-acp = box.claudeAgentAcp;
         macro-agent-runtime = box.agent.runtime;
+        macro-agent-node-modules = box.agent.runtime.thirdParty;
         macro-box-computer-use-linux = box.agent.computerUse.package;
         macro-box-docker = dockerImage "macro-box" container;
         macro-box-firecracker = firecrackerImage "macro-box-firecracker" firecracker;

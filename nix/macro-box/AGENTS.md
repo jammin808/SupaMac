@@ -77,6 +77,11 @@ image with systemd as PID 1 (for the dev-only DockerFleet).
 - `nix build .#macro-box-claude-agent-acp` → the ACP adapter npm prefix.
 - `nix build .#macro-agent-runtime` → the agent's `node_modules` and the
   `bun.lock` it was installed from.
+- `nix build .#macro-agent-node-modules` → just the fixed-output third-party
+  dependencies. After changing the starter lockfile, build this output and
+  update `_agent-runtime.nix` with the hash reported for that derivation.
+  Rebuild with `--rebuild` to verify the lockfile even when its old output is cached,
+  then build `.#macro-agent-runtime` to check the SDK and assembled runtime.
 - `nix build .#macro-box-computer-use-linux` → the computer-use MCP server.
 - `nix build .#nixosConfigurations.macro-box.config.system.build.toplevel` →
   the system closure, without packing the image.

@@ -16,7 +16,7 @@
     "playwright-core": "1.65.0",
     "rrule-temporal": "^2.2.8",
     "temporal-spec": "^1.0.1",
-    "zod": "4.4.3",
+    "zod": "4.6.6",
     "temporal-polyfill": "1.0.6"
   },
   "scripts": {
