@@ -139,12 +139,16 @@ fn codeql() -> Job {
         // SQLx macros must use tracked query metadata, never a live database.
         // Keep this scoped to static analysis; database tests run online.
         .add_env(("SQLX_OFFLINE", "true"))
+        .add_env(("CARGO_BUILD_JOBS", "2"))
         .add_step(steps::checkout(false, false))
         .add_step(
             Step::new("Initialize CodeQL")
                 .uses("github", "codeql-action/init", CODEQL)
                 .add_with(("languages", "${{ matrix.language }}"))
                 .add_with(("build-mode", "none"))
+                // Leave headroom for the runner and Rust macro compilation.
+                .add_with(("ram", "4096"))
+                .add_with(("threads", "2"))
                 .add_with(("queries", "security-extended")),
         )
         .add_step(

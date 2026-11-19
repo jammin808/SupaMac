@@ -79,8 +79,12 @@ successfully on the initial import. Both initial Rust CodeQL jobs exceeded the
 45-minute limit during source extraction, so Rust analysis remains incomplete.
 Their logs also contain SQLx macro-expansion warnings. The revised workflow uses
 the tracked offline SQLx metadata for static analysis and allows up to 120 minutes
-for Rust, retaining 45 minutes for JavaScript/TypeScript. These changes still need
-a completed hosted Rust run; they do not establish a clean analysis result.
+for Rust, retaining 45 minutes for JavaScript/TypeScript. The revised Rust run
+also failed: its check annotation reports that the hosted runner lost
+communication with GitHub. Full logs were unavailable, so the cause is not
+confirmed. CodeQL now has a 4 GiB memory budget and two analysis threads, with
+Cargo limited to two build jobs in static analysis, to leave runner headroom.
+A successful Rust analysis remains a release requirement.
 
 Feature branches run through pull-request CI only. Push CI runs on `main`,
 avoiding duplicate full scans for the same pull-request update. Scheduled and
@@ -93,6 +97,10 @@ The Linux agent check also builds the assembled runtime and SDK. These checks us
 standard GitHub-hosted runners, the tracked flake lock and no deployment credentials.
 Dependency-lock changes must carry the measured fixed-output hashes; a cached old
 output alone cannot establish reproducibility. Hosted results remain pending.
+The first agent dependency build produced its measured replacement hash. The
+main workspace also required lockfile hoisting normalization for Nix's pinned
+Bun 1.3.13; isolated Linux/macOS input checks pass with both Bun versions and
+the normalized lockfile retains the same live advisory counts.
 
 This container lacks Nix and access to a Docker daemon. Full frontend typechecking
 also exceeded the container's available memory. A full Rust service build, live
