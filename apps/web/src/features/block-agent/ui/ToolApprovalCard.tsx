@@ -1,0 +1,126 @@
+import ShieldCheck from '@icon/system/regular/shield-check.svg';
+import { Button, Card, Item } from '@ui';
+import { Show } from 'solid-js';
+
+export type ToolApprovalCardProps = {
+  /** What the agent wants to do, e.g. `read your email`. */
+  action: string;
+  /**
+   * What approving for good would let the requester do without asking, e.g.
+   * `use your Linear account`. Absent when it cannot be offered.
+   */
+  standing?: string;
+  /** Who prompted the turn; absent for a bot on nobody's behalf. */
+  requester?: string;
+  /** The owner prompted the turn: a call they confirm even in their own. */
+  ownTurn?: boolean;
+  /** The session's owner, whose access the call spends. */
+  owner: string;
+  /** The viewer is the owner. */
+  canApprove: boolean;
+  /** The viewer may give up waiting on the owner. */
+  canCancel: boolean;
+  /** An answer is on the wire. */
+  disabled?: boolean;
+  onApprove: () => void;
+  onApproveAlways: () => void;
+  onDeny: () => void;
+  onCancel: () => void;
+};
+
+/**
+ * A tool call held for the session owner: approve or decline for them,
+ * "waiting for the owner" with a way out for everyone else.
+ */
+export function ToolApprovalCard(props: ToolApprovalCardProps) {
+  const asker = () =>
+    props.ownTurn ? 'the agent' : (props.requester ?? 'A bot');
+  return (
+    <Card
+      variant="filled"
+      depth={3}
+      role="region"
+      aria-label="Tool approval request"
+      class="overflow-hidden text-ink"
+    >
+      <Card.Header class="pb-2">
+        <Item class="items-start gap-3 border-0 p-0">
+          <Item.Media>
+            <ShieldCheck />
+          </Item.Media>
+          <Item.Content class="gap-0.5">
+            <Card.Title>
+              {props.canApprove
+                ? 'Approval needed'
+                : `Waiting for ${props.owner} to approve`}
+            </Card.Title>
+            <Card.Description class="leading-5 [overflow-wrap:anywhere]">
+              {props.ownTurn
+                ? `The agent wants to ${props.action}.`
+                : `${asker()} asked the agent to ${props.action}.`}
+            </Card.Description>
+            <Show when={props.canApprove && props.standing}>
+              {(standing) => (
+                <Card.Metadata class="mt-0.5 leading-4 [overflow-wrap:anywhere]">
+                  Always allow lets {asker()} {standing()} in this session
+                  without asking you.
+                </Card.Metadata>
+              )}
+            </Show>
+          </Item.Content>
+        </Item>
+      </Card.Header>
+      <Card.Footer class="border-0 pt-0">
+        <Show
+          when={props.canApprove}
+          fallback={
+            <Show when={props.canCancel}>
+              <Button
+                type="button"
+                size="md"
+                variant="secondary"
+                class="ml-auto"
+                disabled={props.disabled}
+                onClick={() => props.onCancel()}
+              >
+                Cancel
+              </Button>
+            </Show>
+          }
+        >
+          <Button
+            type="button"
+            size="md"
+            variant="ghost"
+            disabled={props.disabled}
+            onClick={() => props.onDeny()}
+          >
+            Decline
+          </Button>
+          <Card.Actions class="ml-auto">
+            <Show when={props.standing}>
+              <Button
+                type="button"
+                size="md"
+                variant="ghost"
+                disabled={props.disabled}
+                onClick={() => props.onApproveAlways()}
+              >
+                Always allow
+              </Button>
+            </Show>
+            <Button
+              type="button"
+              size="md"
+              variant="secondary"
+              disabled={props.disabled}
+              onClick={() => props.onApprove()}
+            >
+              Approve
+            </Button>
+          </Card.Actions>
+        </Show>
+      </Card.Footer>
+    </Card>
+  );
+}

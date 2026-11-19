@@ -1,0 +1,37 @@
+import { createSearchParamsCodec } from '@app/lib/split-router';
+import { z } from 'zod';
+import { DEFAULT_EMAIL_TAB, EMAIL_TAB_IDS, type EmailTab } from './constants';
+
+export const emailTabSearch = {
+  namespace: 'mail',
+  schema: z.object({
+    tab: z.enum(EMAIL_TAB_IDS),
+    savedView: z
+      .string()
+      .uuid()
+      .transform((id) => id.toLowerCase())
+      .optional(),
+  }),
+  defaults: {
+    tab: DEFAULT_EMAIL_TAB,
+    savedView: undefined as string | undefined,
+  },
+};
+
+export const emailTabSearchCodec = createSearchParamsCodec(emailTabSearch);
+
+/** The route search that opens Email's list on `tab`. */
+export const emailTabSearchUpdate = (tab: EmailTab) => ({
+  [emailTabSearch.namespace]: emailTabSearchCodec.serialize({ tab }),
+});
+
+export const EMAIL_DETAIL_SEARCH_NAMESPACE = 'email-detail';
+
+export const emailDetailSearch = {
+  namespace: EMAIL_DETAIL_SEARCH_NAMESPACE,
+  schema: z.object({ messageId: z.string(), seek: z.string() }),
+  defaults: { messageId: '', seek: '' },
+};
+
+export const emailDetailSearchCodec =
+  createSearchParamsCodec(emailDetailSearch);

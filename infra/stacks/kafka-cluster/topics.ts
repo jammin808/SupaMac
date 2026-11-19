@@ -1,0 +1,54 @@
+import * as fs from 'fs';
+import type { TopicArgs } from '../../packages/resources';
+import { stack } from '../../packages/shared';
+
+const SEVEN_DAYS_MS = '604800000';
+const TEN_DAYS_MS = '864000000';
+
+// The search consumer is draining a production email backlog more than six
+// days deep; ten days keeps its oldest unconsumed events from being deleted
+// before they are indexed. Return to seven once the backlog has drained.
+const RETENTION_MS_OVERRIDES: Record<string, string> =
+  stack === 'prod' ? { 'macro.email': TEN_DAYS_MS } : {};
+
+function topicConfigs(name: string): string {
+  return JSON.stringify({
+    'retention.ms': RETENTION_MS_OVERRIDES[name] ?? SEVEN_DAYS_MS,
+    'retention.bytes': '-1', // no max retention size
+    'cleanup.policy': 'delete', // deletes log items when needed
+    'min.insync.replicas': '2', // durability for minimum # of producers available for ack=all to succeed
+  });
+}
+
+// NOTE: For now we will standardize the topic config rather than allow granular topic configuration
+// should we require custom partitioning/formatting for topics in the future we can address that
+// when we come to it
+const topicArgDefaults = {
+  partitionCount: 6,
+  replicationFactor: 3,
+};
+
+// Read in the kafka topic file (kafka-cluster-topics.json) and parse out all topics
+export function getKafkaClusterTopics(): TopicArgs[] {
+  const kafkaClusterTopics: string[] = JSON.parse(
+    fs.readFileSync('../../../.github/kafka-cluster-topics.json').toString()
+  );
+
+  console.log('Generating following topics...', kafkaClusterTopics);
+
+  const topics: TopicArgs[] = [];
+
+  for (const name of kafkaClusterTopics) {
+    topics.push({
+      name,
+      ...topicArgDefaults,
+      configs: topicConfigs(name),
+    });
+  }
+
+  if (topics.length === 0) {
+    throw new Error('no kafka topics were generated');
+  }
+
+  return topics;
+}
