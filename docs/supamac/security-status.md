@@ -35,9 +35,15 @@ The initial main-workspace scan found 73 high and 17 critical matches. Compatibl
 patches updated 25 packages, including DOMPurify, Handlebars, Axios, Hono and Zod.
 The independent agent lockfile is synchronized with its updated manifest.
 No scanner exceptions were added; remaining advisories still fail the gate.
-The editor/email parser suite passed 646 tests, the agent security suite passed
-86 (2 skipped for missing SOPS/age), and the code-mode SDK passed 13. The SDK
-build and agent/code-mode typechecks also passed.
+The editor/email parser suite passed 646 tests and the code-mode SDK passed 13.
+The agent security suite passed all 88 tests after installing SOPS 3.13.3 and age
+1.3.2 from official releases verified against their published SHA-256 digests.
+This includes real encrypted credential round-trips and wrong-key rejection.
+The SDK build and agent/code-mode typechecks also passed.
+The complete agent-library and starter-agent suites then passed **158** and
+**636** tests, respectively, with native Chromium access. They exercise real
+browser interaction, screenshots and clipboard-based secret entry; the command
+sandbox had blocked Chromium startup in the first full-suite run.
 
 RustSec `cargo-audit` 0.23.0 against the current advisory database initially found **21
 vulnerability entries**, plus 1 notice, 12 unmaintained, 36 unsound and 3 yanked
@@ -96,11 +102,14 @@ on Linux and macOS ARM, plus the agent's separate dependency output on Linux.
 The Linux agent check also builds the assembled runtime and SDK. These checks use
 standard GitHub-hosted runners, the tracked flake lock and no deployment credentials.
 Dependency-lock changes must carry the measured fixed-output hashes; a cached old
-output alone cannot establish reproducibility. Hosted results remain pending.
-The first agent dependency build produced its measured replacement hash. The
-main workspace also required lockfile hoisting normalization for Nix's pinned
-Bun 1.3.13; isolated Linux/macOS input checks pass with both Bun versions and
-the normalized lockfile retains the same live advisory counts.
+output alone cannot establish reproducibility. The hosted Linux agent dependency
+build, forced rebuild and assembled runtime/SDK build passed. Both main-workspace
+hashes were measured from completed builds on Linux and macOS ARM and recorded.
+CI verifies the recorded outputs with forced rebuilds on each pull-request update;
+the matching workflow run supplies the current result.
+The main workspace required lockfile hoisting normalization for Nix's pinned
+Bun 1.3.13; isolated Linux/macOS input checks pass with both Bun versions and the
+normalized lockfile retains the same live advisory counts.
 
 This container lacks Nix and access to a Docker daemon. Full frontend typechecking
 also exceeded the container's available memory. A full Rust service build, live
