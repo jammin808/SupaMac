@@ -8,7 +8,6 @@ on:
   push:
     branches:
     - main
-    - jammin808/**
   schedule:
   - cron: 31 7 * * 1
   workflow_dispatch: {}
@@ -77,7 +76,8 @@ jobs:
   codeql:
     name: CodeQL (${{ matrix.language }})
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    env:
+      SQLX_OFFLINE: 'true'
     steps:
     - name: Checkout
       uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
@@ -103,9 +103,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language:
-        - javascript-typescript
-        - rust
+        include:
+        - language: javascript-typescript
+          timeout: 45
+        - language: rust
+          timeout: 120
+    timeout-minutes: ${{ matrix.timeout }}
   secrets:
     name: Secrets scan
     runs-on: ubuntu-24.04

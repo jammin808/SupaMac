@@ -28,11 +28,7 @@ pub fn render() -> Result<String> {
     let workflow = Workflow::new("SupaMac CI")
         .permissions(Permissions::default().contents(Level::Read))
         .on(Event::default()
-            .push(
-                Push::default()
-                    .add_branch("main")
-                    .add_branch("jammin808/**"),
-            )
+            .push(Push::default().add_branch("main"))
             .pull_request(PullRequest::default().add_branch("main"))
             .add_schedule(Schedule::new("31 7 * * 1"))
             .workflow_dispatch(WorkflowDispatch::default()))
@@ -53,8 +49,11 @@ pub fn render() -> Result<String> {
     let mut value: serde_yaml::Value = serde_yaml::from_str(&yaml)?;
     value["jobs"]["codeql"]["permissions"] =
         yaml_fragment("contents: read\nsecurity-events: write\n")?;
-    value["jobs"]["codeql"]["strategy"] =
-        yaml_fragment("fail-fast: false\nmatrix:\n  language: [javascript-typescript, rust]\n")?;
+    value["jobs"]["codeql"]["strategy"] = yaml_fragment(
+        "fail-fast: false\nmatrix:\n  include:\n    - language: javascript-typescript\n      timeout: 45\n    - language: rust\n      timeout: 120\n",
+    )?;
+    value["jobs"]["codeql"]["timeout-minutes"] =
+        serde_yaml::Value::String("${{ matrix.timeout }}".to_owned());
     serde_yaml::to_string(&value).map_err(Into::into)
 }
 
@@ -102,7 +101,9 @@ fn codeql() -> Job {
     Job::default()
         .name("CodeQL (${{ matrix.language }})")
         .runs_on("ubuntu-24.04")
-        .timeout_minutes(45u32)
+        // SQLx macros must use tracked query metadata, never a live database.
+        // Keep this scoped to static analysis; database tests run online.
+        .add_env(("SQLX_OFFLINE", "true"))
         .add_step(steps::checkout(false, false))
         .add_step(
             Step::new("Initialize CodeQL")

@@ -61,8 +61,18 @@ Actionlint, strict TypeScript checks on fork tooling, and its Bun tests are run
 locally. Existing render-queue tests exercise deferred work, coalescing, priority,
 cancellation and disposal. The final handoff records their actual results.
 
-CodeQL JavaScript/TypeScript and Rust security-extended analysis is configured
-for GitHub Actions. Its result is not claimed until a run completes.
+Hosted workflow-tooling checks and JavaScript/TypeScript CodeQL completed
+successfully on the initial import. Both initial Rust CodeQL jobs exceeded the
+45-minute limit during source extraction, so Rust analysis remains incomplete.
+Their logs also contain SQLx macro-expansion warnings. The revised workflow uses
+the tracked offline SQLx metadata for static analysis and allows up to 120 minutes
+for Rust, retaining 45 minutes for JavaScript/TypeScript. These changes still need
+a completed hosted Rust run; they do not establish a clean analysis result.
+
+Feature branches run through pull-request CI only. Push CI runs on `main`,
+avoiding duplicate full scans for the same pull-request update. Scheduled and
+manually requested analysis remain available. Source and advisory scans continue
+to report the inherited release blockers above.
 
 This container lacks Nix and access to a Docker daemon. Full frontend typechecking
 also exceeded the container's available memory. A full Rust service build, live
