@@ -9,7 +9,7 @@ on:
     - released
 jobs:
   deploy-cloud-storage:
-    if: github.event_name == 'release'
+    if: (github.repository == 'macro-inc/macro') && (github.event_name == 'release')
     name: Deploy Cloud Storage Services
     uses: ./.github/workflows/deploy_all_services.yml
     with:
@@ -29,6 +29,7 @@ jobs:
     with:
       environment: prod
     secrets: inherit
+    if: github.repository == 'macro-inc/macro'
   deploy-ai-editing-worker:
     needs:
     - deploy-cloud-storage
@@ -38,6 +39,7 @@ jobs:
     with:
       environment: prod
     secrets: inherit
+    if: github.repository == 'macro-inc/macro'
   deploy-mcp-chatgpt-worker:
     needs:
     - deploy-cloud-storage
@@ -46,8 +48,9 @@ jobs:
     with:
       environment: prod
     secrets: inherit
+    if: github.repository == 'macro-inc/macro'
   deploy-website:
-    if: github.event_name == 'release'
+    if: (github.repository == 'macro-inc/macro') && (github.event_name == 'release')
     name: Deploy Website
     uses: ./.github/workflows/deploy_website.yml
     with:
@@ -65,8 +68,9 @@ jobs:
       contents: read
     secrets:
       IOS_RELEASE_DOPPLER_TOKEN: ${{ secrets.IOS_RELEASE_DOPPLER_TOKEN }}
+    if: github.repository == 'macro-inc/macro'
   build:
-    if: github.event_name == 'release'
+    if: (github.repository == 'macro-inc/macro') && (github.event_name == 'release')
     name: Build Web App
     uses: ./.github/workflows/build_web_app.yml
     with:
@@ -136,6 +140,7 @@ jobs:
     - name: Teardown Nix
       if: always()
       uses: ./.github/actions/teardown-nix
+    if: github.repository == 'macro-inc/macro'
   upload:
     needs:
     - build
@@ -161,6 +166,7 @@ jobs:
       uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65
       with:
         files: web-app-${{ github.ref_name }}.tar.gz
+    if: github.repository == 'macro-inc/macro'
 concurrency:
   group: ${{ github.workflow }}-production
   cancel-in-progress: false

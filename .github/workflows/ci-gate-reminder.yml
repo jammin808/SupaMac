@@ -1,7 +1,7 @@
 # DO NOT EDIT — regenerate with `cargo x workflows` (from the repository root).
 # Source: tooling/xtask/crates/xtask_workflows/src/workflows/ci_gate_reminder.rs
 name: CI Gate Reminder
-'on':
+on:
   pull_request:
     types:
     - opened
@@ -11,7 +11,7 @@ name: CI Gate Reminder
     - main
 jobs:
   remind:
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    if: (github.repository == 'macro-inc/macro') && (github.event.pull_request.head.repo.full_name == github.repository)
     name: CI not run yet
     runs-on: ubuntu-latest
     permissions:

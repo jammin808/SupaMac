@@ -8,6 +8,7 @@ on:
 # runner size that should be allowed to use the generated custom image.
 jobs:
   build-rust-ci-image:
+    if: github.repository == 'macro-inc/macro'
     runs-on: linux-rust-ci-image-generation-small
     snapshot:
       image-name: macro-rust-ci-small

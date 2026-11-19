@@ -22,6 +22,7 @@ jobs:
       pulumi-stack-name: fusionauth-instance
       use-docker: false
     secrets: inherit
+    if: github.repository == 'macro-inc/macro'
 concurrency:
   group: deploy-fusionauth-instance-${{ inputs.environment }}
   cancel-in-progress: false

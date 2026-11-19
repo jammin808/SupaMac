@@ -105,3 +105,4 @@ jobs:
     - name: Teardown Nix
       if: always()
       uses: ./.github/actions/teardown-nix
+    if: github.repository == 'macro-inc/macro'

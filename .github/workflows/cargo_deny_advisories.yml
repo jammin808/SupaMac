@@ -1,9 +1,9 @@
 # DO NOT EDIT — regenerate with `cargo x workflows` (from the repository root).
 # Source: tooling/xtask/crates/xtask_workflows/src/workflows/cargo_deny_advisories.rs
 name: cargo deny advisories
-'on':
+on:
   schedule:
-  - cron: '23 6 * * *'
+  - cron: 23 6 * * *
   workflow_dispatch: {}
 jobs:
   advisories:
@@ -19,7 +19,7 @@ jobs:
         GIT_HTTP_LOW_SPEED_LIMIT: '10000'
         GIT_HTTP_LOW_SPEED_TIME: '60'
     - name: Setup Rust
-      uses: './.github/actions/setup-rust'
+      uses: ./.github/actions/setup-rust
       with:
         sccache: 'false'
         rust-cache: 'false'
@@ -55,3 +55,4 @@ jobs:
       env:
         MACRO_WEBHOOK_URL: ${{ vars.MACRO_BUILD_ALERT_WEBHOOK_URL }}
         MACRO_BOT_TOKEN: ${{ secrets.MACRO_BUILD_ALERT_BOT_TOKEN }}
+    if: github.repository == 'macro-inc/macro'

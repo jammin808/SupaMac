@@ -3,7 +3,7 @@
 name: Cleanup Preview
 env:
   PREVIEW_BUCKET: macro-preview-assets-dev
-'on':
+on:
   pull_request:
     types:
     - closed
@@ -47,3 +47,4 @@ jobs:
           --preview-id ${{ steps.preview-id.outputs.id }} \
           --cleanup
       working-directory: apps/web
+    if: github.repository == 'macro-inc/macro'

@@ -41,7 +41,7 @@ permissions:
 jobs:
   publish:
     name: Upload to internal testing
-    if: github.ref == 'refs/heads/main' && inputs.operation == 'upload-internal'
+    if: (github.repository == 'macro-inc/macro') && (github.ref == 'refs/heads/main' && inputs.operation == 'upload-internal')
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
@@ -116,7 +116,7 @@ jobs:
 
   promote:
     name: Promote tested version to production
-    if: github.ref == 'refs/heads/main' && inputs.operation == 'promote-production'
+    if: (github.repository == 'macro-inc/macro') && (github.ref == 'refs/heads/main' && inputs.operation == 'promote-production')
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:

@@ -1,7 +1,7 @@
 # DO NOT EDIT — regenerate with `cargo x workflows` (from the repository root).
 # Source: tooling/xtask/crates/xtask_workflows/src/workflows/build_desktop_on_tag.rs
 name: Build Desktop on Tag
-'on':
+on:
   push:
     tags:
     - v[0-9]*
@@ -12,7 +12,7 @@ name: Build Desktop on Tag
         type: string
 jobs:
   resolve-ref:
-    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push' || (github.event_name == 'create' && github.event.ref_type == 'tag')
+    if: (github.repository == 'macro-inc/macro') && (github.event_name == 'workflow_dispatch' || github.event_name == 'push' || (github.event_name == 'create' && github.event.ref_type == 'tag'))
     name: Resolve build ref
     runs-on: ubuntu-latest
     outputs:
@@ -90,7 +90,7 @@ jobs:
         cache: nix
       continue-on-error: true
     - name: Setup Nix
-      uses: './.github/actions/setup-nix'
+      uses: ./.github/actions/setup-nix
     - id: metadata
       name: Derive artifact metadata
       run: |
@@ -200,7 +200,8 @@ jobs:
         retention-days: '30'
     - name: Teardown Nix
       if: always()
-      uses: './.github/actions/teardown-nix'
+      uses: ./.github/actions/teardown-nix
+    if: github.repository == 'macro-inc/macro'
   build-dmg:
     needs:
     - resolve-ref
@@ -857,6 +858,7 @@ jobs:
         path: artifacts/*
         if-no-files-found: error
         retention-days: '30'
+    if: github.repository == 'macro-inc/macro'
   publish-installers:
     needs:
     - resolve-ref
@@ -893,11 +895,12 @@ jobs:
         tag_name: ${{ steps.metadata.outputs.tag }}
         files: release-artifacts/*
         fail_on_unmatched_files: 'true'
+    if: github.repository == 'macro-inc/macro'
   publish-release:
     needs:
     - resolve-ref
     - publish-installers
-    if: startsWith(needs.resolve-ref.outputs.ref, 'refs/tags/v')
+    if: (github.repository == 'macro-inc/macro') && (startsWith(needs.resolve-ref.outputs.ref, 'refs/tags/v'))
     name: Sign and publish desktop updates
     runs-on: ubuntu-latest
     permissions:
@@ -916,7 +919,7 @@ jobs:
         GIT_HTTP_LOW_SPEED_LIMIT: '10000'
         GIT_HTTP_LOW_SPEED_TIME: '60'
     - name: Setup Nix
-      uses: './.github/actions/setup-nix'
+      uses: ./.github/actions/setup-nix
     - id: metadata
       name: Derive artifact metadata
       run: |

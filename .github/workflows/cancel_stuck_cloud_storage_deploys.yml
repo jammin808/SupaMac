@@ -70,3 +70,4 @@ jobs:
           fi
         done
       shell: bash
+    if: github.repository == 'macro-inc/macro'

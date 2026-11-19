@@ -1,0 +1,12 @@
+title = "SupaMac source scan"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Installed dependencies, compiler artifacts, and Git internals are not application source"
+paths = [
+  '''(^|/)node_modules/''',
+  '''(^|/)target/''',
+  '''(^|/)\.git/''',
+]

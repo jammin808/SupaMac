@@ -1,7 +1,7 @@
 # DO NOT EDIT — regenerate with `cargo x workflows` (from the repository root).
 # Source: tooling/xtask/crates/xtask_workflows/src/workflows/native_check_label.rs
 name: Native Check Label
-'on':
+on:
   pull_request:
     types:
     - labeled
@@ -10,7 +10,7 @@ name: Native Check Label
     - main
 jobs:
   rerun:
-    if: (github.event.label.name == 'skip-ios-update' || github.event.label.name == 'skip-android-update') && github.event.pull_request.head.repo.full_name == github.repository
+    if: (github.repository == 'macro-inc/macro') && ((github.event.label.name == 'skip-ios-update' || github.event.label.name == 'skip-android-update') && github.event.pull_request.head.repo.full_name == github.repository)
     name: Re-run the native check
     runs-on: namespace-profile-linux-tiny-no-cache
     permissions:

@@ -11,6 +11,7 @@ on:
           - prod
 jobs:
   migrate-db:
+    if: github.repository == 'macro-inc/macro'
     name: Run Database Migrations (${{ inputs.environment }})
     runs-on: db-migrator
     steps:

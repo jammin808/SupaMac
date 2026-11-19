@@ -1,7 +1,7 @@
 # DO NOT EDIT — regenerate with `cargo x workflows` (from the repository root).
 # Source: tooling/xtask/crates/xtask_workflows/src/workflows/assign_labels.rs
 name: Auto Label PRs
-'on':
+on:
   pull_request:
     types:
     - opened
@@ -67,3 +67,4 @@ jobs:
           } else {
             console.log('No matching labels found for changed files');
           }
+    if: github.repository == 'macro-inc/macro'

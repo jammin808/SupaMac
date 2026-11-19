@@ -5,6 +5,7 @@ permissions:
   contents: read
 jobs:
   export:
+    if: github.repository == 'macro-inc/macro'
     runs-on: namespace-profile-linux-small
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10

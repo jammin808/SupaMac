@@ -1,7 +1,7 @@
 # DO NOT EDIT — regenerate with `cargo x workflows` (from the repository root).
 # Source: tooling/xtask/crates/xtask_workflows/src/workflows/ios_preview.rs
 name: iOS Preview
-'on':
+on:
   pull_request:
     types:
     - labeled
@@ -11,7 +11,7 @@ name: iOS Preview
   workflow_dispatch: {}
 jobs:
   preview:
-    if: github.event_name == 'workflow_dispatch' || (github.event.action != 'closed' && contains(github.event.pull_request.labels.*.name, 'ios-preview') && github.event.pull_request.draft == false)
+    if: (github.repository == 'macro-inc/macro') && (github.event_name == 'workflow_dispatch' || (github.event.action != 'closed' && contains(github.event.pull_request.labels.*.name, 'ios-preview') && github.event.pull_request.draft == false))
     name: Build iOS simulator app and publish to Appetize
     runs-on: nscloud-macos-tahoe-slim-arm64-6x14
     permissions:
@@ -408,7 +408,7 @@ jobs:
         BRANCH: ${{ github.head_ref }}
         SHA: ${{ github.event.pull_request.head.sha }}
   cleanup:
-    if: github.event_name == 'pull_request' && github.event.action == 'closed'
+    if: (github.repository == 'macro-inc/macro') && (github.event_name == 'pull_request' && github.event.action == 'closed')
     name: Delete the PR's Appetize app
     runs-on: namespace-profile-linux-tiny-no-cache
     permissions:

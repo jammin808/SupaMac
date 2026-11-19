@@ -1,12 +1,12 @@
 # DO NOT EDIT — regenerate with `cargo x workflows` (from the repository root).
 # Source: tooling/xtask/crates/xtask_workflows/src/workflows/deploy_sdk_docs.rs
 name: Deploy SDK Docs
-'on':
+on:
   push:
     branches:
     - main
     paths:
-    - '.github/workflows/deploy_sdk_docs.yml'
+    - .github/workflows/deploy_sdk_docs.yml
     - packages/sdk/**
     - packages/sdk-docs/**
     - bun.lock
@@ -14,7 +14,7 @@ name: Deploy SDK Docs
   workflow_dispatch: {}
 jobs:
   deploy:
-    if: ${{ github.ref == 'refs/heads/main' }}
+    if: (github.repository == 'macro-inc/macro') && (github.ref == 'refs/heads/main')
     name: Deploy SDK documentation
     runs-on: namespace-profile-linux-small
     permissions:

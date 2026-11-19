@@ -132,10 +132,11 @@ jobs:
           echo "services=${services_json}" >> $GITHUB_OUTPUT
           echo "Services to preview: ${services[@]}"
         fi
+    if: github.repository == 'macro-inc/macro'
   preview-services:
     needs:
     - detect-changes
-    if: ${{ needs.detect-changes.outputs.has-changes == 'true' }}
+    if: (github.repository == 'macro-inc/macro') && (needs.detect-changes.outputs.has-changes == 'true')
     name: Preview ${{ matrix.service }}
     uses: ./.github/workflows/reusable_preview_service.yml
     strategy:
@@ -151,7 +152,7 @@ jobs:
     needs:
     - detect-changes
     - preview-services
-    if: always()
+    if: (github.repository == 'macro-inc/macro') && (always())
     name: Preview Status
     runs-on: namespace-profile-linux-small
     steps:

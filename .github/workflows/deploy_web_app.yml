@@ -46,7 +46,7 @@ on:
         description: Whether to notify the Slack channel of the deployment completion
 jobs:
   build:
-    if: ${{ !inputs.prebuilt }}
+    if: (github.repository == 'macro-inc/macro') && (!inputs.prebuilt)
     name: Build
     uses: ./.github/workflows/build_web_app.yml
     with:
@@ -57,7 +57,7 @@ jobs:
   deploy:
     needs:
     - build
-    if: ${{ !cancelled() && (needs.build.result == 'success' || needs.build.result == 'skipped') }}
+    if: (github.repository == 'macro-inc/macro') && (!cancelled() && (needs.build.result == 'success' || needs.build.result == 'skipped'))
     name: Deploy
     runs-on: namespace-profile-linux-mid;overrides.cache-tag=web-ci
     env:

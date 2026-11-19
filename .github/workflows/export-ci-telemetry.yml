@@ -1,7 +1,7 @@
 # DO NOT EDIT — regenerate with `cargo x workflows` (from the repository root).
 # Source: tooling/xtask/crates/xtask_workflows/src/workflows/export_ci_telemetry.rs
 name: Export CI telemetry
-'on':
+on:
   workflow_run:
     types:
     - completed
@@ -67,7 +67,7 @@ permissions:
   id-token: write
 jobs:
   export:
-    if: github.event.workflow_run.conclusion != 'skipped'
+    if: (github.repository == 'macro-inc/macro') && (github.event.workflow_run.conclusion != 'skipped')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

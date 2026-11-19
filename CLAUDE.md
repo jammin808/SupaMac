@@ -1,5 +1,16 @@
 # Repository guide for coding agents
 
+## SupaMac fork
+
+This repository imports a pinned upstream snapshot; see `README.md` and
+`docs/supamac/`. Run fork-owned checks through `supamac-ci.yml` on GitHub-hosted
+runners. Upstream workflows (including `run-ci` / `CI gate`) are restricted to the
+upstream repository and must not be dispatched to operate this fork. Keep that
+repository boundary when regenerating workflows. Review and audit adaptations
+against the import commit as well as recording full-source security findings.
+Inherited high/critical advisories remain release blockers; never hide them with
+a baseline to claim production readiness. Keep secrets out of source and output.
+
 Macro is a document and collaboration app with a Rust backend and a web frontend.
 This file is the shared entry point: `AGENTS.md` symlinks to `CLAUDE.md`. Edit
 `CLAUDE.md` and preserve the symlink; do not maintain two copies.

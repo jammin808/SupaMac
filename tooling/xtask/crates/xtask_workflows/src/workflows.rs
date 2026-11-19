@@ -57,6 +57,7 @@ mod email_e2e_browser;
 mod email_e2e_full_stack;
 mod ensure_daytona_snapshot;
 mod export_ci_telemetry;
+mod fork_policy;
 mod ios_app_store_publish;
 mod ios_app_store_release;
 mod ios_preview;
@@ -78,6 +79,7 @@ mod reusable_preview_service;
 mod runners;
 mod sdk_check;
 mod steps;
+mod supamac_ci;
 mod test_macrod_update;
 mod vars;
 mod web_app_check_main;
@@ -137,6 +139,11 @@ fn job_mut<'a>(root: &'a mut serde_yaml::Value, id: &str) -> Result<&'a mut serd
 
 /// Every workflow we generate. Add new workflows here.
 const WORKFLOWS: &[WorkflowFile] = &[
+    WorkflowFile {
+        slug: "supamac_ci",
+        file_name: "supamac-ci.yml",
+        render_yaml: supamac_ci::render,
+    },
     WorkflowFile {
         slug: "observability_image",
         file_name: "observability_image.yml",
@@ -572,6 +579,11 @@ pub fn check() -> Result<()> {
 fn render(workflow: &WorkflowFile) -> Result<String> {
     let yaml =
         (workflow.render_yaml)().with_context(|| format!("serializing {}", workflow.file_name))?;
+    let yaml = if workflow.slug == "supamac_ci" {
+        yaml
+    } else {
+        fork_policy::restrict_to_upstream(&yaml)?
+    };
     path_validation::validate(workflow.file_name, &yaml, &xtask_paths::repo_root())?;
     Ok(format!("{}{yaml}", disclaimer(workflow.slug)))
 }

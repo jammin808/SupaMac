@@ -78,6 +78,8 @@ const OBSERVED_WORKFLOWS: &[&str] = &[
 // workflow is in one of the two lists.
 #[cfg(test)]
 const UNOBSERVED_PR_WORKFLOWS: &[&str] = &[
+    // Fork CI does not send telemetry to the upstream deployment.
+    "SupaMac CI",
     "Auto Label PRs",
     "CI Gate Label Check",
     "CI Gate Reminder",

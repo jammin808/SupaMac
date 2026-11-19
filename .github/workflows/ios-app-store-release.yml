@@ -1,13 +1,13 @@
 # DO NOT EDIT — regenerate with `cargo x workflows` (from the repository root).
 # Source: tooling/xtask/crates/xtask_workflows/src/workflows/ios_app_store_release.rs
 name: iOS App Store Release
-'on':
+on:
   pull_request:
     types:
     - labeled
 jobs:
   release:
-    if: github.event.label.name == 'ios-update' && github.event.pull_request.head.repo.full_name == github.repository
+    if: (github.repository == 'macro-inc/macro') && (github.event.label.name == 'ios-update' && github.event.pull_request.head.repo.full_name == github.repository)
     name: iOS App Store Release
     runs-on: nscloud-macos-tahoe-slim-arm64-6x14
     permissions:

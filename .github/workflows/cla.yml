@@ -1,7 +1,7 @@
 # DO NOT EDIT — regenerate with `cargo x workflows` (from the repository root).
 # Source: tooling/xtask/crates/xtask_workflows/src/workflows/cla.rs
 name: CLA
-'on':
+on:
   issue_comment:
     types:
     - created
@@ -12,7 +12,7 @@ name: CLA
     - reopened
 jobs:
   cla:
-    if: github.event_name == 'pull_request_target' || (github.event.issue.pull_request && startsWith(github.event.comment.body, '/macro-cla'))
+    if: (github.repository == 'macro-inc/macro') && (github.event_name == 'pull_request_target' || (github.event.issue.pull_request && startsWith(github.event.comment.body, '/macro-cla')))
     name: CLA
     runs-on: namespace-profile-linux-tiny-no-cache
     permissions:

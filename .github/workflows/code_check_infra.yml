@@ -1,7 +1,7 @@
 # DO NOT EDIT — regenerate with `cargo x workflows` (from the repository root).
 # Source: tooling/xtask/crates/xtask_workflows/src/workflows/code_check_infra.rs
 name: infra code check
-'on':
+on:
   workflow_call: {}
 jobs:
   biome-check:
@@ -27,15 +27,16 @@ jobs:
         cache: nix
       continue-on-error: true
     - name: Setup Nix
-      uses: './.github/actions/setup-nix'
+      uses: ./.github/actions/setup-nix
     - name: Setup Nix dev shell
-      uses: './.github/actions/setup-nix-dev-shell'
+      uses: ./.github/actions/setup-nix-dev-shell
     - name: Run Biome
       run: biome ci --changed --no-errors-on-unmatched --error-on-warnings
       working-directory: infra
     - name: Teardown Nix
       if: always()
-      uses: './.github/actions/teardown-nix'
+      uses: ./.github/actions/teardown-nix
+    if: github.repository == 'macro-inc/macro'
   check:
     runs-on: namespace-profile-linux-small;overrides.cache-tag=web-ci
     timeout-minutes: 15
@@ -52,9 +53,9 @@ jobs:
         path: /home/runner/.bun/install/cache
       continue-on-error: true
     - name: Setup Nix
-      uses: './.github/actions/setup-nix'
+      uses: ./.github/actions/setup-nix
     - name: Setup Nix dev shell
-      uses: './.github/actions/setup-nix-dev-shell'
+      uses: ./.github/actions/setup-nix-dev-shell
     - name: install
       run: bun install --frozen-lockfile
       working-directory: infra
@@ -63,4 +64,5 @@ jobs:
       working-directory: infra
     - name: Teardown Nix
       if: always()
-      uses: './.github/actions/teardown-nix'
+      uses: ./.github/actions/teardown-nix
+    if: github.repository == 'macro-inc/macro'

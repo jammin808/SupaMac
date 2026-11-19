@@ -64,10 +64,11 @@ jobs:
         echo "All services: ${services}"
         echo "With binaries: ${binaries}"
         echo "With lambdas: ${lambdas}"
+    if: github.repository == 'macro-inc/macro'
   warm-binaries:
     needs:
     - setup
-    if: ${{ needs.setup.outputs.binaries != '[]' }}
+    if: (github.repository == 'macro-inc/macro') && (needs.setup.outputs.binaries != '[]')
     name: Warm shared binary deps onto sticky disk
     runs-on: namespace-profile-linux-mid
     steps:
@@ -123,7 +124,7 @@ jobs:
   warm-lambdas:
     needs:
     - setup
-    if: ${{ needs.setup.outputs.lambdas != '[]' }}
+    if: (github.repository == 'macro-inc/macro') && (needs.setup.outputs.lambdas != '[]')
     name: Warm shared lambda deps onto sticky disk
     runs-on: namespace-profile-linux-mid
     steps:
@@ -180,7 +181,7 @@ jobs:
     needs:
     - setup
     - warm-binaries
-    if: ${{ needs.setup.outputs.binaries != '[]' }}
+    if: (github.repository == 'macro-inc/macro') && (needs.setup.outputs.binaries != '[]')
     name: Build ${{ matrix.service }} binaries
     runs-on: namespace-profile-linux-mid
     strategy:
@@ -265,7 +266,7 @@ jobs:
     needs:
     - setup
     - warm-lambdas
-    if: ${{ needs.setup.outputs.lambdas != '[]' }}
+    if: (github.repository == 'macro-inc/macro') && (needs.setup.outputs.lambdas != '[]')
     name: Build ${{ matrix.service }} Lambda artifacts
     runs-on: namespace-profile-linux-mid
     strategy:
@@ -328,7 +329,7 @@ jobs:
     - warm-lambdas
     - build-service-binaries
     - build-lambda-artifacts
-    if: ${{ !cancelled() && needs.setup.outputs.matrix != '[]' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
+    if: (github.repository == 'macro-inc/macro') && (!cancelled() && needs.setup.outputs.matrix != '[]' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled'))
     name: Run Database Migrations
     runs-on: db-migrator
     steps:
@@ -352,7 +353,7 @@ jobs:
     - build-service-binaries
     - build-lambda-artifacts
     - migrate-db
-    if: ${{ !cancelled() && needs.setup.outputs.matrix != '[]' && needs.migrate-db.result == 'success' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
+    if: (github.repository == 'macro-inc/macro') && (!cancelled() && needs.setup.outputs.matrix != '[]' && needs.migrate-db.result == 'success' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled'))
     name: Deploy ${{ matrix.service }}
     runs-on: namespace-profile-linux-small
     env:
@@ -436,7 +437,7 @@ jobs:
     - build-lambda-artifacts
     - migrate-db
     - deploy-services
-    if: always()
+    if: (github.repository == 'macro-inc/macro') && (always())
     name: Deployment Summary
     runs-on: namespace-profile-linux-tiny-no-cache
     steps:

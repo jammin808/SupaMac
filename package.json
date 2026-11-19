@@ -57,7 +57,9 @@
 		"check": "cd apps/web && tsc --noEmit --skipLibCheck --project tsconfig.json",
 		"lint": "cd apps/web && bunx --bun @biomejs/biome lint --skip=suspicious/noImportCycles",
 		"lint:oxlint": "cd apps/web && oxlint --type-aware",
-		"format": "cd apps/web && bunx --bun @biomejs/biome format --write"
+		"format": "cd apps/web && bunx --bun @biomejs/biome format --write",
+		"supamac:doctor": "bun tooling/supamac/doctor.ts",
+		"supamac:audit": "bun tooling/supamac/audit-dependencies.ts"
 	},
 	"trustedDependencies": [
 		"@pulumi/aws-native",

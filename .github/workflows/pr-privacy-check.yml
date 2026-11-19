@@ -1,7 +1,7 @@
 # DO NOT EDIT — regenerate with `cargo x workflows` (from the repository root).
 # Source: tooling/xtask/crates/xtask_workflows/src/workflows/pr_privacy_check.rs
 name: PR Privacy Check
-'on':
+on:
   pull_request:
     types:
     - opened
@@ -10,7 +10,7 @@ name: PR Privacy Check
     - synchronize
 jobs:
   check:
-    if: github.event.pull_request.user.login != 'dependabot[bot]'
+    if: (github.repository == 'macro-inc/macro') && (github.event.pull_request.user.login != 'dependabot[bot]')
     name: PR text has no personal or support-channel details
     runs-on: namespace-profile-linux-tiny-no-cache
     permissions:

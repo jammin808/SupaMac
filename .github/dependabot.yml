@@ -1,0 +1,31 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+  - package-ecosystem: npm
+    directories:
+      - /
+      - /infra
+      - /services/sync-service
+      - /services/websocket-service
+      - /services/analytics-proxy
+      - /services/cla-worker
+      - /services/convert_service/helpers
+      - /apps/docs
+      - /agent-teammates/muppet
+      - /agent-teammates/starter-agent
+      - /packages/starter-agent
+      - /infra/stacks/opensearch/helpers
+      - /nix/macro-box/claude-agent-acp
+      - /tooling/scripts/migrate-s3-keys-extensionless
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5

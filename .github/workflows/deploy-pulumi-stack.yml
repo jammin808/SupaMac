@@ -55,10 +55,11 @@ jobs:
         echo "stack=$STACK ships_code=$ships_code"
       env:
         STACK: ${{ inputs.pulumi-service-name }}
+    if: github.repository == 'macro-inc/macro'
   check-migrations:
     needs:
     - setup
-    if: ${{ needs.setup.outputs.ships_code == 'true' }}
+    if: (github.repository == 'macro-inc/macro') && (needs.setup.outputs.ships_code == 'true')
     name: Check ${{ inputs.pulumi-service-name }} migrations are applied
     runs-on: db-migrator
     steps:
@@ -78,7 +79,7 @@ jobs:
     needs:
     - setup
     - check-migrations
-    if: ${{ !failure() && !cancelled() }}
+    if: (github.repository == 'macro-inc/macro') && (!failure() && !cancelled())
     runs-on: namespace-profile-linux-mid
     steps:
     - name: Checkout Repo

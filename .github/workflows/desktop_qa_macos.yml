@@ -198,4 +198,5 @@ jobs:
         path: ${{ runner.temp }}/qa-out
         if-no-files-found: warn
         retention-days: '14'
+    if: github.repository == 'macro-inc/macro'
 run-name: macOS QA ${{ inputs.suite }} ${{ inputs.ref }}${{ inputs.report && format(' [{0}]', inputs.report) || '' }}

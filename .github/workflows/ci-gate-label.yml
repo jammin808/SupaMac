@@ -1,7 +1,7 @@
 # DO NOT EDIT — regenerate with `cargo x workflows` (from the repository root).
 # Source: tooling/xtask/crates/xtask_workflows/src/workflows/ci_gate_label.rs
 name: CI Gate Label Check
-'on':
+on:
   pull_request_target:
     types:
     - labeled
@@ -9,7 +9,7 @@ name: CI Gate Label Check
     - main
 jobs:
   check:
-    if: github.event.label.name == 'run-ci' && github.event.pull_request.head.repo.full_name == github.repository
+    if: (github.repository == 'macro-inc/macro') && (github.event.label.name == 'run-ci' && github.event.pull_request.head.repo.full_name == github.repository)
     name: Check the label can start PR CI
     runs-on: ubuntu-latest
     permissions:

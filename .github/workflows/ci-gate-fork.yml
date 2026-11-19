@@ -1,7 +1,7 @@
 # DO NOT EDIT — regenerate with `cargo x workflows` (from the repository root).
 # Source: tooling/xtask/crates/xtask_workflows/src/workflows/ci_gate_fork.rs
 name: CI Gate for Forks
-'on':
+on:
   pull_request_target:
     types:
     - labeled
@@ -14,7 +14,7 @@ name: CI Gate for Forks
     - PR CI
 jobs:
   request:
-    if: github.event_name == 'pull_request_target' && github.event.label.name == 'run-ci' && github.event.pull_request.head.repo.full_name != github.repository
+    if: (github.repository == 'macro-inc/macro') && (github.event_name == 'pull_request_target' && github.event.label.name == 'run-ci' && github.event.pull_request.head.repo.full_name != github.repository)
     name: Take a fork's CI request
     runs-on: ubuntu-latest
     permissions:
@@ -466,7 +466,7 @@ jobs:
         CI_GATE_DOCS_URL: https://github.com/macro-inc/macro/blob/main/.agents/skills/run-ci/SKILL.md
         PR_CHECKS_URL: ${{ github.event.pull_request.html_url }}/checks
   report:
-    if: github.event_name == 'workflow_run' && github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.head_repository.full_name != github.repository
+    if: (github.repository == 'macro-inc/macro') && (github.event_name == 'workflow_run' && github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.head_repository.full_name != github.repository)
     name: Report a fork's CI result
     runs-on: ubuntu-latest
     permissions:

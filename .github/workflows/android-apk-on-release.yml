@@ -1,7 +1,7 @@
 # DO NOT EDIT — regenerate with `cargo x workflows` (from the repository root).
 # Source: tooling/xtask/crates/xtask_workflows/src/workflows/android_apk_on_release.rs
 name: Android APK on Release
-'on':
+on:
   release:
     types:
     - released
@@ -51,9 +51,9 @@ jobs:
         echo "NDK_HOME=$ANDROID_HOME/ndk/30.0.16248370" >> "$GITHUB_ENV"
       shell: bash
     - name: Setup Nix
-      uses: './.github/actions/setup-nix'
+      uses: ./.github/actions/setup-nix
     - name: Setup prerequisites
-      uses: './.github/actions/setup-reqs-web'
+      uses: ./.github/actions/setup-reqs-web
     - id: metadata
       name: Prepare version and signing
       run: |
@@ -139,6 +139,7 @@ jobs:
           "$RUNNER_TEMP/android-google-services.json" || true
         rm -f apps/web/tauri/src-tauri/gen/android/keystore.properties || true
       shell: bash
+    if: github.repository == 'macro-inc/macro'
   publish:
     needs:
     - build
@@ -168,5 +169,6 @@ jobs:
       shell: bash
       env:
         GH_TOKEN: ${{ github.token }}
+    if: github.repository == 'macro-inc/macro'
 concurrency:
   group: android-apk-on-release-${{ github.ref_name }}

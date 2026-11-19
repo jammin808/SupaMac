@@ -1,7 +1,7 @@
 # DO NOT EDIT — regenerate with `cargo x workflows` (from the repository root).
 # Source: tooling/xtask/crates/xtask_workflows/src/workflows/ensure_daytona_snapshot.rs
 name: Ensure Daytona Snapshot
-'on':
+on:
   pull_request:
     types:
     - opened
@@ -15,7 +15,7 @@ name: Ensure Daytona Snapshot
     - crates/agent_harness/sandbox_sizes.json
     - nix/cloud-storage.nix
     - tooling/xtask/crates/xtask_workflows/src/workflows/ensure_daytona_snapshot.rs
-    - '.github/workflows/ensure_daytona_snapshot.yml'
+    - .github/workflows/ensure_daytona_snapshot.yml
   push:
     branches:
     - main
@@ -25,14 +25,14 @@ name: Ensure Daytona Snapshot
     - crates/agent_harness/sandbox_sizes.json
     - nix/cloud-storage.nix
     - tooling/xtask/crates/xtask_workflows/src/workflows/ensure_daytona_snapshot.rs
-    - '.github/workflows/ensure_daytona_snapshot.yml'
+    - .github/workflows/ensure_daytona_snapshot.yml
   workflow_dispatch: {}
 permissions:
   contents: read
   packages: write
 jobs:
   ensure-snapshot:
-    if: github.event_name != 'pull_request'
+    if: (github.repository == 'macro-inc/macro') && (github.event_name != 'pull_request')
     name: Ensure macro-agent-harness snapshot
     runs-on: namespace-profile-linux-small
     steps:
@@ -50,9 +50,9 @@ jobs:
         cache: nix
       continue-on-error: true
     - name: Setup Nix
-      uses: './.github/actions/setup-nix'
+      uses: ./.github/actions/setup-nix
     - name: Setup Nix dev shell
-      uses: './.github/actions/setup-nix-dev-shell'
+      uses: ./.github/actions/setup-nix-dev-shell
     - name: Ensure Daytona snapshot
       run: |
         set -euo pipefail
@@ -70,7 +70,7 @@ jobs:
         DAYTONA_SNAPSHOT_MEMORY: '8'
         DAYTONA_SNAPSHOT_DISK: '10'
   publish-image:
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    if: (github.repository == 'macro-inc/macro') && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     name: Publish sandbox image to GHCR
     runs-on: namespace-profile-linux-mid
     timeout-minutes: 90

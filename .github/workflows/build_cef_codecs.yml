@@ -1,20 +1,20 @@
 # DO NOT EDIT — regenerate with `cargo x workflows` (from the repository root).
 # Source: tooling/xtask/crates/xtask_workflows/src/workflows/build_cef_codecs.rs
 name: Build CEF with codecs
-'on':
+on:
   pull_request:
     branches:
     - main
     paths:
     - apps/web/tauri/desktop-cef/cef-codecs.json
     - tooling/xtask/crates/xtask_workflows/src/workflows/scripts/build_cef_codecs.sh
-    - '.github/workflows/build_cef_codecs.yml'
+    - .github/workflows/build_cef_codecs.yml
   workflow_dispatch: {}
 permissions:
   contents: write
 jobs:
   build-cef:
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    if: (github.repository == 'macro-inc/macro') && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     name: Build CEF with proprietary codecs (macOS arm64)
     runs-on: nscloud-macos-sequoia-arm64-12x28
     timeout-minutes: 1440

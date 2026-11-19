@@ -1,7 +1,7 @@
 # DO NOT EDIT — regenerate with `cargo x workflows` (from the repository root).
 # Source: tooling/xtask/crates/xtask_workflows/src/workflows/build_appimage_on_tag.rs
 name: Build AppImage
-'on':
+on:
   workflow_call:
     inputs:
       ref:
@@ -31,7 +31,7 @@ jobs:
         cache: nix
       continue-on-error: true
     - name: Setup Nix
-      uses: './.github/actions/setup-nix'
+      uses: ./.github/actions/setup-nix
     - id: metadata
       name: Derive artifact metadata
       run: |
@@ -141,4 +141,5 @@ jobs:
         retention-days: '30'
     - name: Teardown Nix
       if: always()
-      uses: './.github/actions/teardown-nix'
+      uses: ./.github/actions/teardown-nix
+    if: github.repository == 'macro-inc/macro'
