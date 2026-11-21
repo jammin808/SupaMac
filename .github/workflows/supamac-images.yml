@@ -1,0 +1,713 @@
+# DO NOT EDIT — regenerate with `cargo x workflows` (from the repository root).
+# Source: tooling/xtask/crates/xtask_workflows/src/workflows/supamac_images.rs
+name: SupaMac images
+on:
+  pull_request:
+    branches:
+    - main
+    paths:
+    - .cargo/**
+    - .dockerignore
+    - .sqlx/**
+    - Cargo.lock
+    - Cargo.toml
+    - rust-toolchain.toml
+    - bun.lock
+    - bunfig.toml
+    - package.json
+    - apps/web/patches/**
+    - crates/**
+    - packages/**
+    - services/**
+    - vendor/**
+    - docker/sync-service.Dockerfile
+    - infra/self-hosted/**
+    - infra/local/opensearch/**
+    - infra/stacks/opensearch/helpers/**
+    - infra/stacks/fusionauth-instance/templates/populate_jwt_local.js
+    - .github/kafka-cluster-topics.json
+    - tooling/xtask/crates/xtask_workflows/src/workflows/fork_steps.rs
+    - tooling/xtask/crates/xtask_workflows/src/workflows/supamac_images.rs
+    - tooling/xtask/crates/xtask_workflows/src/workflows/supamac_images/**
+    - .github/workflows/supamac-images.yml
+  push:
+    branches:
+    - main
+  workflow_dispatch: {}
+permissions:
+  contents: read
+jobs:
+  services:
+    name: Build the service binaries
+    runs-on: ubuntu-24.04
+    env:
+      RUSTUP_TOOLCHAIN: 1.94.0
+      SQLX_OFFLINE: 'true'
+      CARGO_BUILD_JOBS: '2'
+      CARGO_INCREMENTAL: '0'
+      CARGO_TERM_COLOR: always
+    timeout-minutes: 350
+    steps:
+    - name: Checkout
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      with:
+        clean: 'false'
+        persist-credentials: 'false'
+      env:
+        GIT_HTTP_LOW_SPEED_LIMIT: '10000'
+        GIT_HTTP_LOW_SPEED_TIME: '60'
+    - name: Free disk space
+      run: |
+        df --human-readable --output=avail / | tail -n 1
+        sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+        df --human-readable --output=avail / | tail -n 1
+    - name: Install build packages
+      run: |
+        sudo apt-get update
+        sudo apt-get install --yes --no-install-recommends build-essential cmake libcurl4-openssl-dev libsasl2-dev perl pkg-config
+    - name: Install pinned Rust tooling
+      run: rustup toolchain install 1.94.0 --profile minimal
+    - name: Setup Bun for current lockfile formats
+      uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+      with:
+        bun-version: 1.4.5
+    - name: Generate the code-mode assets
+      run: |
+        bun install --frozen-lockfile --ignore-scripts
+        bun packages/code-mode-sdk/scripts/generate.ts "$RUNNER_TEMP/code-mode-assets"
+        echo "CODE_MODE_ASSETS_DIR=$RUNNER_TEMP/code-mode-assets" >> "$GITHUB_ENV"
+        find . -name node_modules -type d -prune -exec rm -rf {} +
+    - id: cargo-cache
+      name: Restore the cargo cache
+      uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae
+      with:
+        path: |
+          ~/.cargo/registry/index
+          ~/.cargo/registry/cache
+          ~/.cargo/git
+          target/release
+        key: supamac-services-${{ runner.os }}-rust1.94.0-${{ hashFiles('Cargo.lock') }}
+        restore-keys: |
+          supamac-services-${{ runner.os }}-rust1.94.0-${{ hashFiles('Cargo.lock') }}-
+          supamac-services-${{ runner.os }}-rust1.94.0-
+    - id: build
+      name: Build every service in one cargo invocation
+      run: |
+        cargo build --release --locked \
+          -p authentication_service --bin authentication_service \
+          -p document_storage_service --bin document_storage_service \
+          -p connection_gateway --bin connection_gateway_service \
+          -p notification_service --bin notification_service \
+          -p static_file_service --bin static_file_service \
+          -p document_upload_finalizer_handler --bin document_upload_finalizer_local_worker \
+          -p contacts_service --bin contacts_service \
+          -p email_service --bin email_service --bin pubsub_workers \
+          -p email_refresh_handler --bin email_refresh_handler \
+          -p email_scheduled_handler --bin email_scheduled_handler \
+          -p calendar_service --bin calendar_service \
+          -p agent_harness_service --bin agent_harness_service \
+          -p search_processing_service --bin search_processing_service \
+          -p unfurl_service --bin unfurl_service \
+          -p image_proxy_service --bin image_proxy_service
+      timeout-minutes: 300
+    - name: Strip the binaries into the image context
+      run: |
+        set -euo pipefail
+
+        # The image's build context: the binaries and the one library a service loads
+        # at run time. Nothing else from the checkout enters the image.
+        mkdir -p "$CONTEXT/bin" "$CONTEXT/pdfium-lib/linux"
+
+        for binary in $BINARIES; do
+          strip -o "$CONTEXT/bin/$binary" "target/release/$binary"
+        done
+
+        # search_processing_service opens this library when it parses a PDF. The
+        # repository tracks it, and the digest is the tracked file's, so a library
+        # that changed is noticed here and not in a running service.
+        pdfium=services/search_processing_service/pdfium-lib/linux/libpdfium.so
+        printf '%s  %s\n' "$PDFIUM_SHA256" "$pdfium" | sha256sum --check
+        cp "$pdfium" "$CONTEXT/pdfium-lib/linux/libpdfium.so"
+
+        ls -l "$CONTEXT/bin"
+        du --summarize --human-readable "$CONTEXT"
+      env:
+        BINARIES: authentication_service document_storage_service connection_gateway_service notification_service static_file_service document_upload_finalizer_local_worker contacts_service email_service pubsub_workers email_refresh_handler email_scheduled_handler calendar_service agent_harness_service search_processing_service unfurl_service image_proxy_service
+        CONTEXT: ${{ runner.temp }}/services-context
+        PDFIUM_SHA256: 3f3af4e4ba46bec9d0d11c5635262663b7020345ff4bed7eee85e883e2ce8455
+    - name: Drop the linked binaries from the cargo cache
+      if: '!cancelled() && github.ref == ''refs/heads/main'' && github.event_name != ''pull_request'' && steps.cargo-cache.outputs.cache-hit != ''true'' && steps.build.outcome != ''skipped'''
+      run: |
+        set -euo pipefail
+
+        # A build that stopped before it compiled anything left nothing to trim.
+        test -d target/release/deps || exit 0
+
+        # A fresh checkout's sources are newer than any kept build, so cargo
+        # recompiles the workspace's own crates and links every binary again on each
+        # run: only third-party crates are reused. The linked executables are the
+        # largest files no later run reads, so they are not kept.
+        find target/release -maxdepth 1 -type f -executable -delete
+        find target/release/deps -maxdepth 1 -type f -executable ! -name '*.so' -delete
+        du --summarize --human-readable target/release
+    - name: Save the cargo cache
+      if: '!cancelled() && github.ref == ''refs/heads/main'' && github.event_name != ''pull_request'' && steps.cargo-cache.outputs.cache-hit != ''true'' && steps.build.outcome != ''skipped'''
+      uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae
+      with:
+        path: |
+          ~/.cargo/registry/index
+          ~/.cargo/registry/cache
+          ~/.cargo/git
+          target/release
+        key: ${{ steps.cargo-cache.outputs.cache-primary-key }}${{ steps.build.outcome != 'success' && format('-partial-{0}-{1}', github.run_id, github.run_attempt) || '' }}
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069
+    - name: Build the services image
+      uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc
+      with:
+        context: ${{ runner.temp }}/services-context
+        file: infra/self-hosted/images/services.Dockerfile
+        platforms: linux/amd64
+        load: 'true'
+        tags: supamac-services:check
+    - name: Check the image runs what was built
+      run: |
+        set -euo pipefail
+
+        # Runs inside the image as its own user, with no network. The binaries were
+        # linked on the runner, so this is where a shared library the image lacks, or
+        # a C library older than the runner's, shows up.
+        docker run --rm --interactive --network none --entrypoint sh "$IMAGE" -eu -s -- $BINARIES <<'CHECK'
+        test "$(id -u)" = 10001
+
+        for binary in "$@"; do
+          test -x "/app/bin/$binary"
+          if ldd "/app/bin/$binary" 2>&1 | grep 'not found'; then
+            echo "$binary needs a shared library this image does not have" >&2
+            exit 1
+          fi
+        done
+
+        pdfium=/app/pdfium-lib/linux/libpdfium.so
+        test -r "$pdfium"
+        if ldd "$pdfium" 2>&1 | grep 'not found'; then
+          echo "libpdfium.so needs a shared library this image does not have" >&2
+          exit 1
+        fi
+
+        "$DENO_BINARY" --version
+        test -x "$(git --exec-path)/git-http-backend"
+        test -w /data/agent-git
+        echo "the image holds $# binaries and what they load"
+        CHECK
+      env:
+        BINARIES: authentication_service document_storage_service connection_gateway_service notification_service static_file_service document_upload_finalizer_local_worker contacts_service email_service pubsub_workers email_refresh_handler email_scheduled_handler calendar_service agent_harness_service search_processing_service unfurl_service image_proxy_service
+        IMAGE: supamac-services:check
+    - name: Pack the image context
+      if: github.event_name != 'pull_request'
+      run: tar --create --zstd --file "$ARCHIVE" --directory "$CONTEXT" .
+      env:
+        ARCHIVE: ${{ runner.temp }}/services-context.tar.zst
+        CONTEXT: ${{ runner.temp }}/services-context
+    - name: Hand the image context to the publishing job
+      if: github.event_name != 'pull_request'
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+      with:
+        name: supamac-services-context
+        path: ${{ runner.temp }}/services-context.tar.zst
+        if-no-files-found: error
+        compression-level: '0'
+        retention-days: '1'
+        overwrite: 'true'
+  services-image:
+    needs:
+    - services
+    if: github.event_name != 'pull_request'
+    name: Publish the services image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+    - name: Checkout
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      with:
+        clean: 'false'
+        persist-credentials: 'false'
+      env:
+        GIT_HTTP_LOW_SPEED_LIMIT: '10000'
+        GIT_HTTP_LOW_SPEED_TIME: '60'
+    - name: Fetch the image context
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+      with:
+        name: supamac-services-context
+        path: ${{ runner.temp }}
+    - name: Unpack the image context
+      run: |
+        mkdir "$CONTEXT"
+        tar --extract --zstd --file "$ARCHIVE" --directory "$CONTEXT"
+      env:
+        ARCHIVE: ${{ runner.temp }}/services-context.tar.zst
+        CONTEXT: ${{ runner.temp }}/services-context
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069
+    - name: Name the registry namespace
+      run: echo "IMAGE_NAMESPACE=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_ENV"
+    - name: Log in to the container registry
+      uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    - id: build-supamac-services
+      name: Build and push supamac-services
+      uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc
+      with:
+        context: ${{ runner.temp }}/services-context
+        file: infra/self-hosted/images/services.Dockerfile
+        platforms: linux/amd64
+        push: 'true'
+        tags: |
+          ${{ env.IMAGE_NAMESPACE }}/supamac-services:${{ github.sha }}
+          ${{ github.ref == 'refs/heads/main' && format('{0}/supamac-services:latest', env.IMAGE_NAMESPACE) || '' }}
+        labels: |
+          org.opencontainers.image.title=supamac-services
+          org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          org.opencontainers.image.revision=${{ github.sha }}
+          org.opencontainers.image.licenses=AGPL-3.0-only
+        provenance: mode=max
+        sbom: 'true'
+    - name: Attest the provenance of supamac-services
+      uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8
+      with:
+        subject-name: ${{ env.IMAGE_NAMESPACE }}/supamac-services
+        subject-digest: ${{ steps.build-supamac-services.outputs.digest }}
+        push-to-registry: 'true'
+        create-storage-record: 'false'
+    - name: Report the digest of supamac-services
+      run: |
+        set -euo pipefail
+
+        # The digest names exactly what this run pushed. A deployment pins it.
+        test -n "$DIGEST"
+        {
+          echo "### $IMAGE"
+          echo
+          echo '```'
+          echo "$IMAGE@$DIGEST"
+          echo '```'
+        } >> "$GITHUB_STEP_SUMMARY"
+      env:
+        IMAGE: ${{ env.IMAGE_NAMESPACE }}/supamac-services
+        DIGEST: ${{ steps.build-supamac-services.outputs.digest }}
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+  sync-service-check:
+    if: github.event_name == 'pull_request'
+    name: Build the sync service image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+    - name: Checkout
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      with:
+        clean: 'false'
+        persist-credentials: 'false'
+      env:
+        GIT_HTTP_LOW_SPEED_LIMIT: '10000'
+        GIT_HTTP_LOW_SPEED_TIME: '60'
+    - name: Free disk space
+      run: |
+        df --human-readable --output=avail / | tail -n 1
+        sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+        df --human-readable --output=avail / | tail -n 1
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069
+    - name: Build supamac-sync
+      uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc
+      with:
+        context: .
+        file: docker/sync-service.Dockerfile
+        platforms: linux/amd64
+        push: 'false'
+  sync-service-image:
+    if: github.event_name != 'pull_request'
+    name: Publish the sync service image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+    - name: Checkout
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      with:
+        clean: 'false'
+        persist-credentials: 'false'
+      env:
+        GIT_HTTP_LOW_SPEED_LIMIT: '10000'
+        GIT_HTTP_LOW_SPEED_TIME: '60'
+    - name: Free disk space
+      run: |
+        df --human-readable --output=avail / | tail -n 1
+        sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+        df --human-readable --output=avail / | tail -n 1
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069
+    - name: Name the registry namespace
+      run: echo "IMAGE_NAMESPACE=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_ENV"
+    - name: Log in to the container registry
+      uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    - id: build-supamac-sync
+      name: Build and push supamac-sync
+      uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc
+      with:
+        context: .
+        file: docker/sync-service.Dockerfile
+        platforms: linux/amd64
+        push: 'true'
+        tags: |
+          ${{ env.IMAGE_NAMESPACE }}/supamac-sync:${{ github.sha }}
+          ${{ github.ref == 'refs/heads/main' && format('{0}/supamac-sync:latest', env.IMAGE_NAMESPACE) || '' }}
+        labels: |
+          org.opencontainers.image.title=supamac-sync
+          org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          org.opencontainers.image.revision=${{ github.sha }}
+          org.opencontainers.image.licenses=AGPL-3.0-only
+        provenance: mode=max
+        sbom: 'true'
+    - name: Attest the provenance of supamac-sync
+      uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8
+      with:
+        subject-name: ${{ env.IMAGE_NAMESPACE }}/supamac-sync
+        subject-digest: ${{ steps.build-supamac-sync.outputs.digest }}
+        push-to-registry: 'true'
+        create-storage-record: 'false'
+    - name: Report the digest of supamac-sync
+      run: |
+        set -euo pipefail
+
+        # The digest names exactly what this run pushed. A deployment pins it.
+        test -n "$DIGEST"
+        {
+          echo "### $IMAGE"
+          echo
+          echo '```'
+          echo "$IMAGE@$DIGEST"
+          echo '```'
+        } >> "$GITHUB_STEP_SUMMARY"
+      env:
+        IMAGE: ${{ env.IMAGE_NAMESPACE }}/supamac-sync
+        DIGEST: ${{ steps.build-supamac-sync.outputs.digest }}
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+  workers-check:
+    if: github.event_name == 'pull_request'
+    name: Build the lexical service and AI editing worker images
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+    - name: Checkout
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      with:
+        clean: 'false'
+        persist-credentials: 'false'
+      env:
+        GIT_HTTP_LOW_SPEED_LIMIT: '10000'
+        GIT_HTTP_LOW_SPEED_TIME: '60'
+    - name: Free disk space
+      run: |
+        df --human-readable --output=avail / | tail -n 1
+        sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+        df --human-readable --output=avail / | tail -n 1
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069
+    - name: Build supamac-lexical
+      uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc
+      with:
+        context: .
+        file: infra/self-hosted/images/lexical-service.Dockerfile
+        platforms: linux/amd64
+        push: 'false'
+    - name: Build supamac-ai-editing
+      uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc
+      with:
+        context: .
+        file: infra/self-hosted/images/ai-editing-worker.Dockerfile
+        platforms: linux/amd64
+        push: 'false'
+  workers-image:
+    if: github.event_name != 'pull_request'
+    name: Publish the lexical service and AI editing worker images
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+    - name: Checkout
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      with:
+        clean: 'false'
+        persist-credentials: 'false'
+      env:
+        GIT_HTTP_LOW_SPEED_LIMIT: '10000'
+        GIT_HTTP_LOW_SPEED_TIME: '60'
+    - name: Free disk space
+      run: |
+        df --human-readable --output=avail / | tail -n 1
+        sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+        df --human-readable --output=avail / | tail -n 1
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069
+    - name: Name the registry namespace
+      run: echo "IMAGE_NAMESPACE=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_ENV"
+    - name: Log in to the container registry
+      uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    - id: build-supamac-lexical
+      name: Build and push supamac-lexical
+      uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc
+      with:
+        context: .
+        file: infra/self-hosted/images/lexical-service.Dockerfile
+        platforms: linux/amd64
+        push: 'true'
+        tags: |
+          ${{ env.IMAGE_NAMESPACE }}/supamac-lexical:${{ github.sha }}
+          ${{ github.ref == 'refs/heads/main' && format('{0}/supamac-lexical:latest', env.IMAGE_NAMESPACE) || '' }}
+        labels: |
+          org.opencontainers.image.title=supamac-lexical
+          org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          org.opencontainers.image.revision=${{ github.sha }}
+          org.opencontainers.image.licenses=AGPL-3.0-only
+        provenance: mode=max
+        sbom: 'true'
+    - name: Attest the provenance of supamac-lexical
+      uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8
+      with:
+        subject-name: ${{ env.IMAGE_NAMESPACE }}/supamac-lexical
+        subject-digest: ${{ steps.build-supamac-lexical.outputs.digest }}
+        push-to-registry: 'true'
+        create-storage-record: 'false'
+    - name: Report the digest of supamac-lexical
+      run: |
+        set -euo pipefail
+
+        # The digest names exactly what this run pushed. A deployment pins it.
+        test -n "$DIGEST"
+        {
+          echo "### $IMAGE"
+          echo
+          echo '```'
+          echo "$IMAGE@$DIGEST"
+          echo '```'
+        } >> "$GITHUB_STEP_SUMMARY"
+      env:
+        IMAGE: ${{ env.IMAGE_NAMESPACE }}/supamac-lexical
+        DIGEST: ${{ steps.build-supamac-lexical.outputs.digest }}
+    - id: build-supamac-ai-editing
+      name: Build and push supamac-ai-editing
+      uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc
+      with:
+        context: .
+        file: infra/self-hosted/images/ai-editing-worker.Dockerfile
+        platforms: linux/amd64
+        push: 'true'
+        tags: |
+          ${{ env.IMAGE_NAMESPACE }}/supamac-ai-editing:${{ github.sha }}
+          ${{ github.ref == 'refs/heads/main' && format('{0}/supamac-ai-editing:latest', env.IMAGE_NAMESPACE) || '' }}
+        labels: |
+          org.opencontainers.image.title=supamac-ai-editing
+          org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          org.opencontainers.image.revision=${{ github.sha }}
+          org.opencontainers.image.licenses=AGPL-3.0-only
+        provenance: mode=max
+        sbom: 'true'
+    - name: Attest the provenance of supamac-ai-editing
+      uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8
+      with:
+        subject-name: ${{ env.IMAGE_NAMESPACE }}/supamac-ai-editing
+        subject-digest: ${{ steps.build-supamac-ai-editing.outputs.digest }}
+        push-to-registry: 'true'
+        create-storage-record: 'false'
+    - name: Report the digest of supamac-ai-editing
+      run: |
+        set -euo pipefail
+
+        # The digest names exactly what this run pushed. A deployment pins it.
+        test -n "$DIGEST"
+        {
+          echo "### $IMAGE"
+          echo
+          echo '```'
+          echo "$IMAGE@$DIGEST"
+          echo '```'
+        } >> "$GITHUB_STEP_SUMMARY"
+      env:
+        IMAGE: ${{ env.IMAGE_NAMESPACE }}/supamac-ai-editing
+        DIGEST: ${{ steps.build-supamac-ai-editing.outputs.digest }}
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+  ops-check:
+    if: github.event_name == 'pull_request'
+    name: Build the ops and search images
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+    - name: Checkout
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      with:
+        clean: 'false'
+        persist-credentials: 'false'
+      env:
+        GIT_HTTP_LOW_SPEED_LIMIT: '10000'
+        GIT_HTTP_LOW_SPEED_TIME: '60'
+    - name: Free disk space
+      run: |
+        df --human-readable --output=avail / | tail -n 1
+        sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+        df --human-readable --output=avail / | tail -n 1
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069
+    - name: Build supamac-ops
+      uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc
+      with:
+        context: .
+        file: infra/self-hosted/ops/Dockerfile
+        platforms: linux/amd64
+        push: 'false'
+    - name: Build supamac-search
+      uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc
+      with:
+        context: infra/local/opensearch
+        file: infra/local/opensearch/Dockerfile
+        platforms: linux/amd64
+        push: 'false'
+  ops-image:
+    if: github.event_name != 'pull_request'
+    name: Publish the ops and search images
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+    - name: Checkout
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      with:
+        clean: 'false'
+        persist-credentials: 'false'
+      env:
+        GIT_HTTP_LOW_SPEED_LIMIT: '10000'
+        GIT_HTTP_LOW_SPEED_TIME: '60'
+    - name: Free disk space
+      run: |
+        df --human-readable --output=avail / | tail -n 1
+        sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+        df --human-readable --output=avail / | tail -n 1
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069
+    - name: Name the registry namespace
+      run: echo "IMAGE_NAMESPACE=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_ENV"
+    - name: Log in to the container registry
+      uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    - id: build-supamac-ops
+      name: Build and push supamac-ops
+      uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc
+      with:
+        context: .
+        file: infra/self-hosted/ops/Dockerfile
+        platforms: linux/amd64
+        push: 'true'
+        tags: |
+          ${{ env.IMAGE_NAMESPACE }}/supamac-ops:${{ github.sha }}
+          ${{ github.ref == 'refs/heads/main' && format('{0}/supamac-ops:latest', env.IMAGE_NAMESPACE) || '' }}
+        labels: |
+          org.opencontainers.image.title=supamac-ops
+          org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          org.opencontainers.image.revision=${{ github.sha }}
+          org.opencontainers.image.licenses=AGPL-3.0-only
+        provenance: mode=max
+        sbom: 'true'
+    - name: Attest the provenance of supamac-ops
+      uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8
+      with:
+        subject-name: ${{ env.IMAGE_NAMESPACE }}/supamac-ops
+        subject-digest: ${{ steps.build-supamac-ops.outputs.digest }}
+        push-to-registry: 'true'
+        create-storage-record: 'false'
+    - name: Report the digest of supamac-ops
+      run: |
+        set -euo pipefail
+
+        # The digest names exactly what this run pushed. A deployment pins it.
+        test -n "$DIGEST"
+        {
+          echo "### $IMAGE"
+          echo
+          echo '```'
+          echo "$IMAGE@$DIGEST"
+          echo '```'
+        } >> "$GITHUB_STEP_SUMMARY"
+      env:
+        IMAGE: ${{ env.IMAGE_NAMESPACE }}/supamac-ops
+        DIGEST: ${{ steps.build-supamac-ops.outputs.digest }}
+    - id: build-supamac-search
+      name: Build and push supamac-search
+      uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc
+      with:
+        context: infra/local/opensearch
+        file: infra/local/opensearch/Dockerfile
+        platforms: linux/amd64
+        push: 'true'
+        tags: |
+          ${{ env.IMAGE_NAMESPACE }}/supamac-search:${{ github.sha }}
+          ${{ github.ref == 'refs/heads/main' && format('{0}/supamac-search:latest', env.IMAGE_NAMESPACE) || '' }}
+        labels: |
+          org.opencontainers.image.title=supamac-search
+          org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          org.opencontainers.image.revision=${{ github.sha }}
+          org.opencontainers.image.licenses=Apache-2.0
+        provenance: mode=max
+        sbom: 'true'
+    - name: Attest the provenance of supamac-search
+      uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8
+      with:
+        subject-name: ${{ env.IMAGE_NAMESPACE }}/supamac-search
+        subject-digest: ${{ steps.build-supamac-search.outputs.digest }}
+        push-to-registry: 'true'
+        create-storage-record: 'false'
+    - name: Report the digest of supamac-search
+      run: |
+        set -euo pipefail
+
+        # The digest names exactly what this run pushed. A deployment pins it.
+        test -n "$DIGEST"
+        {
+          echo "### $IMAGE"
+          echo
+          echo '```'
+          echo "$IMAGE@$DIGEST"
+          echo '```'
+        } >> "$GITHUB_STEP_SUMMARY"
+      env:
+        IMAGE: ${{ env.IMAGE_NAMESPACE }}/supamac-search
+        DIGEST: ${{ steps.build-supamac-search.outputs.digest }}
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+concurrency:
+  group: supamac-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}

@@ -1,0 +1,39 @@
+# Build context of ai-editing-worker.Dockerfile: the repository root, cut down
+# to what the image is built from. BuildKit reads this file in place of the
+# root .dockerignore because it carries the Dockerfile's name.
+
+# Nothing enters the context unless a line below names it.
+*
+
+# What a frozen install reads: the lockfile, the manifest of every workspace
+# it lists, and the patches it applies.
+!package.json
+!bun.lock
+!bunfig.toml
+!apps/web/package.json
+!apps/marketing/package.json
+!packages/*/package.json
+!services/*/package.json
+!services/bots/*/package.json
+!apps/web/patches
+
+# The worker, the workspace packages it imports and how it starts.
+!services/ai-editing-worker
+!packages/collaboration
+!packages/graphics
+!packages/lexical-core
+!packages/loro-mirror
+!packages/observability
+!packages/spreadsheet
+!vendor/ironcalc/pkg
+!infra/self-hosted/images/ai-editing-worker-entrypoint.sh
+
+# Never, wherever the lines above reach.
+**/node_modules
+**/.env
+**/.env.*
+**/*.env
+**/.dev.vars*
+**/.wrangler
+**/dist
+**/*.log

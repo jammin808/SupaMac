@@ -58,6 +58,7 @@ mod email_e2e_full_stack;
 mod ensure_daytona_snapshot;
 mod export_ci_telemetry;
 mod fork_policy;
+mod fork_steps;
 mod ios_app_store_publish;
 mod ios_app_store_release;
 mod ios_preview;
@@ -80,6 +81,8 @@ mod runners;
 mod sdk_check;
 mod steps;
 mod supamac_ci;
+mod supamac_images;
+mod supamac_web;
 mod test_macrod_update;
 mod vars;
 mod web_app_check_main;
@@ -101,6 +104,18 @@ struct WorkflowFile {
     file_name: &'static str,
     /// Produces the YAML body for this workflow.
     render_yaml: fn() -> Result<String>,
+}
+
+impl WorkflowFile {
+    /// Whether this fork owns the workflow instead of importing it from
+    /// upstream. Its module carries the fork's prefix (`supamac_ci`) and so
+    /// does its file (`supamac-ci.yml`). A fork-owned workflow runs in this
+    /// repository, so [`render`] holds it to the fork's own resources. Every
+    /// other workflow has each of its jobs restricted to the upstream
+    /// repository.
+    fn fork_owned(&self) -> bool {
+        self.slug.starts_with(fork_policy::FORK_SLUG_PREFIX)
+    }
 }
 
 /// Render a `gh_workflow::Workflow` to YAML. Used by most workflow modules.
@@ -137,12 +152,25 @@ fn job_mut<'a>(root: &'a mut serde_yaml::Value, id: &str) -> Result<&'a mut serd
         .with_context(|| format!("job `{id}` not found in rendered workflow"))
 }
 
-/// Every workflow we generate. Add new workflows here.
+/// Every workflow we generate. Add new workflows here. One this fork owns
+/// takes a `supamac_` slug and a `supamac-` file name
+/// ([`WorkflowFile::fork_owned`]); under any other name its jobs never run
+/// outside the upstream repository.
 const WORKFLOWS: &[WorkflowFile] = &[
     WorkflowFile {
         slug: "supamac_ci",
         file_name: "supamac-ci.yml",
         render_yaml: supamac_ci::render,
+    },
+    WorkflowFile {
+        slug: "supamac_images",
+        file_name: "supamac-images.yml",
+        render_yaml: supamac_images::render,
+    },
+    WorkflowFile {
+        slug: "supamac_web",
+        file_name: "supamac-web.yml",
+        render_yaml: supamac_web::render,
     },
     WorkflowFile {
         slug: "observability_image",
@@ -579,7 +607,8 @@ pub fn check() -> Result<()> {
 fn render(workflow: &WorkflowFile) -> Result<String> {
     let yaml =
         (workflow.render_yaml)().with_context(|| format!("serializing {}", workflow.file_name))?;
-    let yaml = if workflow.slug == "supamac_ci" {
+    let yaml = if workflow.fork_owned() {
+        fork_policy::check_fork_owned(workflow.file_name, &yaml)?;
         yaml
     } else {
         fork_policy::restrict_to_upstream(&yaml)?

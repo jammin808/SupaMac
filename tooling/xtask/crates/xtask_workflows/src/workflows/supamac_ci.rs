@@ -6,20 +6,11 @@ use gh_workflow::{
     Workflow, WorkflowDispatch,
 };
 
+use crate::workflows::fork_steps::{self, setup_bun};
 use crate::workflows::{steps, yaml_fragment};
 
 #[cfg(test)]
 mod test;
-
-fn setup_bun() -> gh_workflow::Step<gh_workflow::Use> {
-    Step::new("Setup Bun for current lockfile formats")
-        .uses(
-            "oven-sh",
-            "setup-bun",
-            "0c5077e51419868618aeaa5fe8019c62421857d6",
-        )
-        .add_with(("bun-version", "1.4.5"))
-}
 
 const CODEQL: &str = "33d7b85da1a04171e211befe2c739303b9a4c066"; // v4, resolved 2026-11-19
 
@@ -64,13 +55,13 @@ pub fn render() -> Result<String> {
 fn tooling() -> Job {
     Job::default()
         .name("Fork tooling and workflow checks")
-        .runs_on("ubuntu-24.04")
+        .runs_on(fork_steps::RUNNER)
         .timeout_minutes(30u32)
-        .add_env(("RUSTUP_TOOLCHAIN", "1.94.0"))
+        .add_env(("RUSTUP_TOOLCHAIN", fork_steps::RUST_TOOLCHAIN))
         .add_step(steps::checkout(false, false))
         .add_step(setup_bun())
         .add_step(Step::new("Install locked analysis dependencies").run("bun install --frozen-lockfile --ignore-scripts"))
-        .add_step(Step::new("Install pinned Rust tooling").run("rustup toolchain install 1.94.0 --profile minimal --component rustfmt --component clippy"))
+        .add_step(fork_steps::install_rust(&["--component rustfmt", "--component clippy"]))
         .add_step(Step::new("Check and test fork tooling").run("cargo fmt --all -- --check\ncargo clippy --locked -p xtask_workflows -- -D warnings\ncargo test --locked -p xtask_workflows\ncargo x workflows --check\nbun test tooling/supamac\nbun node_modules/typescript-native/bin/tsc --noEmit --strict --skipLibCheck --types bun --target es2022 --module esnext --moduleResolution bundler tooling/supamac/*.ts\n"))
 }
 
