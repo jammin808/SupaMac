@@ -1,0 +1,116 @@
+# Puts one backup back into the main project's volumes.
+#
+# Deploy this as its own project only while the main project (`supamac`) is
+# stopped: it drops both databases and empties the state volumes. It starts
+# the database and the object store on the main project's volumes, runs
+# ops/scripts/restore.sh once, and is then removed again. Deploying the main
+# project afterwards reapplies newer migrations and the bucket settings.
+#
+#   SUPAMAC_OPS_IMAGE      the ops image the main project uses
+#   SUPAMAC_RESTORE_FROM   the folder name the backup logged, e.g.
+#                          2026-01-31T03-00-00Z
+#
+# The two stores are declared as in compose.yaml; keep their images in step.
+name: supamac-restore
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "3"
+
+x-generated-env: &generated-env
+  - path: ${SUPAMAC_SECRETS_DIR:-/etc/supamac}/generated.env
+    required: true
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg18@sha256:38681dc6eaf55308e2a4c6de392d131652dcfac70e1263e35cd9b5ea3fe39782
+    restart: "no"
+    logging: *logging
+    env_file: *generated-env
+    environment:
+      POSTGRES_USER: supamac
+      POSTGRES_DB: macrodb
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U supamac -d macrodb"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    mem_limit: 1280m
+
+  # Started without the upload webhook: restored objects are not new uploads.
+  minio:
+    image: cgr.dev/chainguard/minio@sha256:e9cf6b99c226e9539ed0f14b6f00e37b07da153c7ba1f4f8709c807574b471ec
+    restart: "no"
+    logging: *logging
+    command: ["server", "/data"]
+    env_file: *generated-env
+    environment:
+      MINIO_SITE_REGION: us-east-1
+      MINIO_BROWSER: "off"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      # The image has bash and neither an HTTP client nor grep, and the
+      # store answers 400 to a request without a Host header.
+      test:
+        - CMD
+        - bash
+        - -c
+        - >-
+          exec 3<>/dev/tcp/127.0.0.1/9000 &&
+          printf 'GET /minio/health/live HTTP/1.0\r\nHost: 127.0.0.1:9000\r\n\r\n' >&3 &&
+          read -r status <&3 &&
+          [[ $$status == *' 200 '* ]]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    mem_limit: 384m
+
+  restore:
+    image: ${SUPAMAC_OPS_IMAGE:?set SUPAMAC_OPS_IMAGE}
+    restart: "no"
+    logging: *logging
+    command: ["/opt/supamac/scripts/restore.sh", "${SUPAMAC_RESTORE_FROM:?set SUPAMAC_RESTORE_FROM}"]
+    env_file: *generated-env
+    volumes:
+      - backups:/backups:ro
+      - dynamodb_data:/volumes/dynamodb
+      - kms_data:/volumes/kms
+      - sync_state:/volumes/sync-state
+      - agent_git:/volumes/agent-git
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    mem_limit: 512m
+
+# The main project's volumes, by the names compose.yaml gives them.
+volumes:
+  postgres_data:
+    external: true
+    name: supamac_postgres_data
+  minio_data:
+    external: true
+    name: supamac_minio_data
+  dynamodb_data:
+    external: true
+    name: supamac_dynamodb_data
+  kms_data:
+    external: true
+    name: supamac_kms_data
+  sync_state:
+    external: true
+    name: supamac_sync_state
+  agent_git:
+    external: true
+    name: supamac_agent_git
+  backups:
+    external: true
+    name: supamac_backups

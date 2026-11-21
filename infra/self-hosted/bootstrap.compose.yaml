@@ -1,0 +1,202 @@
+# One-shot bootstrap of the secrets the SupaMac stack reads from the VPS.
+#
+# Deploy this once as its own project, before compose.yaml. It writes
+# /etc/supamac/generated.env (every internal secret, generated on this machine)
+# and /etc/supamac/secrets.env (comments naming the third-party keys the owner
+# adds later). Both are mode 600 in a mode 700 directory. A file that exists is
+# never rewritten, so deploying this again changes nothing, and the log lists
+# variable names only.
+#
+# The script lives in this file, with every `$` doubled for Compose, because
+# the VPS takes a compose file and nothing else.
+name: supamac-bootstrap
+
+services:
+  bootstrap:
+    image: alpine:3.22@sha256:49340b346798875b5592e5d420241f2f9cfba5f47e62ebb1446a1b34734e898f
+    restart: "no"
+    volumes:
+      - ${SUPAMAC_SECRETS_DIR:-/etc/supamac}:/etc/supamac
+    logging:
+      driver: json-file
+      options:
+        max-size: "1m"
+        max-file: "1"
+    command:
+      - sh
+      - -c
+      - |
+        set -eu
+        umask 077
+        dir=/etc/supamac
+        generated=$$dir/generated.env
+        secrets=$$dir/secrets.env
+
+        names() {
+          sed -n 's/^\([A-Za-z_][A-Za-z0-9_]*\)=.*/  \1/p' "$$1"
+        }
+
+        chmod 700 "$$dir"
+
+        if [ ! -e "$$secrets" ]; then
+          cat > "$$secrets" <<'EOF'
+        # Third-party credentials for SupaMac, one NAME='value' per line.
+        # Nothing in the repository or the deploy tool ever holds these values.
+        #
+        # Mail relay, needed before anyone can sign in:
+        #   RELAYHOST                      '[smtp.example.com]:587'
+        #   RELAYHOST_USERNAME
+        #   RELAYHOST_PASSWORD
+        #   POSTFIX_smtp_tls_wrappermode   'yes', only for a provider on port 465
+        #
+        # AI providers, each optional:
+        #   GOOGLE_GENERATIVE_AI_API_KEY
+        #   ANTHROPIC_API_KEY
+        #   OPENAI_API_KEY
+        #   CEREBRAS_API_KEY
+        #   FIREWORK_API_KEY
+        #   COHERE_API_KEY
+        EOF
+          echo "created $$secrets (comments only)"
+        fi
+
+        if [ -e "$$generated" ]; then
+          echo "$$generated exists and is left unchanged. It defines:"
+          names "$$generated"
+          exit 0
+        fi
+
+        apk add --no-cache --quiet openssl openssh-keygen
+
+        hex() {
+          openssl rand -hex "$$1"
+        }
+
+        # A PEM as one line with \n escapes: Compose turns them back into newlines
+        # when the value is double-quoted in an env_file, so a service reads a PEM.
+        one_line() {
+          awk '{ printf "%s\\n", $$0 }'
+        }
+
+        postgres_password=$$(hex 24)
+        fusionauth_database_password=$$(hex 24)
+        redis_password=$$(hex 24)
+        object_store_access_key=$$(hex 10 | tr 'a-f' 'A-F')
+        object_store_secret_key=$$(hex 20)
+        internal_key=$$(hex 32)
+        document_permission_secret=$$(hex 32)
+        fusionauth_api_key=$$(hex 32)
+        pipedream_webhook_secret=$$(hex 24)
+
+        api_token_private_key=$$(openssl genrsa 2048 2>/dev/null)
+        api_token_public_key=$$(printf '%s\n' "$$api_token_private_key" | openssl rsa -pubout 2>/dev/null)
+        attachment_signing_key=$$(openssl genrsa -traditional 2048 2>/dev/null)
+        # A run that stopped half-way may have left a key file, and ssh-keygen
+        # asks before it overwrites one, which nobody is there to answer.
+        rm -f "$$dir/preview_host_key" "$$dir/preview_host_key.pub"
+        ssh-keygen -q -t ed25519 -N '' -C supamac-preview -f "$$dir/preview_host_key"
+
+        database_url=postgres://supamac:$$postgres_password@postgres:5432/macrodb
+        redis_url=redis://:$$redis_password@redis:6379
+
+        cat > "$$generated.tmp" <<EOF
+        # Generated once on this machine by the SupaMac bootstrap project.
+        # Rotating a value: infra/self-hosted/README.md, "Rotating a secret".
+
+        # PostgreSQL: the cluster owner, and FusionAuth's own role.
+        POSTGRES_PASSWORD=$$postgres_password
+        DATABASE_URL=$$database_url
+        DATABASE_URL_READONLY=$$database_url
+        MACRO_DB_URL=$$database_url
+        DATABASE_PASSWORD=$$fusionauth_database_password
+
+        # Redis.
+        REDIS_PASSWORD=$$redis_password
+        REDIS_URI=$$redis_url
+        DOCUMENT_STORAGE_SERVICE_REDIS_URI=$$redis_url
+        LAST_ONLINE_REDIS_URI=$$redis_url
+        REDIS_HOST=$$redis_url
+
+        # Object store: one key pair under the three names its readers use.
+        MINIO_ROOT_USER=$$object_store_access_key
+        MINIO_ROOT_PASSWORD=$$object_store_secret_key
+        LOCAL_AWS_ACCESS_KEY_ID=$$object_store_access_key
+        LOCAL_AWS_SECRET_ACCESS_KEY=$$object_store_secret_key
+        AWS_ACCESS_KEY_ID=$$object_store_access_key
+        AWS_SECRET_ACCESS_KEY=$$object_store_secret_key
+        MINIO_NOTIFY_WEBHOOK_AUTH_TOKEN_UPLOADS=$$(hex 32)
+
+        # The shared internal service key, under every name a service reads it by.
+        INTERNAL_API_SECRET_KEY=$$internal_key
+        INTERNAL_API_KEY=$$internal_key
+        INTERNAL_AUTH_KEY=$$internal_key
+        AUTHENTICATION_SERVICE_SECRET_KEY=$$internal_key
+        SYNC_SERVICE_AUTH_KEY=$$internal_key
+        SERVICE_INTERNAL_AUTH_KEY=$$internal_key
+        DOCUMENT_STORAGE_SERVICE_AUTH_KEY=$$internal_key
+        DSS_INTERNAL_AUTH_KEY=$$internal_key
+
+        # Document permission tokens: the Rust services and the sync service.
+        DOCUMENT_PERMISSION_JWT=$$document_permission_secret
+        DOCUMENT_PERMISSIONS_SECRET=$$document_permission_secret
+
+        # Sessions and FusionAuth.
+        JWT_SECRET_KEY=$$(hex 48)
+        FUSIONAUTH_API_KEY=$$fusionauth_api_key
+        FUSIONAUTH_API_KEY_SECRET_KEY=$$fusionauth_api_key
+        FUSIONAUTH_CLIENT_SECRET_KEY=$$(hex 32)
+        FUSIONAUTH_ADMIN_PASSWORD=$$(hex 24)
+
+        # Macro API tokens (RS256).
+        MACRO_API_TOKEN_PRIVATE_SECRET_KEY="$$(printf '%s\n' "$$api_token_private_key" | one_line)"
+        MACRO_API_TOKEN_PUBLIC_KEY="$$(printf '%s\n' "$$api_token_public_key" | one_line)"
+
+        # Other keys the services sign, encrypt or verify with.
+        INTERNAL_CALL_SECRET=$$(hex 32)
+        URL_SIGNING_HMAC=$$(hex 32)
+        ACCOUNT_LINK_STATE_SECRET=$$(hex 32)
+        MCP_CREDENTIALS_KEY_SECRET_NAME=$$(openssl rand -base64 32)
+        EMAIL_SERVICE_CLOUDFRONT_SIGNER_PRIVATE_KEY="$$(printf '%s\n' "$$attachment_signing_key" | one_line)"
+        PREVIEW_SSH_HOST_KEY="$$(one_line < "$$dir/preview_host_key")"
+
+        # Verification secrets of inbound webhooks no provider is connected to.
+        STRIPE_WEBHOOK_SECRET_KEY=$$(hex 32)
+        PIPEDREAM_WEBHOOK_SECRET=$$pipedream_webhook_secret
+        PIPEDREAM_WEBHOOK_URI=http://localhost:8080/pipedream/mcp/webhook?secret=$$pipedream_webhook_secret
+        GITHUB_WEBHOOK_SECRET_KEY=$$(hex 32)
+        GITHUB_INSTALLATION_STATE_SECRET=$$(hex 32)
+        CAL_WEBHOOK_SECRET_KEY=$$(hex 32)
+        LIVEKIT_API_SECRET=$$(hex 32)
+
+        # Key material of the KMS keys, so they survive the loss of the KMS volume.
+        KMS_KEY_CURSOR_API_KEY=$$(hex 32)
+        KMS_KEY_CODEX_OAUTH=$$(hex 32)
+        KMS_KEY_MCP_OAUTH=$$(hex 32)
+        KMS_KEY_MICROSOFT_TOKEN=$$(hex 32)
+        KMS_KEY_WHATSAPP_SESSION=$$(hex 32)
+
+        # Not secrets: stand-ins for provider keys, which secrets.env overrides.
+        # Every one must be set or the first AI request fails.
+        GOOGLE_GENERATIVE_AI_API_KEY=not-configured
+        ANTHROPIC_API_KEY=not-configured
+        OPENAI_API_KEY=not-configured
+        CEREBRAS_API_KEY=not-configured
+        FIREWORK_API_KEY=not-configured
+        COHERE_API_KEY=not-configured
+        EOF
+
+        rm -f "$$dir/preview_host_key" "$$dir/preview_host_key.pub"
+
+        # A generator that fails inside the text above does not stop the script:
+        # it leaves its value empty.
+        empty=$$(sed -n 's/^\([A-Za-z_][A-Za-z0-9_]*\)=\(""\)\{0,1\}$$/  \1/p' "$$generated.tmp")
+        if [ -n "$$empty" ]; then
+          echo "nothing was written: no value could be generated for" >&2
+          echo "$$empty" >&2
+          rm -f "$$generated.tmp"
+          exit 1
+        fi
+
+        mv "$$generated.tmp" "$$generated"
+        echo "created $$generated. It defines:"
+        names "$$generated"

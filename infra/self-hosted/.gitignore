@@ -1,0 +1,3 @@
+# The root .gitignore leaves out every *.env file. This one holds placeholders
+# only and is the list of variables an operator supplies.
+!example.env

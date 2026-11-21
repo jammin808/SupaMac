@@ -1,0 +1,1174 @@
+# The SupaMac backend for one VPS, behind the Traefik that is already there.
+#
+# Read README.md in this directory before changing anything. What must stay
+# true of this file:
+#
+# - No `ports:`. The gateway is the only container Traefik can see, and
+#   Traefik is the only way in.
+# - No bind mount of repository files. Config reaches third-party containers
+#   through the `config` volume, which `init-volumes` fills from the ops image.
+# - No secret, and none read from the deploy tool: every `${SUPAMAC_...}`
+#   below is a name, an address or an image reference. Secrets come from the
+#   two files in /etc/supamac on the VPS.
+# - Every Rust service runs with ENVIRONMENT=local, the only mode that works
+#   off the upstream company's AWS account and domain, and with no
+#   DEV_DANGEROUS_* variable set.
+name: supamac
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "3"
+
+x-container: &container
+  restart: unless-stopped
+  logging: *logging
+
+# A job runs to completion on every deployment and is safe to run again.
+x-job: &job
+  restart: "no"
+  logging: *logging
+  networks: [internal]
+
+# generated.env holds every internal secret, written once by
+# bootstrap.compose.yaml. secrets.env holds the third-party keys the owner
+# adds; it comes second so that its values win. The fork's own images get
+# both; a third-party image gets the one file that has what it reads.
+x-env-files: &env-files
+  - path: ${SUPAMAC_SECRETS_DIR:-/etc/supamac}/generated.env
+    required: true
+  - path: ${SUPAMAC_SECRETS_DIR:-/etc/supamac}/secrets.env
+    required: false
+
+x-generated-env: &generated-env
+  - path: ${SUPAMAC_SECRETS_DIR:-/etc/supamac}/generated.env
+    required: true
+
+x-secrets-env: &secrets-env
+  - path: ${SUPAMAC_SECRETS_DIR:-/etc/supamac}/secrets.env
+    required: false
+
+# A container that reads the config volume carries this label, so Compose
+# recreates it when a new ops image brings new config.
+x-config-label: &config-label
+  supamac.ops-image: ${SUPAMAC_OPS_IMAGE:?set SUPAMAC_OPS_IMAGE}
+
+# The environment every Rust service gets. Names and non-secret values follow
+# the local stack (tooling/xtask/crates/xtask_local/src/local/local_env.rs),
+# which gives every service the same set. Secrets are not here: they are in
+# generated.env under the same names.
+x-rust-env: &rust-env
+  # Anything else, or nothing, means Production: AWS Secrets Manager, MSK and
+  # cookies for the upstream domain.
+  ENVIRONMENT: local
+  PORT: "8080"
+
+  # Where browsers find the UI and the API.
+  ALLOWED_ORIGINS: ${SUPAMAC_UI_ORIGIN:?set SUPAMAC_UI_ORIGIN}
+  FRONTEND_ORIGIN: ${SUPAMAC_UI_ORIGIN}${SUPAMAC_UI_PATH:-}/
+  APP_BASE_URL: ${SUPAMAC_UI_ORIGIN}
+  OVERRIDE_APP_SERVICE_URL: ${SUPAMAC_UI_ORIGIN}
+  PIPEDREAM_ALLOWED_ORIGINS: ${SUPAMAC_UI_ORIGIN}
+  BASE_URL: https://api.${SUPAMAC_DOMAIN:?set SUPAMAC_DOMAIN}/auth
+  FUSIONAUTH_OAUTH_REDIRECT_URI: https://api.${SUPAMAC_DOMAIN}/auth/oauth/redirect
+  OVERRIDE_API_GATEWAY_URL: https://api.${SUPAMAC_DOMAIN}
+  OVERRIDE_COGNITION_PUBLIC_URL: https://api.${SUPAMAC_DOMAIN}/cognition
+  OVERRIDE_MCP_PUBLIC_URL: https://api.${SUPAMAC_DOMAIN}/mcp
+  OVERRIDE_STATIC_FILE_PUBLIC_URL: https://api.${SUPAMAC_DOMAIN}/static-file
+  LOCAL_AWS_PUBLIC_URL: https://api.${SUPAMAC_DOMAIN}/local-storage
+  DOCUMENT_STORAGE_SERVICE_CLOUDFRONT_DISTRIBUTION_URL: https://api.${SUPAMAC_DOMAIN}/local-storage/doc-storage
+  EMAIL_SERVICE_CLOUDFRONT_DISTRIBUTION_URL: https://api.${SUPAMAC_DOMAIN}/local-storage/macro-email-attachments
+  # Without DEV_DANGEROUS_PRIVATE_MCP_ADDRESSES the agent harness dials these
+  # two over https at public addresses only, so they go out and come back in
+  # through Traefik.
+  OVERRIDE_MCP_SERVICE_URL: https://api.${SUPAMAC_DOMAIN}
+  OVERRIDE_PREVIEW_GATEWAY_URL: https://api.${SUPAMAC_DOMAIN}/preview
+
+  # Where the services find each other. Without an override a service looks
+  # for its peer on its own localhost.
+  OVERRIDE_AUTH_SERVICE_URL: http://authentication-service:8080
+  OVERRIDE_CONNECTION_GATEWAY_URL: http://connection-gateway:8080
+  OVERRIDE_CONNECTION_GATEWAY_WEBSOCKET_URL: ws://connection-gateway:8080
+  OVERRIDE_DOCUMENT_STORAGE_SERVICE_URL: http://document-storage-service:8080
+  OVERRIDE_DOCUMENT_COGNITION_SERVICE_URL: http://agent-harness-service:8080/cognition
+  OVERRIDE_AGENT_HARNESS_SERVICE_URL: http://agent-harness-service:8080
+  OVERRIDE_SCHEDULED_ACTION_SERVICE_URL: http://agent-harness-service:8080/scheduled-action
+  OVERRIDE_AGENT_GIT_SERVICE_URL: http://agent-harness-service:8080/agent-git
+  OVERRIDE_AGENT_HARNESS_EGRESS_URL: http://agent-harness-service:8102
+  OVERRIDE_NOTIFICATION_SERVICE_URL: http://notification-service:8080
+  OVERRIDE_CONTACTS_SERVICE_URL: http://contacts-service:8080
+  OVERRIDE_UNFURL_SERVICE_URL: http://unfurl-service:8080
+  OVERRIDE_STATIC_FILE_SERVICE_URL: http://static-file-service:8080
+  OVERRIDE_EMAIL_SERVICE_URL: http://email-service:8080
+  OVERRIDE_CALENDAR_SERVICE_URL: http://calendar-service:8080
+  OVERRIDE_SEARCH_PROCESSING_SERVICE_URL: http://search-processing-service:8080
+  OVERRIDE_LEXICAL_SERVICE_URL: http://lexical-service:8096
+  OVERRIDE_SYNC_SERVICE_URL: http://sync-service:8787
+  OVERRIDE_AI_EDITING_WORKER_URL: http://ai-editing-worker:8933
+
+  # Backing stores. The database and Redis URLs carry passwords and are in
+  # generated.env.
+  KAFKA_BROKERS: kafka:9092
+  OPENSEARCH_URL: http://search:9200
+  # The search cluster has no security plugin; the client only needs both set.
+  OPENSEARCH_USERNAME: macrouser
+  OPENSEARCH_PASSWORD: unused
+  FUSIONAUTH_BASE_URL: http://fusionauth:9011
+  SMTP_HOST: mail-relay
+  SMTP_PORT: "587"
+  SENDER_BASE_ADDRESS: ${SUPAMAC_MAIL_DOMAIN:-${SUPAMAC_DOMAIN}}
+
+  # The in-network AWS endpoint. The host must be `localstack`: presigned
+  # URLs are rewritten for browsers only then.
+  LOCAL_AWS_URL: http://localstack:4566
+  AWS_REGION: us-east-1
+  AWS_DEFAULT_REGION: us-east-1
+  CURSOR_API_KEY_KMS_KEY_ID: alias/macro-local-cursor-api-key
+  CODEX_OAUTH_KMS_KEY_ID: alias/macro-local-codex-oauth
+  MCP_OAUTH_KMS_KEY_ID: alias/macro-local-mcp-oauth
+
+  # Buckets and tables, as init-aws.sh creates them.
+  ATTACHMENT_BUCKET: macro-email-attachments
+  DOCUMENT_STORAGE_BUCKET: doc-storage
+  DOCX_DOCUMENT_UPLOAD_BUCKET: docx-upload
+  STATIC_STORAGE_BUCKET: static-file-storage
+  UPLOAD_STAGING_BUCKET: bulk-upload-staging
+  CALL_RECORDING_BUCKET_NAME: macro-call-recording-local
+  AGENT_SESSION_CHANGES_BUCKET: agent-session-changes
+  GITHUB_PULL_REQUEST_PATCH_BUCKET: github-pull-request-patches
+  BULK_UPLOAD_REQUESTS_TABLE: bulk-upload
+  CONNECTION_GATEWAY_TABLE: connection-gateway-table
+  STATIC_FILE_SERVICE_DYNAMODB_TABLE_NAME: static-file-metadata
+  # The search service creates this one itself.
+  BACKFILL_JOBS_TABLE: search-processing-backfill-jobs
+
+  # Queues, as ops/config/elasticmq/elasticmq.conf declares them. Some
+  # readers want the name, some the URL.
+  OVERRIDE_SLACK_IMPORT_QUEUE: http://localstack:4566/000000000000/slack-import-queue
+  OVERRIDE_SLACK_IMPORT_DLQ: http://localstack:4566/000000000000/slack-import-dlq
+  NOTIFICATION_QUEUE: http://localstack:4566/000000000000/notification-queue
+  NOTIFICATION_INGRESS_QUEUE: http://localstack:4566/000000000000/notification-ingress-queue
+  PUSH_NOTIFICATION_EVENT_HANDLER_QUEUE: push-delivery-queue
+  OVERRIDE_WEBHOOK_EVENT_QUEUE: http://localstack:4566/000000000000/webhook-event-queue.fifo
+  BACKFILL_QUEUE: email-service-backfill-queue
+  EMAIL_BACKFILL_QUEUE: http://localstack:4566/000000000000/email-service-backfill-queue
+  OVERRIDE_EMAIL_CRM_CLEANUP_QUEUE: http://localstack:4566/000000000000/email-service-crm-cleanup-queue
+  CHAT_DELETE_QUEUE: delete-chat-handler-queue
+  CONTACTS_QUEUE: contacts-queue
+  CONVERT_QUEUE: convert-service-queue
+  DOCUMENT_DELETE_QUEUE: delete-document-handler-queue
+  DOCUMENT_UPLOAD_FINALIZER_QUEUE_URL: http://localstack:4566/000000000000/document-upload-finalizer-queue
+  DOCUMENT_TEXT_EXTRACTOR_QUEUE: document-text-extractor-lambda-queue
+  EMAIL_SCHEDULED_QUEUE: email-service-scheduled-queue
+  GMAIL_INBOX_SYNC_QUEUE: email-service-gmail-inbox-sync-queue
+  GMAIL_INBOX_SYNC_RETRY_QUEUE: email-service-gmail-inbox-retry-queue
+  GMAIL_OPS_QUEUE: email-service-gmail-ops-queue
+  GMAIL_OPS_RETRY_QUEUE: email-service-gmail-ops-retry-queue
+  LINK_MANAGER_QUEUE: email-service-refresh-queue
+  SEARCH_EVENT_QUEUE: search-event-queue
+  SFS_DELETE_QUEUE: email-sfs-delete-queue
+  SFS_UPLOADER_QUEUE: email-service-sfs-mapper-queue
+  STATIC_FILE_SERVICE_S3_EVENT_QUEUE_URL: http://localstack:4566/000000000000/static-file-s3-event-notification-queue
+  OVERRIDE_REMINDER_DISPATCH_QUEUE: http://localstack:4566/000000000000/reminder-dispatch-queue
+  OVERRIDE_CALENDAR_REMINDER_DISPATCH_QUEUE: http://localstack:4566/000000000000/calendar-reminder-dispatch-queue
+  OVERRIDE_CALENDAR_SERVICE_BACKFILL_QUEUE: http://localstack:4566/000000000000/calendar-service-backfill-queue
+  ENABLE_EMAIL_SCHEDULED_QUEUE: "true"
+  ENABLE_GMAIL_OPS_QUEUE: "true"
+
+  # Identity. Not secrets: fixed ids shared with ops/config/fusionauth, and
+  # the names tokens are issued under.
+  FUSIONAUTH_CLIENT_ID: 22222222-2222-4222-8222-222222222222
+  AUDIENCE: 22222222-2222-4222-8222-222222222222
+  ISSUER: api.${SUPAMAC_DOMAIN}
+  MACRO_API_TOKEN_ISSUER: api.${SUPAMAC_DOMAIN}
+  MACRO_API_TOKEN_EXPIRY_SECONDS: "3600"
+
+  # Feature switches the local stack turns on.
+  CALENDAR_SYNC_ENABLED: "true"
+  CALENDAR_SCOPE_ENABLED: "true"
+  GMAIL_LABEL_WRITE_BATCHES_ENABLED: "true"
+
+  # The agent harness: no sandbox provider, so no Docker socket and no
+  # Daytona key. Previews need a sandbox; these only have to be set.
+  HARNESS_BOT_ID: 00000000-0000-0000-0000-00000000a9e7
+  DAYTONA_API_KEY: ""
+  REPO_STORAGE_ROOT: /data/agent-git
+  MAX_REPO_SIZE_BYTES: "524288000"
+  PUSHES_PER_MINUTE: "30"
+  PREVIEW_DOMAIN: preview.localhost
+  PREVIEW_SSH_HOST: localhost
+
+  # AI: prompts and replies stay out of telemetry.
+  OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT: "false"
+  AI_USAGE_FREE_INCLUDED_ALLOWANCE_CENTS: "500"
+  AI_USAGE_INCLUDED_ALLOWANCE_CENTS: "1500"
+  AI_USAGE_MAX_INCLUDED_ALLOWANCE_CENTS: "15000"
+  AI_USAGE_OVERAGE_MARKUP_PERCENT: "25"
+
+  # Feature flags are read from PostHog, and some services refuse to start
+  # without a project key. The host is a port nothing listens on, so no
+  # identifier leaves the box and a flag check fails at once: flag-gated
+  # features stay off.
+  POSTHOG_API_KEY: unused
+  POSTHOG_HOST: http://127.0.0.1:9
+
+  # Stripe: this exact value makes sign-up skip Stripe. Any other value makes
+  # every sign-up call Stripe and fail.
+  STRIPE_SECRET_KEY: local-stripe-secret
+  STRIPE_PRICE_ID: price_local
+
+  # Integrations that are not connected. The loaders require each value, and
+  # nothing here is a credential anybody accepts.
+  GOOGLE_CLIENT_ID: local-google-client
+  GOOGLE_CLIENT_SECRET_KEY: local-google-client-secret
+  GITHUB_CLIENT_ID: local-github-client
+  GITHUB_CLIENT_SECRET: local-github-client-secret
+  GITHUB_IDP_ID: 99999999-9999-4999-8999-999999999999
+  GITHUB_SYNC_APP_URL: http://localhost:8080
+  GITHUB_SYNC_APP_CLIENT_ID: local-github-sync-client
+  GITHUB_SYNC_APP_CLIENT_SECRET: local-github-sync-secret
+  GITHUB_SYNC_APP_PEM_SECRET_KEY: local-github-sync-pem
+  PIPEDREAM_CLIENT_ID: local-pipedream-client
+  PIPEDREAM_CLIENT_SECRET: local-pipedream-secret
+  PIPEDREAM_PROJECT_ID: proj_local
+  SLACK_MCP_CLIENT_ID: local-slack-mcp-client
+  SLACK_MCP_CLIENT_SECRET: local-slack-mcp-secret
+  OPENAI_DOMAIN_VERIFICATION_TOKEN: local-openai-domain-verification-token
+  LIVEKIT_SERVER_URL: http://localhost:7880
+  LIVEKIT_API_KEY: local-livekit-key
+  GMAIL_GCP_QUEUE: gmail-gcp-queue-local
+  CAL_EVENT_TYPE_CONTENT_NAMES_KEY: '{"1":{"content_name":"local","value":0}}'
+  APPLE_BUNDLE_ID: com.macro.local
+  SNS_APNS_PLATFORM_ARN: arn:aws:sns:us-east-1:000000000000:app/APNS/macro-local
+  SNS_FCM_PLATFORM_ARN: arn:aws:sns:us-east-1:000000000000:app/GCM/macro-local
+  # Object links are signed by the object store here, never by a CDN key.
+  DOCUMENT_STORAGE_SERVICE_CLOUDFRONT_SIGNER_PUBLIC_KEY_ID: local-cloudfront-signer
+  DOCUMENT_STORAGE_SERVICE_CLOUDFRONT_SIGNER_PRIVATE_KEY: local
+  DOCUMENT_STORAGE_SERVICE_CLOUDFRONT_SIGNER_PRIVATE_KEY_SECRET_NAME: local-cloudfront-signer-private-key
+  EMAIL_SERVICE_CLOUDFRONT_SIGNER_PUBLIC_KEY_ID: local-cloudfront-signer
+
+x-rust-service: &rust-service
+  <<: *container
+  image: ${SUPAMAC_SERVICES_IMAGE:?set SUPAMAC_SERVICES_IMAGE}
+  env_file: *env-files
+  environment: *rust-env
+  networks: [internal, egress]
+
+x-rust-healthcheck: &rust-healthcheck
+  test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://localhost:8080/health"]
+  interval: 30s
+  timeout: 10s
+  retries: 3
+  start_period: 30s
+
+# What every Rust service needs before it starts: a migrated database, the
+# AWS-shaped resources, the event topics and Redis.
+x-backing: &backing
+  migrate:
+    condition: service_completed_successfully
+  init-aws:
+    condition: service_completed_successfully
+  init-kafka-topics:
+    condition: service_completed_successfully
+  redis:
+    condition: service_healthy
+
+services:
+  # ==========================================================================
+  # Jobs
+  # ==========================================================================
+
+  init-volumes:
+    <<: *job
+    image: ${SUPAMAC_OPS_IMAGE}
+    command: ["/opt/supamac/scripts/init-volumes.sh"]
+    env_file: *env-files
+    volumes:
+      - config:/volumes/config
+      - kms_seed:/volumes/kms-seed
+      - dynamodb_data:/volumes/dynamodb
+    mem_limit: 128m
+
+  init-fusionauth-db:
+    <<: *job
+    image: ${SUPAMAC_OPS_IMAGE}
+    command: ["/opt/supamac/scripts/init-fusionauth-db.sh"]
+    env_file: *env-files
+    depends_on:
+      postgres:
+        condition: service_healthy
+    mem_limit: 128m
+
+  migrate:
+    <<: *job
+    image: ${SUPAMAC_OPS_IMAGE}
+    command: ["/opt/supamac/scripts/migrate.sh"]
+    env_file: *env-files
+    depends_on:
+      postgres:
+        condition: service_healthy
+    mem_limit: 256m
+
+  init-kafka-topics:
+    <<: *job
+    image: apache/kafka:3.9.1@sha256:4ceccc577f03f51f6af8dbfda55194d0d892f4fa7913ffbded567ce3895622ed
+    entrypoint: ["/bin/sh", "/supamac/scripts/init-kafka-topics.sh"]
+    environment:
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_HEAP_OPTS: -Xmx128m
+    labels: *config-label
+    volumes:
+      - config:/supamac:ro
+    depends_on:
+      init-volumes:
+        condition: service_completed_successfully
+      kafka:
+        condition: service_healthy
+    mem_limit: 384m
+
+  init-aws:
+    <<: *job
+    image: amazon/aws-cli:2.31.0@sha256:3b018ce74732c98acf6f1de59b3a89587cb7f9eb6ea0d1447d1779091b2bf057
+    entrypoint: ["/bin/sh", "/supamac/scripts/init-aws.sh"]
+    env_file: *generated-env
+    environment:
+      LOCAL_AWS_URL: http://localstack:4566
+      AWS_CONFIG_FILE: /supamac/config/aws/config
+    labels: *config-label
+    volumes:
+      - config:/supamac:ro
+    depends_on:
+      router:
+        condition: service_healthy
+    mem_limit: 256m
+
+  # Grants the paid-plan roles to the owner's accounts that exist by now. An
+  # account exists after its first sign-in, so the first deployment grants
+  # nothing: sign in, then deploy again.
+  grant-owner-roles:
+    <<: *job
+    image: ${SUPAMAC_OPS_IMAGE}
+    command: ["/opt/supamac/scripts/grant-owner-roles.sh"]
+    env_file: *env-files
+    environment:
+      OWNER_EMAILS: ${SUPAMAC_OWNER_EMAILS:-}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    mem_limit: 128m
+
+  init-search-indices:
+    <<: *job
+    profiles: [search]
+    image: ${SUPAMAC_OPS_IMAGE}
+    command: ["/opt/supamac/scripts/init-search-indices.sh"]
+    environment:
+      OPENSEARCH_URL: http://opensearch:9200
+      OPENSEARCH_USERNAME: macrouser
+      OPENSEARCH_PASSWORD: unused
+    depends_on:
+      opensearch:
+        condition: service_healthy
+    mem_limit: 256m
+
+  # ==========================================================================
+  # Backing stores
+  # ==========================================================================
+
+  postgres:
+    <<: *container
+    image: pgvector/pgvector:pg18@sha256:38681dc6eaf55308e2a4c6de392d131652dcfac70e1263e35cd9b5ea3fe39782
+    # The services' pools add up to more than the default 100 connections.
+    # The migrations install pg_stat_statements, which must be preloaded.
+    command:
+      - postgres
+      - -c
+      - max_connections=300
+      - -c
+      - shared_buffers=256MB
+      - -c
+      - shared_preload_libraries=pg_stat_statements
+    env_file: *generated-env
+    environment:
+      POSTGRES_USER: supamac
+      POSTGRES_DB: macrodb
+    volumes:
+      # Postgres 18 keeps its data in a versioned folder below this one.
+      - postgres_data:/var/lib/postgresql
+    networks: [internal]
+    # Parallel queries share memory through /dev/shm, 64 MB by default.
+    shm_size: 256m
+    healthcheck:
+      # Over TCP, as the jobs and services connect. While the image sets up a
+      # new data folder it runs a server that listens on its socket only.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U supamac -d macrodb"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    mem_limit: 1280m
+
+  redis:
+    <<: *container
+    image: redis/redis-stack-server:7.4.0-v3@sha256:7d8e657d60d525534d6abe96e7645ab30ef1b4f1ffedc6eeb2d4d4283b3a49b9
+    # The image's entrypoint appends REDIS_ARGS to the server's arguments.
+    # `noeviction`: Redis holds sign-in codes and rate limits, so a full
+    # store refuses writes instead of dropping keys.
+    command:
+      - sh
+      - -c
+      - >-
+        REDIS_ARGS="--requirepass $$REDIS_PASSWORD --maxmemory 256mb
+        --maxmemory-policy noeviction" exec /entrypoint.sh
+    env_file: *generated-env
+    volumes:
+      - redis_data:/data
+    networks: [internal]
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" --no-auth-warning ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+    mem_limit: 512m
+
+  kafka:
+    <<: *container
+    image: apache/kafka:3.9.1@sha256:4ceccc577f03f51f6af8dbfda55194d0d892f4fa7913ffbded567ce3895622ed
+    environment:
+      # One node that is both broker and controller.
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      # Fixed, so the data volume still belongs to this cluster after the
+      # container is replaced.
+      CLUSTER_ID: U3VwYU1hY0thZmthTm9kZQ
+      KAFKA_HEAP_OPTS: -Xms320m -Xmx320m
+      # Events are transport, not storage: a week, and at most 100 MB per
+      # partition, in segments small enough for that limit to apply.
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_LOG_RETENTION_BYTES: 104857600
+      KAFKA_LOG_SEGMENT_BYTES: 52428800
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    networks: [internal]
+    healthcheck:
+      # The port, not the admin tool: that would start a second JVM inside
+      # this container's memory limit. init-kafka-topics proves the broker.
+      test: ["CMD-SHELL", "nc -z localhost 9092"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    mem_limit: 640m
+
+  # The object store. It verifies the signature of every request; a bucket
+  # answers an unsigned one only where init-aws.sh says so.
+  minio:
+    <<: *container
+    image: cgr.dev/chainguard/minio@sha256:e9cf6b99c226e9539ed0f14b6f00e37b07da153c7ba1f4f8709c807574b471ec
+    command: ["server", "/data"]
+    env_file: *generated-env
+    environment:
+      # The region the services sign for.
+      MINIO_SITE_REGION: us-east-1
+      MINIO_BROWSER: "off"
+      # Browsers upload to and read from presigned URLs, from the UI's origin.
+      MINIO_API_CORS_ALLOW_ORIGIN: ${SUPAMAC_UI_ORIGIN}
+      # Object-created events of the document bucket go to the upload relay.
+      # Events it cannot deliver wait in the queue folder and are sent again.
+      MINIO_NOTIFY_WEBHOOK_ENABLE_UPLOADS: "on"
+      MINIO_NOTIFY_WEBHOOK_ENDPOINT_UPLOADS: http://upload-relay:8080/
+      MINIO_NOTIFY_WEBHOOK_QUEUE_DIR_UPLOADS: /data/.notify-uploads
+    volumes:
+      - minio_data:/data
+    networks: [internal]
+    depends_on:
+      upload-relay:
+        condition: service_healthy
+    healthcheck:
+      # The image has bash and neither an HTTP client nor grep, and the
+      # store answers 400 to a request without a Host header.
+      test:
+        - CMD
+        - bash
+        - -c
+        - >-
+          exec 3<>/dev/tcp/127.0.0.1/9000 &&
+          printf 'GET /minio/health/live HTTP/1.0\r\nHost: 127.0.0.1:9000\r\n\r\n' >&3 &&
+          read -r status <&3 &&
+          [[ $$status == *' 200 '* ]]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+    mem_limit: 384m
+
+  elasticmq:
+    <<: *container
+    image: softwaremill/elasticmq-native:1.6.15@sha256:ed1504d2c43eb5dda2613c5a9c06b4632ea637470f0000fe32493bb271511bb4
+    # The image's own entrypoint, reading its config from the config volume.
+    entrypoint:
+      - /sbin/tini
+      - --
+      - /opt/elasticmq/bin/elasticmq-native-server
+      - -Dconfig.file=/supamac/config/elasticmq/elasticmq.conf
+      - -Dlogback.configurationFile=/opt/logback.xml
+    labels: *config-label
+    volumes:
+      - config:/supamac:ro
+      - elasticmq_data:/data
+    networks: [internal]
+    depends_on:
+      init-volumes:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 9324"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+    mem_limit: 192m
+
+  dynamodb:
+    <<: *container
+    image: amazon/dynamodb-local:3.1.0@sha256:7ef4a2c45b58c2901e70a4f28e0953a422c2c631baaaf5e2c15e0805740c7752
+    # One database file for every caller, on the data volume.
+    command: ["-Xmx192m", "-jar", "DynamoDBLocal.jar", "-sharedDb", "-dbPath", "/data"]
+    volumes:
+      - dynamodb_data:/data
+    networks: [internal]
+    depends_on:
+      init-volumes:
+        condition: service_completed_successfully
+    healthcheck:
+      # Any answer will do; an unsigned request gets a 400.
+      test: ["CMD-SHELL", "curl -s -o /dev/null http://127.0.0.1:8000"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    mem_limit: 320m
+
+  kms:
+    <<: *container
+    image: nsmithuk/local-kms:3.12.0@sha256:7c987f75e10d775630117293f86d09666169d0416e442244e55f816a002e0e77
+    environment:
+      PORT: "8080"
+      # Keys are stored under their ARN: changing either makes them unreadable.
+      KMS_ACCOUNT_ID: "000000000000"
+      KMS_REGION: us-east-1
+      KMS_SEED_PATH: /seed/seed.yaml
+      KMS_DATA_PATH: /data
+    labels: *config-label
+    volumes:
+      - kms_seed:/seed:ro
+      - kms_data:/data
+    networks: [internal]
+    depends_on:
+      init-volumes:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 8080"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+    mem_limit: 64m
+
+  # In-network front for the two names the services are given:
+  # `localstack:4566` (the AWS APIs) and `search:9200` (OpenSearch, or its
+  # stand-in when the `search` profile is off).
+  router:
+    <<: *container
+    image: caddy:2-alpine@sha256:003a97808e781aa9f7e75cc2f43d34d461099031faf5e20faefb9f61126836f0
+    command: ["caddy", "run", "--config", "/supamac/config/router/Caddyfile", "--adapter", "caddyfile"]
+    labels: *config-label
+    volumes:
+      - config:/supamac:ro
+    networks:
+      internal:
+        aliases:
+          - localstack
+          - search
+    depends_on:
+      init-volumes:
+        condition: service_completed_successfully
+      minio:
+        condition: service_healthy
+      elasticmq:
+        condition: service_healthy
+      dynamodb:
+        condition: service_healthy
+      kms:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:4566/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 5s
+    mem_limit: 96m
+
+  # Puts the object store's upload events on the finalizer's queue.
+  upload-relay:
+    <<: *container
+    image: ${SUPAMAC_OPS_IMAGE}
+    command: ["bun", "/opt/supamac/src/upload-relay.ts"]
+    env_file: *env-files
+    environment:
+      LOCAL_AWS_URL: http://localstack:4566
+      UPLOAD_FINALIZER_QUEUE: document-upload-finalizer-queue
+    networks: [internal]
+    healthcheck:
+      test: ["CMD", "bun", "-e", "fetch('http://127.0.0.1:8080/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    mem_limit: 96m
+
+  # The only way mail leaves: FusionAuth's sign-in codes and the services'
+  # own mail are handed over in-network, and submitted to the owner's SMTP
+  # provider over TLS with a login. Senders outside the mail domain are
+  # refused.
+  mail-relay:
+    <<: *container
+    image: boky/postfix@sha256:0632783c64183446c4edeae9092a2e015fdc0c4e8a3976bdf8878a7fc2146361
+    # Without a provider the image would deliver straight to recipients'
+    # servers; this stays down instead until secrets.env names one.
+    command:
+      - /bin/sh
+      - -c
+      - >-
+        if [ -z "$$RELAYHOST" ]; then
+        echo "RELAYHOST is not set in secrets.env: no mail can be sent";
+        exit 1;
+        fi;
+        exec /scripts/run.sh
+    env_file: *secrets-env
+    environment:
+      ALLOWED_SENDER_DOMAINS: ${SUPAMAC_MAIL_DOMAIN:-${SUPAMAC_DOMAIN}}
+      POSTFIX_myhostname: api.${SUPAMAC_DOMAIN}
+      POSTFIX_smtp_tls_security_level: encrypt
+    networks: [internal, egress]
+    mem_limit: 192m
+
+  fusionauth:
+    <<: *container
+    image: fusionauth/fusionauth-app:1.62.1@sha256:69f89c4a386fe7ee6afbe47ca6ce1828b28413447225784d5720e433c3fe11ca
+    init: true
+    env_file: *generated-env
+    environment:
+      # FusionAuth's own role and database, which init-fusionauth-db.sh
+      # creates; the password is DATABASE_PASSWORD in generated.env. No root
+      # credentials: it gets an empty database and creates its schema.
+      DATABASE_URL: jdbc:postgresql://postgres:5432/fusionauth
+      DATABASE_USERNAME: fusionauth
+      FUSIONAUTH_APP_RUNTIME_MODE: production
+      FUSIONAUTH_APP_SILENT_MODE: "true"
+      FUSIONAUTH_APP_MEMORY: 512M
+      FUSIONAUTH_APP_URL: http://fusionauth:9011
+      SEARCH_TYPE: database
+      FUSIONAUTH_APP_KICKSTART_FILE: /supamac/config/fusionauth/kickstart.json
+      # Read by the kickstart, once, on an empty database.
+      ISSUER: api.${SUPAMAC_DOMAIN}
+      SUPAMAC_API_ORIGIN: https://api.${SUPAMAC_DOMAIN}
+      SUPAMAC_UI_ORIGIN: ${SUPAMAC_UI_ORIGIN}
+      SUPAMAC_UI_URL: ${SUPAMAC_UI_ORIGIN}${SUPAMAC_UI_PATH:-}
+      SUPAMAC_MAIL_FROM: no-reply@${SUPAMAC_MAIL_DOMAIN:-${SUPAMAC_DOMAIN}}
+      # Not an address anyone signs in to the app with: an account that
+      # exists in FusionAuth before its first sign-in gets no app profile.
+      FUSIONAUTH_ADMIN_EMAIL: fusionauth-admin@${SUPAMAC_DOMAIN}
+    labels: *config-label
+    volumes:
+      - config:/supamac:ro
+    networks: [internal]
+    depends_on:
+      init-volumes:
+        condition: service_completed_successfully
+      init-fusionauth-db:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS --max-time 4 -o /dev/null http://localhost:9011/api/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 90s
+    mem_limit: 896m
+
+  # ==========================================================================
+  # The gateway: the one container Traefik routes to
+  # ==========================================================================
+
+  gateway:
+    <<: *container
+    image: caddy:2-alpine@sha256:003a97808e781aa9f7e75cc2f43d34d461099031faf5e20faefb9f61126836f0
+    command: ["caddy", "run", "--config", "/supamac/config/gateway/Caddyfile", "--adapter", "caddyfile"]
+    environment:
+      SUPAMAC_UI_ORIGIN: ${SUPAMAC_UI_ORIGIN}
+    labels:
+      <<: *config-label
+      traefik.enable: "true"
+      traefik.docker.network: n8n_default
+      traefik.http.routers.supamac-api.rule: Host(`api.${SUPAMAC_DOMAIN}`)
+      traefik.http.routers.supamac-api.entrypoints: websecure
+      traefik.http.routers.supamac-api.tls: "true"
+      traefik.http.routers.supamac-api.tls.certresolver: mytlschallenge
+      traefik.http.routers.supamac-api.middlewares: supamac-api-headers
+      traefik.http.services.supamac-api.loadbalancer.server.port: "8080"
+      traefik.http.middlewares.supamac-api-headers.headers.stsSeconds: "31536000"
+      traefik.http.middlewares.supamac-api-headers.headers.contentTypeNosniff: "true"
+      traefik.http.middlewares.supamac-api-headers.headers.referrerPolicy: no-referrer
+    volumes:
+      - config:/supamac:ro
+    networks: [internal, traefik]
+    depends_on:
+      init-volumes:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    mem_limit: 128m
+
+  # ==========================================================================
+  # Default profile: sign-in, documents, tasks, CRM, notifications, files,
+  # collaborative editing and the AI assistant
+  # ==========================================================================
+
+  authentication-service:
+    <<: *rust-service
+    command: ["/app/bin/authentication_service"]
+    environment:
+      <<: *rust-env
+      # Only these addresses can create an account. Unset would admit anyone.
+      SIGNUP_ALLOWLIST_JSON: ${SUPAMAC_SIGNUP_ALLOWLIST_JSON:?set SUPAMAC_SIGNUP_ALLOWLIST_JSON}
+      # No support channel with the upstream company's staff in new accounts.
+      SUPPORT_CHANNEL_PARTICIPANTS_JSON: "[]"
+      AUTH_SENDER_ADDRESS: no-reply@${SUPAMAC_MAIL_DOMAIN:-${SUPAMAC_DOMAIN}}
+      # Blank counts as unset here: no sign-up event is sent anywhere.
+      POSTHOG_API_KEY: ""
+    depends_on:
+      <<: *backing
+      fusionauth:
+        condition: service_healthy
+    healthcheck: *rust-healthcheck
+    mem_limit: 320m
+
+  connection-gateway:
+    <<: *rust-service
+    command: ["/app/bin/connection_gateway_service"]
+    depends_on: *backing
+    healthcheck: *rust-healthcheck
+    mem_limit: 256m
+
+  contacts-service:
+    <<: *rust-service
+    command: ["/app/bin/contacts_service"]
+    depends_on: *backing
+    healthcheck: *rust-healthcheck
+    mem_limit: 256m
+
+  document-storage-service:
+    <<: *rust-service
+    command: ["/app/bin/document_storage_service"]
+    environment:
+      <<: *rust-env
+      # Required by this service's loader. They are used only to report a
+      # Cal.com booking webhook to Meta, and no such webhook can pass here:
+      # its secret is a random value nobody was given. The authentication
+      # service would send sign-ups with them, so they are set nowhere else.
+      META_PIXEL_ID: unused
+      META_ACCESS_TOKEN: unused
+    networks:
+      internal:
+        aliases:
+          # The name the sync service's built-in config calls this by.
+          - document_storage_service
+      egress:
+    depends_on:
+      <<: *backing
+      authentication-service:
+        condition: service_healthy
+      connection-gateway:
+        condition: service_healthy
+      sync-service:
+        condition: service_healthy
+      lexical-service:
+        condition: service_healthy
+    healthcheck: *rust-healthcheck
+    mem_limit: 896m
+
+  document-upload-finalizer:
+    <<: *rust-service
+    command: ["/app/bin/document_upload_finalizer_local_worker"]
+    depends_on:
+      <<: *backing
+      sync-service:
+        condition: service_healthy
+      lexical-service:
+        condition: service_healthy
+    mem_limit: 192m
+
+  notification-service:
+    <<: *rust-service
+    command: ["/app/bin/notification_service"]
+    environment:
+      <<: *rust-env
+      # This service puts its own address into unsubscribe links.
+      OVERRIDE_NOTIFICATION_SERVICE_URL: https://api.${SUPAMAC_DOMAIN}/notification
+    depends_on:
+      <<: *backing
+      connection-gateway:
+        condition: service_healthy
+    healthcheck: *rust-healthcheck
+    mem_limit: 256m
+
+  static-file-service:
+    <<: *rust-service
+    command: ["/app/bin/static_file_service"]
+    depends_on: *backing
+    healthcheck:
+      <<: *rust-healthcheck
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://localhost:8080/api/health"]
+    mem_limit: 192m
+
+  unfurl-service:
+    <<: *rust-service
+    command: ["/app/bin/unfurl_service"]
+    healthcheck: *rust-healthcheck
+    mem_limit: 160m
+
+  image-proxy-service:
+    <<: *rust-service
+    command: ["/app/bin/image_proxy_service"]
+    healthcheck: *rust-healthcheck
+    mem_limit: 192m
+
+  # Chat, MCP tools, routines and scheduled actions. It has no sandbox
+  # provider: no Docker socket is mounted and no Daytona key is set, so
+  # sessions that need a sandbox fail when they start one.
+  agent-harness-service:
+    <<: *rust-service
+    command: ["/app/bin/agent_harness_service"]
+    volumes:
+      - agent_git:/data/agent-git
+    depends_on:
+      <<: *backing
+      fusionauth:
+        condition: service_healthy
+      connection-gateway:
+        condition: service_healthy
+      lexical-service:
+        condition: service_healthy
+    healthcheck: *rust-healthcheck
+    mem_limit: 1536m
+
+  # Collaborative editing. Document content lives in its state volume and
+  # nowhere else.
+  sync-service:
+    <<: *container
+    image: ${SUPAMAC_SYNC_IMAGE:?set SUPAMAC_SYNC_IMAGE}
+    env_file: *env-files
+    environment:
+      ALLOWED_ORIGINS: ${SUPAMAC_UI_ORIGIN}
+    volumes:
+      - sync_state:/app/.wrangler/state
+    networks: [internal, egress]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:8787/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    mem_limit: 640m
+
+  lexical-service:
+    <<: *container
+    image: ${SUPAMAC_LEXICAL_IMAGE:?set SUPAMAC_LEXICAL_IMAGE}
+    env_file: *env-files
+    environment:
+      PORT: "8096"
+      SYNC_SERVICE_URL: http://sync-service:8787
+    networks: [internal, egress]
+    depends_on:
+      sync-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "bun", "-e", "fetch('http://localhost:8096/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    mem_limit: 512m
+
+  # Applies AI edits to open documents. Its image keeps its state, the edit
+  # traces, under /data.
+  ai-editing-worker:
+    <<: *container
+    image: ${SUPAMAC_AI_EDITING_IMAGE:?set SUPAMAC_AI_EDITING_IMAGE}
+    env_file: *env-files
+    volumes:
+      - ai_editing_state:/data
+    networks: [internal, egress]
+    depends_on:
+      sync-service:
+        condition: service_healthy
+    mem_limit: 512m
+
+  # Stands in for the EventBridge rule that ticks the reminder sweep.
+  scheduler:
+    <<: *container
+    image: ${SUPAMAC_OPS_IMAGE}
+    command: ["bun", "/opt/supamac/src/clock.ts", "reminders"]
+    environment:
+      LOCAL_AWS_URL: http://localstack:4566
+    networks: [internal]
+    depends_on:
+      init-aws:
+        condition: service_completed_successfully
+    mem_limit: 96m
+
+  # A backup when the stack starts and every 24 hours after. One that fails
+  # is tried again after ten minutes: after a reboot Docker starts the
+  # containers in no order, and the database may not be up yet. The folders
+  # are on this machine: copying them elsewhere is the owner's to arrange.
+  backup:
+    <<: *container
+    image: ${SUPAMAC_OPS_IMAGE}
+    command:
+      - sh
+      - -c
+      - >-
+        while :; do
+        if /opt/supamac/scripts/backup.sh; then
+        sleep 86400;
+        else
+        echo "backup failed; trying again in ten minutes";
+        sleep 600;
+        fi;
+        done
+    env_file: *env-files
+    environment:
+      BACKUP_KEEP: ${SUPAMAC_BACKUP_KEEP:-7}
+    volumes:
+      - backups:/backups
+      - dynamodb_data:/volumes/dynamodb:ro
+      - kms_data:/volumes/kms:ro
+      - sync_state:/volumes/sync-state:ro
+      - agent_git:/volumes/agent-git:ro
+    networks: [internal]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      init-fusionauth-db:
+        condition: service_completed_successfully
+      minio:
+        condition: service_healthy
+    mem_limit: 256m
+
+  # ==========================================================================
+  # Profile `email`: mailboxes, calendar and their schedules
+  # ==========================================================================
+
+  email-service:
+    <<: *rust-service
+    profiles: [email]
+    command: ["/app/bin/email_service"]
+    environment: &email-env
+      <<: *rust-env
+      # This service puts its own address into read-receipt links.
+      OVERRIDE_EMAIL_SERVICE_URL: https://api.${SUPAMAC_DOMAIN}/email
+    depends_on:
+      <<: *backing
+      authentication-service:
+        condition: service_healthy
+      document-storage-service:
+        condition: service_healthy
+      connection-gateway:
+        condition: service_healthy
+      static-file-service:
+        condition: service_healthy
+    healthcheck: *rust-healthcheck
+    mem_limit: 512m
+
+  email-pubsub-workers:
+    <<: *rust-service
+    profiles: [email]
+    command: ["/app/bin/pubsub_workers"]
+    environment: *email-env
+    depends_on:
+      <<: *backing
+      email-service:
+        condition: service_healthy
+    mem_limit: 512m
+
+  calendar-service:
+    <<: *rust-service
+    profiles: [email]
+    command: ["/app/bin/calendar_service"]
+    depends_on:
+      <<: *backing
+      authentication-service:
+        condition: service_healthy
+      connection-gateway:
+        condition: service_healthy
+    healthcheck: *rust-healthcheck
+    mem_limit: 256m
+
+  # Stands in for the EventBridge rules of the email stack: it serves the
+  # Lambda runtime API to the two handlers below and starts the nightly CRM
+  # cleanup.
+  email-scheduler:
+    <<: *container
+    profiles: [email]
+    image: ${SUPAMAC_OPS_IMAGE}
+    command: ["bun", "/opt/supamac/src/clock.ts", "email"]
+    environment:
+      LOCAL_AWS_URL: http://localstack:4566
+    networks: [internal]
+    depends_on:
+      init-aws:
+        condition: service_completed_successfully
+    mem_limit: 96m
+
+  # Hourly: renews Gmail push subscriptions and queues mailbox health checks.
+  email-refresh-handler:
+    <<: *rust-service
+    profiles: [email]
+    command: ["/app/bin/email_refresh_handler"]
+    environment:
+      <<: *rust-env
+      AWS_LAMBDA_RUNTIME_API: email-scheduler:9001
+      AWS_LAMBDA_FUNCTION_NAME: email_refresh_handler
+      AWS_LAMBDA_FUNCTION_MEMORY_SIZE: "128"
+      AWS_LAMBDA_FUNCTION_VERSION: $$LATEST
+      # The upstream production settings.
+      DELETE_UNUSED_AFTER_DAYS: "7"
+      DELETE_INACTIVE_AFTER_DAYS: "60"
+      INBOX_HEALTH_POLL_INTERVAL_HOURS: "6"
+    depends_on:
+      <<: *backing
+      email-scheduler:
+        condition: service_started
+    mem_limit: 128m
+
+  # Each minute: wakes the email workers for scheduled sends that are due.
+  email-scheduled-handler:
+    <<: *rust-service
+    profiles: [email]
+    command: ["/app/bin/email_scheduled_handler"]
+    environment:
+      <<: *rust-env
+      AWS_LAMBDA_RUNTIME_API: email-scheduler:9002
+      AWS_LAMBDA_FUNCTION_NAME: email_scheduled_handler
+      AWS_LAMBDA_FUNCTION_MEMORY_SIZE: "128"
+      AWS_LAMBDA_FUNCTION_VERSION: $$LATEST
+    depends_on:
+      <<: *backing
+      email-scheduler:
+        condition: service_started
+    mem_limit: 128m
+
+  # ==========================================================================
+  # Profile `search`: full-text search
+  # ==========================================================================
+
+  # Built from infra/local/opensearch: OpenSearch 3.5 with the analysis-icu
+  # plugin the index mappings need, and no security plugin. It is reachable
+  # on the internal network only.
+  opensearch:
+    <<: *container
+    profiles: [search]
+    image: ${SUPAMAC_SEARCH_IMAGE:-set-SUPAMAC_SEARCH_IMAGE-for-the-search-profile}
+    environment:
+      cluster.name: supamac
+      node.name: opensearch
+      discovery.type: single-node
+      OPENSEARCH_JAVA_OPTS: -Xms512m -Xmx512m
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - opensearch_data:/usr/share/opensearch/data
+    networks: [internal]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS -o /dev/null http://localhost:9200/_cluster/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+    mem_limit: 1536m
+
+  search-processing-service:
+    <<: *rust-service
+    profiles: [search]
+    command: ["/app/bin/search_processing_service"]
+    depends_on:
+      <<: *backing
+      init-search-indices:
+        condition: service_completed_successfully
+      lexical-service:
+        condition: service_healthy
+    healthcheck: *rust-healthcheck
+    mem_limit: 512m
+
+# Named outright, not after the project: the deploy tool may name the project
+# as it likes, a renamed project must find its data again, and
+# restore.compose.yaml mounts these by name.
+volumes:
+  config:
+    name: supamac_config
+  kms_seed:
+    name: supamac_kms_seed
+  postgres_data:
+    name: supamac_postgres_data
+  redis_data:
+    name: supamac_redis_data
+  kafka_data:
+    name: supamac_kafka_data
+  minio_data:
+    name: supamac_minio_data
+  elasticmq_data:
+    name: supamac_elasticmq_data
+  dynamodb_data:
+    name: supamac_dynamodb_data
+  kms_data:
+    name: supamac_kms_data
+  sync_state:
+    name: supamac_sync_state
+  ai_editing_state:
+    name: supamac_ai_editing_state
+  agent_git:
+    name: supamac_agent_git
+  backups:
+    name: supamac_backups
+  opensearch_data:
+    name: supamac_opensearch_data
+
+networks:
+  # No route out: the stores and everything that only talks to them.
+  internal:
+    internal: true
+  # For the containers that call the outside: AI providers, the SMTP
+  # provider, fetched links and images.
+  egress:
+  # The network of the VPS's Traefik.
+  traefik:
+    external: true
+    name: n8n_default

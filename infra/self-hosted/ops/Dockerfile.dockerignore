@@ -1,0 +1,8 @@
+# The ops image is built from the repository root. Only these paths are sent.
+*
+!infra/self-hosted/ops/**
+!infra/stacks/opensearch/helpers/**
+infra/stacks/opensearch/helpers/node_modules
+!infra/stacks/fusionauth-instance/templates/populate_jwt_local.js
+!.github/kafka-cluster-topics.json
+!crates/macro_db_client/migrations/**

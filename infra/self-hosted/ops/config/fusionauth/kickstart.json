@@ -1,0 +1,195 @@
+{
+  "variables": {
+    "defaultTenantId": "11111111-1111-4111-8111-111111111111",
+    "apiKey": "#{ENV.FUSIONAUTH_API_KEY}",
+    "jwtSecret": "#{ENV.JWT_SECRET_KEY}",
+    "clientSecret": "#{ENV.FUSIONAUTH_CLIENT_SECRET_KEY}",
+    "internalKey": "#{ENV.INTERNAL_API_KEY}",
+    "adminEmail": "#{ENV.FUSIONAUTH_ADMIN_EMAIL}",
+    "adminPassword": "#{ENV.FUSIONAUTH_ADMIN_PASSWORD}",
+    "issuer": "#{ENV.ISSUER}",
+    "mailFrom": "#{ENV.SUPAMAC_MAIL_FROM}",
+    "apiOrigin": "#{ENV.SUPAMAC_API_ORIGIN}",
+    "uiOrigin": "#{ENV.SUPAMAC_UI_ORIGIN}",
+    "uiUrl": "#{ENV.SUPAMAC_UI_URL}"
+  },
+  "apiKeys": [
+    {
+      "key": "#{apiKey}",
+      "description": "SupaMac services"
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "url": "/api/key/import/d7d09513-a3f5-401c-9685-34ab6c552453",
+      "body": {
+        "key": {
+          "id": "d7d09513-a3f5-401c-9685-34ab6c552453",
+          "algorithm": "HS256",
+          "name": "SupaMac session signing key",
+          "secret": "#{jwtSecret}",
+          "type": "HMAC"
+        }
+      }
+    },
+    {
+      "method": "POST",
+      "url": "/api/lambda/a7f3e8d2-4b91-4c5a-9e6f-1a2b3c4d5e6f",
+      "body": {
+        "lambda": {
+          "id": "a7f3e8d2-4b91-4c5a-9e6f-1a2b3c4d5e6f",
+          "name": "Populate JWT",
+          "type": "JWTPopulate",
+          "enabled": true,
+          "body": "@{populate_jwt.js}"
+        }
+      }
+    },
+    {
+      "method": "POST",
+      "url": "/api/email/template/33333333-3333-4333-8333-333333333333",
+      "body": {
+        "emailTemplate": {
+          "name": "Sign-in code",
+          "defaultSubject": "Your sign-in code",
+          "defaultHtmlTemplate": "<p>Your sign-in code:</p><h1>${code}</h1><p>It works for ten minutes. If you did not ask for it, ignore this message.</p>",
+          "defaultTextTemplate": "Your sign-in code: ${code}\n\nIt works for ten minutes. If you did not ask for it, ignore this message.",
+          "defaultFromName": "SupaMac",
+          "fromEmail": "#{mailFrom}"
+        }
+      }
+    },
+    {
+      "method": "PATCH",
+      "url": "/api/tenant/11111111-1111-4111-8111-111111111111",
+      "body": {
+        "tenant": {
+          "name": "SupaMac",
+          "issuer": "#{issuer}",
+          "eventConfiguration": {
+            "events": {
+              "user.create": { "enabled": true, "transactionType": "AbsoluteMajority" },
+              "user.create.complete": { "enabled": true, "transactionType": "None" },
+              "user.delete.complete": { "enabled": true, "transactionType": "None" },
+              "user.email.verified": { "enabled": true, "transactionType": "AbsoluteMajority" }
+            }
+          },
+          "jwtConfiguration": {
+            "accessTokenKeyId": "d7d09513-a3f5-401c-9685-34ab6c552453",
+            "idTokenKeyId": "d7d09513-a3f5-401c-9685-34ab6c552453",
+            "refreshTokenTimeToLiveInMinutes": 43200,
+            "timeToLiveInSeconds": 3600
+          },
+          "emailConfiguration": {
+            "host": "mail-relay",
+            "port": 587,
+            "security": "NONE",
+            "defaultFromEmail": "#{mailFrom}",
+            "defaultFromName": "SupaMac",
+            "passwordlessEmailTemplateId": "33333333-3333-4333-8333-333333333333"
+          },
+          "externalIdentifierConfiguration": {
+            "passwordlessLoginTimeToLiveInSeconds": 600,
+            "passwordlessLoginGenerator": {
+              "length": 6,
+              "type": "randomDigits"
+            }
+          }
+        }
+      }
+    },
+    {
+      "method": "POST",
+      "url": "/api/application/22222222-2222-4222-8222-222222222222",
+      "tenantId": "11111111-1111-4111-8111-111111111111",
+      "body": {
+        "application": {
+          "name": "SupaMac",
+          "tenantId": "11111111-1111-4111-8111-111111111111",
+          "loginConfiguration": {
+            "allowTokenRefresh": true,
+            "requireAuthentication": true,
+            "generateRefreshTokens": true
+          },
+          "oauthConfiguration": {
+            "clientId": "22222222-2222-4222-8222-222222222222",
+            "clientSecret": "#{clientSecret}",
+            "enabledGrants": ["authorization_code", "refresh_token"],
+            "authorizedRedirectURLs": [
+              "#{apiOrigin}/auth/oauth/redirect",
+              "#{uiUrl}",
+              "#{uiUrl}/"
+            ],
+            "authorizedOriginURLs": ["#{uiOrigin}", "#{apiOrigin}"],
+            "authorizedURLValidationPolicy": "ExactMatch",
+            "logoutURL": "#{uiUrl}/",
+            "logoutBehavior": "AllApplications",
+            "generateRefreshTokens": true,
+            "requireClientAuthentication": true
+          },
+          "jwtConfiguration": {
+            "enabled": true,
+            "accessTokenKeyId": "d7d09513-a3f5-401c-9685-34ab6c552453",
+            "idTokenKeyId": "d7d09513-a3f5-401c-9685-34ab6c552453",
+            "timeToLiveInSeconds": 3600,
+            "refreshTokenTimeToLiveInMinutes": 43200,
+            "refreshTokenExpirationPolicy": "SlidingWindow"
+          },
+          "lambdaConfiguration": {
+            "accessTokenPopulateId": "a7f3e8d2-4b91-4c5a-9e6f-1a2b3c4d5e6f"
+          },
+          "passwordlessConfiguration": { "enabled": true }
+        }
+      }
+    },
+    {
+      "method": "POST",
+      "url": "/api/user/registration",
+      "body": {
+        "user": {
+          "email": "#{adminEmail}",
+          "password": "#{adminPassword}"
+        },
+        "registration": {
+          "applicationId": "3c219e58-ed0e-4b18-ad48-f4f92793ae32",
+          "roles": ["admin"]
+        }
+      }
+    },
+    {
+      "method": "POST",
+      "url": "/api/webhook",
+      "body": {
+        "webhook": {
+          "description": "Create user",
+          "connectTimeout": 1000,
+          "readTimeout": 2000,
+          "url": "http://authentication-service:8080/webhooks/user",
+          "global": true,
+          "eventsEnabled": {
+            "user.create": true,
+            "user.create.complete": true,
+            "user.email.verified": true
+          },
+          "headers": { "x-internal-auth-key": "#{internalKey}" }
+        }
+      }
+    },
+    {
+      "method": "POST",
+      "url": "/api/webhook",
+      "body": {
+        "webhook": {
+          "description": "Delete user",
+          "connectTimeout": 1000,
+          "readTimeout": 2000,
+          "url": "http://authentication-service:8080/webhooks/user/delete",
+          "global": true,
+          "eventsEnabled": { "user.delete.complete": true },
+          "headers": { "x-internal-auth-key": "#{internalKey}" }
+        }
+      }
+    }
+  ]
+}
