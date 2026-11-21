@@ -59,7 +59,8 @@
 		"lint:oxlint": "cd apps/web && oxlint --type-aware",
 		"format": "cd apps/web && bunx --bun @biomejs/biome format --write",
 		"supamac:doctor": "bun tooling/supamac/doctor.ts",
-		"supamac:audit": "bun tooling/supamac/audit-dependencies.ts"
+		"supamac:audit": "bun tooling/supamac/audit-dependencies.ts",
+		"supamac:package-web": "bun tooling/supamac/package-web.ts"
 	},
 	"trustedDependencies": [
 		"@pulumi/aws-native",
