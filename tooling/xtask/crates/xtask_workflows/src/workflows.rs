@@ -1,0 +1,793 @@
+//! Generate the repo's GitHub Actions workflows from Rust.
+//!
+//! `cargo x workflows` writes every entry in [`WORKFLOWS`] to
+//! `<repo-root>/.github/workflows/<filename>`. The `--check` variant regenerates
+//! them in memory and fails if the committed YAML has drifted, so CI can
+//! guarantee the checked-in YAML always matches this source.
+//!
+//! Layout mirrors Zed's xtask: one file per workflow plus three shared "library"
+//! files — [`runners`] (runner labels), [`vars`] (env / secrets / concurrency),
+//! and [`steps`] (reusable step + job helpers).
+
+mod android_apk_on_release;
+mod android_build;
+mod android_play_publish;
+mod android_play_release;
+mod android_release_drift;
+mod android_release_watch;
+mod assign_author;
+mod assign_labels;
+mod build_agent_daemon_on_tag;
+mod build_appimage_on_tag;
+mod build_cef_codecs;
+mod build_desktop_on_tag;
+mod build_dmg_on_tag;
+mod build_web_app;
+mod cancel_stuck_cloud_storage_deploys;
+mod cargo_deny;
+mod cargo_deny_advisories;
+mod cargo_workspace_dependency_check;
+mod check_generated;
+mod check_node_modules_nix;
+mod check_tauri_lockfiles;
+mod ci_gate_fork;
+mod ci_gate_label;
+mod ci_gate_reminder;
+mod cla;
+mod cleanup_preview;
+mod code_check_cloud_storage;
+mod code_check_conventions;
+mod code_check_infra;
+mod deploy_ai_editing_worker;
+mod deploy_all_services;
+mod deploy_cla_worker;
+mod deploy_fusionauth_instance;
+mod deploy_mcp_chatgpt_worker;
+mod deploy_observability;
+mod deploy_on_push;
+mod deploy_pulumi_stack;
+mod deploy_sdk_docs;
+mod deploy_sync_service;
+mod deploy_web_app;
+mod deploy_website;
+mod desktop_qa_macos;
+mod email_e2e;
+mod email_e2e_alert;
+mod email_e2e_browser;
+mod email_e2e_full_stack;
+mod ensure_daytona_snapshot;
+mod export_ci_telemetry;
+mod fork_policy;
+mod ios_app_store_publish;
+mod ios_app_store_release;
+mod ios_preview;
+mod ios_release_drift;
+mod ios_release_watch;
+mod native_check_label;
+mod observability_image;
+mod path_validation;
+mod pr_ci;
+mod pr_privacy_check;
+mod publish_sdk;
+mod pulumi_preview_pr;
+mod push_local_stack_binaries;
+mod release_label_check;
+mod release_production;
+mod release_sdk;
+mod reusable_deploy_service;
+mod reusable_preview_service;
+mod runners;
+mod sdk_check;
+mod steps;
+mod supamac_ci;
+mod test_macrod_update;
+mod vars;
+mod web_app_check_main;
+mod web_artifact_paths;
+
+use std::fs;
+use std::path::PathBuf;
+
+use anyhow::{Context, Result, bail};
+use gh_workflow::Workflow;
+
+/// A generated workflow. `slug` is the snake_case source module (`<slug>.rs`)
+/// used in the generated header. `file_name` is explicit so generated workflows
+/// can replace existing hyphenated GitHub workflow filenames without changing
+/// their identity in GitHub Actions.
+struct WorkflowFile {
+    slug: &'static str,
+    /// Output filename under `.github/workflows/`.
+    file_name: &'static str,
+    /// Produces the YAML body for this workflow.
+    render_yaml: fn() -> Result<String>,
+}
+
+/// Render a `gh_workflow::Workflow` to YAML. Used by most workflow modules.
+fn render_gh_workflow(build: fn() -> Workflow) -> impl Fn() -> Result<String> {
+    move || build().to_string().map_err(|e| anyhow::anyhow!("{e:?}"))
+}
+
+/// Render a `gh_workflow::Workflow`, then apply a structural patch to the YAML
+/// for constructs gh-workflow 0.8 cannot express: reusable-workflow caller
+/// `with:` / `secrets: inherit`, and `workflow_call`/`workflow_dispatch` input
+/// blocks (the crate models those as unordered `HashMap`s, which would
+/// serialize in nondeterministic order and trip the drift guard).
+fn render_patched(
+    build: fn() -> Workflow,
+    patch: fn(&mut serde_yaml::Value) -> Result<()>,
+) -> Result<String> {
+    let yaml = render_gh_workflow(build)()?;
+    let mut root: serde_yaml::Value =
+        serde_yaml::from_str(&yaml).context("re-parsing generated workflow YAML")?;
+    patch(&mut root)?;
+    serde_yaml::to_string(&root).context("serializing patched workflow YAML")
+}
+
+/// Parse a YAML fragment (used by workflow `patch` fns to build ordered blocks).
+fn yaml_fragment(s: &str) -> Result<serde_yaml::Value> {
+    serde_yaml::from_str(s).context("parsing YAML fragment")
+}
+
+/// Look up `jobs.<id>` in a rendered workflow as a mutable mapping.
+fn job_mut<'a>(root: &'a mut serde_yaml::Value, id: &str) -> Result<&'a mut serde_yaml::Mapping> {
+    root.get_mut("jobs")
+        .and_then(|jobs| jobs.get_mut(id))
+        .and_then(serde_yaml::Value::as_mapping_mut)
+        .with_context(|| format!("job `{id}` not found in rendered workflow"))
+}
+
+/// Every workflow we generate. Add new workflows here.
+const WORKFLOWS: &[WorkflowFile] = &[
+    WorkflowFile {
+        slug: "supamac_ci",
+        file_name: "supamac-ci.yml",
+        render_yaml: supamac_ci::render,
+    },
+    WorkflowFile {
+        slug: "observability_image",
+        file_name: "observability_image.yml",
+        render_yaml: || render_gh_workflow(observability_image::observability_image)(),
+    },
+    WorkflowFile {
+        slug: "deploy_observability",
+        file_name: "deploy-observability.yml",
+        render_yaml: || {
+            render_patched(
+                deploy_observability::deploy_observability,
+                deploy_observability::patch,
+            )
+        },
+    },
+    WorkflowFile {
+        slug: "export_ci_telemetry",
+        file_name: "export-ci-telemetry.yml",
+        render_yaml: || render_gh_workflow(export_ci_telemetry::export_ci_telemetry)(),
+    },
+    WorkflowFile {
+        slug: "assign_author",
+        file_name: "assign-author.yml",
+        render_yaml: || render_gh_workflow(assign_author::assign_author)(),
+    },
+    WorkflowFile {
+        slug: "assign_labels",
+        file_name: "assign-labels.yml",
+        render_yaml: || render_gh_workflow(assign_labels::assign_labels)(),
+    },
+    WorkflowFile {
+        slug: "build_agent_daemon_on_tag",
+        file_name: "build_agent_daemon_on_tag.yml",
+        render_yaml: || render_gh_workflow(build_agent_daemon_on_tag::build_agent_daemon_on_tag)(),
+    },
+    WorkflowFile {
+        slug: "test_macrod_update",
+        file_name: "test_macrod_update.yml",
+        render_yaml: || render_gh_workflow(test_macrod_update::test_macrod_update)(),
+    },
+    WorkflowFile {
+        slug: "build_appimage_on_tag",
+        file_name: "build_appimage_on_tag.yml",
+        render_yaml: || render_gh_workflow(build_appimage_on_tag::build_appimage)(),
+    },
+    WorkflowFile {
+        slug: "build_dmg_on_tag",
+        file_name: "build_dmg_on_tag.yml",
+        render_yaml: || render_patched(build_dmg_on_tag::build_dmg, build_dmg_on_tag::patch),
+    },
+    WorkflowFile {
+        slug: "desktop_qa_macos",
+        file_name: "desktop_qa_macos.yml",
+        render_yaml: || render_patched(desktop_qa_macos::desktop_qa_macos, desktop_qa_macos::patch),
+    },
+    WorkflowFile {
+        slug: "build_desktop_on_tag",
+        file_name: "build_desktop_on_tag.yml",
+        render_yaml: || render_gh_workflow(build_desktop_on_tag::build_desktop_on_tag)(),
+    },
+    WorkflowFile {
+        slug: "email_e2e",
+        file_name: "email_e2e.yml",
+        render_yaml: || email_e2e::render(email_e2e::email_e2e),
+    },
+    WorkflowFile {
+        slug: "email_e2e_browser",
+        file_name: "email_e2e_browser.yml",
+        render_yaml: || email_e2e::render(email_e2e_browser::email_e2e_browser),
+    },
+    WorkflowFile {
+        slug: "email_e2e_full_stack",
+        file_name: "email_e2e_full_stack.yml",
+        render_yaml: || email_e2e::render(email_e2e_full_stack::email_e2e_full_stack),
+    },
+    WorkflowFile {
+        slug: "code_check_infra",
+        file_name: "code_check_infra.yml",
+        render_yaml: || render_gh_workflow(code_check_infra::code_check_infra)(),
+    },
+    WorkflowFile {
+        slug: "build_web_app",
+        file_name: "build_web_app.yml",
+        render_yaml: || render_patched(build_web_app::build_web_app, build_web_app::patch),
+    },
+    WorkflowFile {
+        slug: "cancel_stuck_cloud_storage_deploys",
+        file_name: "cancel_stuck_cloud_storage_deploys.yml",
+        render_yaml: || {
+            render_patched(
+                cancel_stuck_cloud_storage_deploys::cancel_stuck_cloud_storage_deploys,
+                cancel_stuck_cloud_storage_deploys::patch,
+            )
+        },
+    },
+    WorkflowFile {
+        slug: "cargo_deny",
+        file_name: "cargo_deny.yml",
+        render_yaml: || render_gh_workflow(cargo_deny::cargo_deny)(),
+    },
+    WorkflowFile {
+        slug: "cargo_deny_advisories",
+        file_name: "cargo_deny_advisories.yml",
+        render_yaml: || render_gh_workflow(cargo_deny_advisories::cargo_deny_advisories)(),
+    },
+    WorkflowFile {
+        slug: "cargo_workspace_dependency_check",
+        file_name: "cargo_workspace_dependency_check.yml",
+        render_yaml: || {
+            render_gh_workflow(cargo_workspace_dependency_check::cargo_workspace_dependency_check)()
+        },
+    },
+    WorkflowFile {
+        slug: "cla",
+        file_name: "cla.yml",
+        render_yaml: || render_gh_workflow(cla::cla)(),
+    },
+    WorkflowFile {
+        slug: "cleanup_preview",
+        file_name: "cleanup_preview.yml",
+        render_yaml: || render_gh_workflow(cleanup_preview::cleanup_preview)(),
+    },
+    WorkflowFile {
+        slug: "code_check_cloud_storage",
+        file_name: "code_check_cloud_storage.yml",
+        render_yaml: || render_gh_workflow(code_check_cloud_storage::code_check_cloud_storage)(),
+    },
+    WorkflowFile {
+        slug: "code_check_conventions",
+        file_name: "code_check_conventions.yml",
+        render_yaml: || render_gh_workflow(code_check_conventions::code_check_conventions)(),
+    },
+    WorkflowFile {
+        slug: "deploy_ai_editing_worker",
+        file_name: "deploy_ai_editing_worker.yml",
+        render_yaml: || {
+            render_patched(
+                deploy_ai_editing_worker::deploy_ai_editing_worker,
+                deploy_ai_editing_worker::patch,
+            )
+        },
+    },
+    WorkflowFile {
+        slug: "deploy_mcp_chatgpt_worker",
+        file_name: "deploy_mcp_chatgpt_worker.yml",
+        render_yaml: || {
+            render_patched(
+                deploy_mcp_chatgpt_worker::deploy_mcp_chatgpt_worker,
+                deploy_mcp_chatgpt_worker::patch,
+            )
+        },
+    },
+    WorkflowFile {
+        slug: "deploy_all_services",
+        file_name: "deploy_all_services.yml",
+        render_yaml: || {
+            render_patched(
+                deploy_all_services::deploy_all_services,
+                deploy_all_services::patch,
+            )
+        },
+    },
+    WorkflowFile {
+        slug: "deploy_cla_worker",
+        file_name: "deploy_cla_worker.yml",
+        render_yaml: || render_gh_workflow(deploy_cla_worker::deploy_cla_worker)(),
+    },
+    WorkflowFile {
+        slug: "deploy_sdk_docs",
+        file_name: "deploy_sdk_docs.yml",
+        render_yaml: || render_gh_workflow(deploy_sdk_docs::deploy_sdk_docs)(),
+    },
+    WorkflowFile {
+        slug: "deploy_on_push",
+        file_name: "deploy_on_push.yml",
+        render_yaml: || {
+            let yaml = render_patched(deploy_on_push::deploy_on_push, deploy_on_push::patch)?;
+            Ok(format!("{}{yaml}", deploy_on_push::NOTICE))
+        },
+    },
+    WorkflowFile {
+        slug: "deploy_fusionauth_instance",
+        file_name: "deploy_fusionauth_instance.yml",
+        render_yaml: || {
+            render_patched(
+                deploy_fusionauth_instance::deploy_fusionauth_instance,
+                deploy_fusionauth_instance::patch,
+            )
+        },
+    },
+    WorkflowFile {
+        slug: "deploy_pulumi_stack",
+        file_name: "deploy-pulumi-stack.yml",
+        render_yaml: || {
+            render_patched(
+                deploy_pulumi_stack::deploy_pulumi_stack,
+                deploy_pulumi_stack::patch,
+            )
+        },
+    },
+    WorkflowFile {
+        slug: "deploy_sync_service",
+        file_name: "deploy_sync_service.yml",
+        render_yaml: || {
+            render_patched(
+                deploy_sync_service::deploy_sync_service,
+                deploy_sync_service::patch,
+            )
+        },
+    },
+    WorkflowFile {
+        slug: "deploy_web_app",
+        file_name: "deploy_web_app.yml",
+        render_yaml: || render_patched(deploy_web_app::deploy_web_app, deploy_web_app::patch),
+    },
+    WorkflowFile {
+        slug: "release_production",
+        file_name: "release-production.yml",
+        render_yaml: || {
+            render_patched(
+                release_production::release_production,
+                release_production::patch,
+            )
+        },
+    },
+    WorkflowFile {
+        slug: "deploy_website",
+        file_name: "deploy_website.yml",
+        render_yaml: || render_patched(deploy_website::deploy_website, deploy_website::patch),
+    },
+    WorkflowFile {
+        slug: "build_cef_codecs",
+        file_name: "build_cef_codecs.yml",
+        render_yaml: || render_gh_workflow(build_cef_codecs::build_cef_codecs)(),
+    },
+    WorkflowFile {
+        slug: "ensure_daytona_snapshot",
+        file_name: "ensure_daytona_snapshot.yml",
+        render_yaml: || render_gh_workflow(ensure_daytona_snapshot::ensure_daytona_snapshot)(),
+    },
+    WorkflowFile {
+        slug: "ios_preview",
+        file_name: "ios_preview.yml",
+        render_yaml: || render_gh_workflow(ios_preview::ios_preview)(),
+    },
+    WorkflowFile {
+        slug: "pr_ci",
+        file_name: "pr-ci.yml",
+        render_yaml: || render_patched(pr_ci::pr_ci, pr_ci::patch),
+    },
+    WorkflowFile {
+        slug: "ci_gate_reminder",
+        file_name: "ci-gate-reminder.yml",
+        render_yaml: || render_gh_workflow(ci_gate_reminder::ci_gate_reminder)(),
+    },
+    WorkflowFile {
+        slug: "ci_gate_label",
+        file_name: "ci-gate-label.yml",
+        render_yaml: || render_gh_workflow(ci_gate_label::ci_gate_label)(),
+    },
+    WorkflowFile {
+        slug: "ci_gate_fork",
+        file_name: "ci-gate-fork.yml",
+        render_yaml: || render_gh_workflow(ci_gate_fork::ci_gate_fork)(),
+    },
+    WorkflowFile {
+        slug: "pr_privacy_check",
+        file_name: "pr-privacy-check.yml",
+        render_yaml: || render_gh_workflow(pr_privacy_check::pr_privacy_check)(),
+    },
+    WorkflowFile {
+        slug: "push_local_stack_binaries",
+        file_name: "push_local_stack_binaries.yml",
+        render_yaml: || render_gh_workflow(push_local_stack_binaries::push_local_stack_binaries)(),
+    },
+    WorkflowFile {
+        slug: "publish_sdk",
+        file_name: "publish-sdk.yml",
+        render_yaml: || render_gh_workflow(publish_sdk::publish_sdk)(),
+    },
+    WorkflowFile {
+        slug: "release_sdk",
+        file_name: "release-sdk.yml",
+        render_yaml: || render_gh_workflow(release_sdk::release_sdk)(),
+    },
+    WorkflowFile {
+        slug: "ios_app_store_release",
+        file_name: "ios-app-store-release.yml",
+        render_yaml: || render_gh_workflow(ios_app_store_release::ios_app_store_release)(),
+    },
+    WorkflowFile {
+        slug: "ios_app_store_publish",
+        file_name: "ios-app-store-publish.yml",
+        render_yaml: || render_gh_workflow(ios_app_store_publish::ios_app_store_publish)(),
+    },
+    WorkflowFile {
+        slug: "native_check_label",
+        file_name: "native-check-label.yml",
+        render_yaml: || render_gh_workflow(native_check_label::native_check_label)(),
+    },
+    WorkflowFile {
+        slug: "release_label_check",
+        file_name: "release-label-check.yml",
+        render_yaml: || render_gh_workflow(release_label_check::release_label_check)(),
+    },
+    WorkflowFile {
+        slug: "android_play_release",
+        file_name: "android-play-release.yml",
+        render_yaml: || render_gh_workflow(android_play_release::android_play_release)(),
+    },
+    WorkflowFile {
+        slug: "android_apk_on_release",
+        file_name: "android-apk-on-release.yml",
+        render_yaml: || render_gh_workflow(android_apk_on_release::android_apk_on_release)(),
+    },
+    WorkflowFile {
+        slug: "android_play_publish",
+        file_name: "android-play-publish.yml",
+        render_yaml: || render_gh_workflow(android_play_publish::android_play_publish)(),
+    },
+    WorkflowFile {
+        slug: "android_release_watch",
+        file_name: "android-release-watch.yml",
+        render_yaml: || render_gh_workflow(android_release_watch::android_release_watch)(),
+    },
+    WorkflowFile {
+        slug: "android_release_drift",
+        file_name: "android-release-drift.yml",
+        render_yaml: || render_gh_workflow(android_release_drift::android_release_drift)(),
+    },
+    WorkflowFile {
+        slug: "ios_release_drift",
+        file_name: "ios-release-drift.yml",
+        render_yaml: || render_gh_workflow(ios_release_drift::ios_release_drift)(),
+    },
+    WorkflowFile {
+        slug: "ios_release_watch",
+        file_name: "ios-release-watch.yml",
+        render_yaml: || render_gh_workflow(ios_release_watch::ios_release_watch)(),
+    },
+    WorkflowFile {
+        slug: "pulumi_preview_pr",
+        file_name: "pulumi_preview_pr.yml",
+        render_yaml: || {
+            render_patched(
+                pulumi_preview_pr::pulumi_preview_pr,
+                pulumi_preview_pr::patch,
+            )
+        },
+    },
+    WorkflowFile {
+        slug: "reusable_deploy_service",
+        file_name: "reusable_deploy_service.yml",
+        render_yaml: || {
+            render_patched(
+                reusable_deploy_service::reusable_deploy_service,
+                reusable_deploy_service::patch,
+            )
+        },
+    },
+    WorkflowFile {
+        slug: "reusable_preview_service",
+        file_name: "reusable_preview_service.yml",
+        render_yaml: || {
+            render_patched(
+                reusable_preview_service::reusable_preview_service,
+                reusable_preview_service::patch,
+            )
+        },
+    },
+    WorkflowFile {
+        slug: "check_node_modules_nix",
+        file_name: "check_node_modules_nix.yml",
+        render_yaml: || render_gh_workflow(check_node_modules_nix::check_node_modules_nix)(),
+    },
+    WorkflowFile {
+        slug: "check_tauri_lockfiles",
+        file_name: "check_tauri_lockfiles.yml",
+        render_yaml: || render_gh_workflow(check_tauri_lockfiles::check_tauri_lockfiles)(),
+    },
+    WorkflowFile {
+        slug: "check_generated",
+        file_name: "check_generated.yml",
+        render_yaml: || render_gh_workflow(check_generated::check_generated_workflows)(),
+    },
+    WorkflowFile {
+        slug: "web_app_check_main",
+        file_name: "web-app-check-main.yml",
+        render_yaml: || render_gh_workflow(web_app_check_main::web_app_check_main)(),
+    },
+    WorkflowFile {
+        slug: "sdk_check",
+        file_name: "sdk-check.yml",
+        render_yaml: || render_gh_workflow(sdk_check::sdk_check)(),
+    },
+];
+
+/// Write every workflow to disk.
+pub fn generate() -> Result<()> {
+    let dir = workflows_dir()?;
+    for workflow in WORKFLOWS {
+        let path = dir.join(workflow.file_name);
+        fs::write(&path, render(workflow)?)
+            .with_context(|| format!("writing {}", path.display()))?;
+        println!("generated {}", path.display());
+    }
+    Ok(())
+}
+
+/// Fail if any committed workflow differs from what we'd generate now.
+pub fn check() -> Result<()> {
+    let dir = workflows_dir()?;
+    let mut stale = Vec::new();
+    for workflow in WORKFLOWS {
+        let path = dir.join(workflow.file_name);
+        let on_disk =
+            fs::read_to_string(&path).with_context(|| format!("reading {}", path.display()))?;
+        if on_disk != render(workflow)? {
+            stale.push(workflow.file_name.to_string());
+        }
+    }
+    if !stale.is_empty() {
+        bail!(
+            "generated workflows are stale: {}\nrun `cargo x workflows` from the repository root and commit the result",
+            stale.join(", ")
+        );
+    }
+    println!("all generated workflows are up to date");
+    Ok(())
+}
+
+/// Serialize a workflow to YAML and prepend the "do not edit" header.
+fn render(workflow: &WorkflowFile) -> Result<String> {
+    let yaml =
+        (workflow.render_yaml)().with_context(|| format!("serializing {}", workflow.file_name))?;
+    let yaml = if workflow.slug == "supamac_ci" {
+        yaml
+    } else {
+        fork_policy::restrict_to_upstream(&yaml)?
+    };
+    path_validation::validate(workflow.file_name, &yaml, &xtask_paths::repo_root())?;
+    Ok(format!("{}{yaml}", disclaimer(workflow.slug)))
+}
+
+/// The header every generated file starts with.
+fn disclaimer(source: &str) -> String {
+    format!(
+        "# DO NOT EDIT — regenerate with `cargo x workflows` (from the repository root).\n\
+         # Source: tooling/xtask/crates/xtask_workflows/src/workflows/{source}.rs\n",
+    )
+}
+
+/// `<repo-root>/.github/workflows`. Anchored on the repo root (from
+/// [`xtask_paths`]) so the task works from any cwd.
+fn workflows_dir() -> Result<PathBuf> {
+    let dir = xtask_paths::repo_root().join(".github").join("workflows");
+    if !dir.is_dir() {
+        bail!("expected a workflows directory at {}", dir.display());
+    }
+    Ok(dir)
+}
+
+#[cfg(test)]
+mod handoff_tests {
+    #[test]
+    fn every_handoff_has_a_runtime_bound_and_attempt_scoped_destination() {
+        for workflow in [
+            super::deploy_all_services::deploy_all_services(),
+            super::reusable_deploy_service::reusable_deploy_service(),
+        ] {
+            let workflow = serde_json::to_value(workflow).unwrap();
+            for job in ["build-service-binaries", "build-lambda-artifacts"] {
+                let steps = workflow["jobs"][job]["steps"].as_array().unwrap();
+                let upload_index = steps
+                    .iter()
+                    .position(|step| step["name"] == "Upload handoff artifact")
+                    .unwrap();
+                let upload = &steps[upload_index];
+                assert!(steps[..upload_index].iter().any(|step| {
+                    step["uses"] == "oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6"
+                        && step["with"]["bun-version"] == "1.3.13"
+                }));
+                assert_eq!(upload["timeout-minutes"], 20);
+                assert!(upload.get("continue-on-error").is_none());
+                let command = upload["run"].as_str().unwrap();
+                assert!(command.starts_with("bun .github/scripts/upload-handoff-artifact.ts "));
+                assert!(command.ends_with("\"$DEST\""));
+                let destination = upload["env"]["DEST"].as_str().unwrap();
+                assert!(
+                    destination
+                        .starts_with("handoff/${{ github.run_id }}-${{ github.run_attempt }}/")
+                );
+                assert!(destination.ends_with(if job == "build-service-binaries" {
+                    "/prebuilt-binaries.tar.gz"
+                } else {
+                    "/lambda-artifacts.tar.gz"
+                }));
+            }
+        }
+    }
+
+    #[test]
+    fn upload_retry_contract_and_process_lifecycle() {
+        let output = std::process::Command::new("bun")
+            .args(["test", "./.github/scripts/upload-handoff-artifact.test.ts"])
+            .current_dir(xtask_paths::repo_root())
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+}
+
+#[cfg(test)]
+mod cargo_target_tests {
+    use std::collections::BTreeMap;
+
+    const REUSE: &str = "Reuse the kept cargo target";
+    const SEAL: &str = "Seal the kept cargo target";
+
+    /// Whether a step mounts a cargo `target` directory on a cache volume.
+    fn mounts_target(step: &serde_yaml::Value) -> bool {
+        step["uses"]
+            .as_str()
+            .is_some_and(|uses| uses.starts_with("namespacelabs/nscloud-cache-action@"))
+            && step["with"]["path"].as_str().is_some_and(|paths| {
+                paths
+                    .lines()
+                    .any(|path| path == "./target" || path == super::vars::CARGO_TARGET_VOLUME_DIR)
+            })
+    }
+
+    /// `steps::reuse_cargo_target` keeps, next to `target`, the times its
+    /// sources' contents first appeared, and cargo trusts units newer than
+    /// them. A job that builds into a `target` without updating those times
+    /// leaves units that look fresh for other contents, so on one cache tag
+    /// either every job that mounts a `target` dates its checkout right after
+    /// mounting it, or none does.
+    #[test]
+    fn every_job_sharing_a_reused_target_dates_its_checkout() {
+        // Cache tag (or the runner's default volume) -> (job, reuses it) for
+        // every job that mounts a `target`.
+        let mut by_volume: BTreeMap<String, Vec<(String, bool)>> = BTreeMap::new();
+        for workflow in super::WORKFLOWS {
+            let yaml = (workflow.render_yaml)().expect("workflow renders");
+            let root: serde_yaml::Value = serde_yaml::from_str(&yaml).expect("workflow parses");
+            for (id, job) in root["jobs"].as_mapping().expect("jobs") {
+                let place = format!(
+                    "{} job {}",
+                    workflow.file_name,
+                    id.as_str().unwrap_or_default()
+                );
+                let steps: Vec<&serde_yaml::Value> =
+                    job["steps"].as_sequence().into_iter().flatten().collect();
+                let Some(mount) = steps.iter().position(|step| mounts_target(step)) else {
+                    assert!(
+                        !steps
+                            .iter()
+                            .any(|step| step["name"].as_str() == Some(REUSE)),
+                        "{place} reuses a target it doesn't mount"
+                    );
+                    continue;
+                };
+                let reuses = steps
+                    .iter()
+                    .any(|step| step["name"].as_str() == Some(REUSE));
+                if reuses {
+                    assert_eq!(
+                        steps.get(mount + 1).and_then(|step| step["name"].as_str()),
+                        Some(REUSE),
+                        "{place} dates its checkout right after mounting its target"
+                    );
+                    assert_eq!(
+                        steps.last().and_then(|step| step["name"].as_str()),
+                        Some(SEAL),
+                        "{place} seals its target last"
+                    );
+                }
+                let runs_on = serde_yaml::to_string(&job["runs-on"]).expect("runs-on serializes");
+                let volume = runs_on
+                    .split_once("cache-tag=")
+                    .map(|(_, tag)| tag.trim().to_owned())
+                    .unwrap_or_else(|| format!("default volume of {}", runs_on.trim()));
+                by_volume.entry(volume).or_default().push((place, reuses));
+            }
+        }
+
+        for (volume, jobs) in by_volume {
+            let reusing: Vec<_> = jobs.iter().filter(|(_, reuses)| *reuses).collect();
+            assert!(
+                reusing.is_empty() || reusing.len() == jobs.len(),
+                "on {volume}, these jobs reuse the kept target: {reusing:?}; all of {jobs:?} must"
+            );
+        }
+    }
+}
+
+#[cfg(test)]
+mod checkout_tests {
+    /// A stalled fetch otherwise holds a job until its timeout; see
+    /// [`super::steps::abort_stalled_fetch`].
+    #[test]
+    fn every_checkout_gives_up_on_a_stalled_fetch() {
+        let expected = super::steps::abort_stalled_fetch(
+            gh_workflow::Step::new("x").uses("actions", "checkout", "x"),
+        );
+        let expected = serde_yaml::to_value(&expected).expect("step serializes")["env"].clone();
+
+        let mut checked = Vec::new();
+        for workflow in super::WORKFLOWS {
+            let yaml = (workflow.render_yaml)().expect("workflow renders");
+            let root: serde_yaml::Value = serde_yaml::from_str(&yaml).expect("workflow parses");
+            for (id, job) in root["jobs"].as_mapping().expect("jobs") {
+                let id = id.as_str().unwrap_or_default();
+                checked.push((
+                    format!("{} job {id}", workflow.file_name),
+                    job["steps"].clone(),
+                ));
+            }
+        }
+        // Composite actions are hand-written and run inside generated jobs.
+        let actions = xtask_paths::repo_root().join(".github/actions");
+        for entry in std::fs::read_dir(&actions).expect("composite actions") {
+            let path = entry.expect("action dir").path().join("action.yml");
+            let Ok(text) = std::fs::read_to_string(&path) else {
+                continue;
+            };
+            let root: serde_yaml::Value = serde_yaml::from_str(&text).expect("action parses");
+            checked.push((path.display().to_string(), root["runs"]["steps"].clone()));
+        }
+
+        for (place, steps) in checked {
+            for step in steps.as_sequence().into_iter().flatten() {
+                let uses = step["uses"].as_str().unwrap_or_default();
+                if uses.starts_with("actions/checkout@") {
+                    assert_eq!(
+                        step["env"], expected,
+                        "{place} checks out without abort_stalled_fetch's settings"
+                    );
+                }
+            }
+        }
+    }
+}

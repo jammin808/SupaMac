@@ -1,0 +1,340 @@
+#![deny(missing_docs)]
+
+//! This crate contains models for the search cursor.
+
+use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
+
+/// Required trait to be able to create a cursor from a Sortable list of items
+pub trait SearchCursorAttributes {
+    /// Gets the entity id
+    fn entity_id(&self) -> uuid::Uuid;
+    /// Gets the updated_at
+    fn updated_at(&self) -> chrono::DateTime<chrono::Utc>;
+}
+
+/// Result of processing sorted results for pagination
+#[derive(Debug, Clone)]
+pub struct PaginatedResult<T> {
+    /// The items to return (with extra item removed if present)
+    pub items: Vec<T>,
+    /// The cursor for fetching the next page
+    pub cursor: SearchCursorOption,
+}
+
+/// Cursor for a single search method. Each variant matches the sort fields
+/// of the search it paginates, so the values can be passed straight to
+/// OpenSearch's `search_after` without re-purposing.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub enum SearchMethodCursor {
+    /// Sort: `[updated_at_ms desc, entity_id asc]`. Used by name searches and
+    /// the default channel content sort.
+    UpdatedAt {
+        /// Tiebreaker entity id.
+        entity_id: uuid::Uuid,
+        /// Primary sort timestamp.
+        updated_at: chrono::DateTime<chrono::Utc>,
+    },
+    /// Sort: `[thread_id desc, message_id desc]`. Used by channel content
+    /// search in thread-grouped mode.
+    Thread {
+        /// Primary sort key.
+        thread_id: uuid::Uuid,
+        /// Tiebreaker for replies within the same thread.
+        message_id: uuid::Uuid,
+    },
+}
+
+impl SearchMethodCursor {
+    /// Produces the values to pass as OpenSearch `search_after`.
+    pub fn search_after(&self) -> Vec<serde_json::Value> {
+        match self {
+            Self::UpdatedAt {
+                entity_id,
+                updated_at,
+            } => vec![
+                serde_json::json!(updated_at.timestamp_millis()),
+                serde_json::json!(entity_id.to_string()),
+            ],
+            Self::Thread {
+                thread_id,
+                message_id,
+            } => vec![
+                serde_json::json!(thread_id.to_string()),
+                serde_json::json!(message_id.to_string()),
+            ],
+        }
+    }
+
+    /// Returns `(entity_id, updated_at)` for the `UpdatedAt` variant.
+    /// Callers that only paginate by `(updated_at, entity_id)` use this to
+    /// avoid exhaustive matching; `Thread` cursors yield `None`.
+    pub fn as_updated_at(&self) -> Option<(uuid::Uuid, chrono::DateTime<chrono::Utc>)> {
+        match self {
+            Self::UpdatedAt {
+                entity_id,
+                updated_at,
+            } => Some((*entity_id, *updated_at)),
+            Self::Thread { .. } => None,
+        }
+    }
+
+    /// Encodes the cursor as a base64 string for client transport.
+    pub fn encode(&self) -> Option<String> {
+        serde_json::to_vec(self)
+            .ok()
+            .map(|bytes| BASE64.encode(bytes))
+    }
+
+    /// Decodes a base64-encoded cursor string.
+    pub fn decode(encoded: &str) -> Option<Self> {
+        BASE64
+            .decode(encoded)
+            .ok()
+            .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+    }
+}
+
+/// Represents the state of a search cursor
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub enum SearchCursorOption {
+    /// The cursor has either not been started or is not exhausted
+    NotDone(Option<SearchMethodCursor>),
+    /// The cursor is exhausted
+    Done,
+}
+
+impl Default for SearchCursorOption {
+    fn default() -> Self {
+        SearchCursorOption::NotDone(None)
+    }
+}
+
+impl SearchCursorOption {
+    /// Returns true if there are more results to fetch
+    pub fn has_more(&self) -> bool {
+        matches!(self, SearchCursorOption::NotDone(_))
+    }
+
+    /// Returns true if the cursor is exhausted (no more results)
+    pub fn is_done(&self) -> bool {
+        matches!(self, SearchCursorOption::Done)
+    }
+
+    /// Processes sorted results for pagination.
+    ///
+    /// Expects the query to have fetched `limit + 1` items. Returns the trimmed
+    /// items (at most `limit`) and the appropriate cursor.
+    pub fn paginate<T: SearchCursorAttributes>(
+        mut items: Vec<T>,
+        limit: usize,
+    ) -> PaginatedResult<T> {
+        let has_more = items.len() > limit;
+        if has_more {
+            items.pop();
+        }
+
+        let cursor = if has_more {
+            match items.last() {
+                Some(last) => SearchCursorOption::NotDone(Some(SearchMethodCursor::UpdatedAt {
+                    entity_id: last.entity_id(),
+                    updated_at: last.updated_at(),
+                })),
+                None => SearchCursorOption::Done,
+            }
+        } else {
+            SearchCursorOption::Done
+        };
+
+        PaginatedResult { items, cursor }
+    }
+}
+
+/// How the search that minted a cursor matched multi-term document content.
+///
+/// A wire type of its own: the cursor's JSON must not change when the request
+/// or query-builder enums do, and this crate depends on neither.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CursorTermMatching {
+    /// Every term somewhere in the document.
+    All,
+    /// Most terms in one passage.
+    Dynamic,
+}
+
+/// The search cursor contains all the individual `SearchCursorOption` for each search method.
+#[derive(Debug, serde::Serialize, serde::Deserialize, Default)]
+pub struct SearchCursor {
+    /// The chat name cursor
+    pub chat_name_cursor: SearchCursorOption,
+    /// The content cursor
+    pub content_cursor: SearchCursorOption,
+    /// The project cursor
+    pub project_name_cursor: SearchCursorOption,
+    /// The CRM company name cursor. `#[serde(default)]` so cursors minted
+    /// before CRM search existed still decode (defaults to a fresh cursor).
+    #[serde(default)]
+    pub crm_company_cursor: SearchCursorOption,
+    /// The channel name cursor. `#[serde(default)]` so cursors minted before
+    /// channels were name-searched in Postgres still decode.
+    #[serde(default)]
+    pub channel_name_cursor: SearchCursorOption,
+    /// The matching mode the first page ran with, so every later page runs
+    /// the same one. Absent on cursors minted before it existed and on
+    /// searches dynamic matching could not apply to; the page then decides
+    /// for itself. A mode this build does not know reads as absent, so a
+    /// cursor from a newer build still pages.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "known_term_matching"
+    )]
+    pub document_term_matching: Option<CursorTermMatching>,
+}
+
+fn known_term_matching<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Option<CursorTermMatching>, D::Error> {
+    let value: Option<serde_json::Value> = serde::Deserialize::deserialize(deserializer)?;
+    Ok(value.and_then(|value| serde_json::from_value(value).ok()))
+}
+
+impl SearchCursor {
+    /// Decodes a base64-encoded cursor string into a SearchCursor
+    pub fn decode(encoded: &str) -> Option<Self> {
+        BASE64
+            .decode(encoded)
+            .ok()
+            .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+    }
+
+    /// Encodes the SearchCursor into a base64 string
+    pub fn encode(&self) -> Option<String> {
+        serde_json::to_vec(self)
+            .ok()
+            .map(|bytes| BASE64.encode(bytes))
+    }
+
+    /// Returns if the cursor is fully exhausted
+    pub fn is_exhausted(&self) -> bool {
+        self.chat_name_cursor.is_done()
+            && self.content_cursor.is_done()
+            && self.project_name_cursor.is_done()
+            && self.crm_company_cursor.is_done()
+            && self.channel_name_cursor.is_done()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    /// A cursor minted before CRM search existed (no `crm_company_cursor`
+    /// field) must still decode, with the new field defaulting to a fresh
+    /// `NotDone(None)` rather than failing.
+    #[test]
+    fn decodes_legacy_cursor_without_crm_field() {
+        let legacy = r#"{"document_name_cursor":"Done","chat_name_cursor":"Done","content_cursor":"Done","project_name_cursor":"Done"}"#;
+        let encoded = BASE64.encode(legacy);
+
+        let cursor = SearchCursor::decode(&encoded).expect("legacy cursor should decode");
+
+        assert!(
+            cursor.crm_company_cursor.has_more(),
+            "missing crm cursor should default to NotDone(None)"
+        );
+        // The four legacy sources are Done, but the defaulted CRM cursor is
+        // NotDone, so the whole cursor is not yet exhausted.
+        assert!(!cursor.is_exhausted());
+    }
+
+    /// A cursor minted before channels were name-searched in Postgres (no
+    /// `channel_name_cursor` field) decodes with a fresh channel cursor, so
+    /// the next page runs the channel search from the start.
+    #[test]
+    fn decodes_legacy_cursor_without_channel_name_field() {
+        let legacy = r#"{"chat_name_cursor":"Done","content_cursor":"Done","project_name_cursor":"Done","crm_company_cursor":"Done"}"#;
+        let encoded = BASE64.encode(legacy);
+
+        let cursor = SearchCursor::decode(&encoded).expect("legacy cursor should decode");
+
+        assert!(cursor.channel_name_cursor.has_more());
+        assert!(!cursor.is_exhausted());
+    }
+
+    /// A cursor minted before the matching mode was carried decodes without
+    /// one, and a cursor without one serializes exactly as it used to.
+    #[test]
+    fn legacy_cursor_has_no_term_matching_and_stays_byte_identical() {
+        let legacy = r#"{"chat_name_cursor":"Done","content_cursor":{"NotDone":null},"project_name_cursor":"Done","crm_company_cursor":"Done","channel_name_cursor":"Done"}"#;
+
+        let cursor = SearchCursor::decode(&BASE64.encode(legacy)).expect("legacy cursor decodes");
+
+        assert_eq!(cursor.document_term_matching, None);
+        assert_eq!(cursor.encode(), Some(BASE64.encode(legacy)));
+    }
+
+    /// A mode from a newer build must not make the whole cursor undecodable:
+    /// the handler treats an undecodable cursor as no cursor and would serve
+    /// page one again.
+    #[test]
+    fn unknown_term_matching_reads_as_absent_and_keeps_the_position() {
+        let newer = r#"{"chat_name_cursor":"Done","content_cursor":{"NotDone":null},"project_name_cursor":"Done","crm_company_cursor":"Done","channel_name_cursor":"Done","document_term_matching":"semantic"}"#;
+
+        let cursor = SearchCursor::decode(&BASE64.encode(newer)).expect("cursor decodes");
+
+        assert_eq!(cursor.document_term_matching, None);
+        assert!(cursor.chat_name_cursor.is_done());
+        assert!(cursor.content_cursor.has_more());
+    }
+
+    #[test]
+    fn term_matching_round_trips() {
+        for mode in [CursorTermMatching::All, CursorTermMatching::Dynamic] {
+            let cursor = SearchCursor {
+                document_term_matching: Some(mode),
+                ..Default::default()
+            };
+
+            let decoded = SearchCursor::decode(&cursor.encode().expect("encode")).expect("decode");
+
+            assert_eq!(decoded.document_term_matching, Some(mode));
+        }
+    }
+
+    #[test]
+    fn crm_cursor_round_trips() {
+        let cursor = SearchCursor {
+            crm_company_cursor: SearchCursorOption::Done,
+            ..Default::default()
+        };
+        let decoded = SearchCursor::decode(&cursor.encode().expect("encode")).expect("decode");
+        assert!(decoded.crm_company_cursor.is_done());
+    }
+
+    #[test]
+    fn is_exhausted_requires_every_source_done() {
+        let mut cursor = SearchCursor {
+            chat_name_cursor: SearchCursorOption::Done,
+            content_cursor: SearchCursorOption::Done,
+            project_name_cursor: SearchCursorOption::Done,
+            crm_company_cursor: SearchCursorOption::Done,
+            channel_name_cursor: SearchCursorOption::Done,
+            document_term_matching: None,
+        };
+        assert!(cursor.is_exhausted());
+
+        cursor.crm_company_cursor = SearchCursorOption::NotDone(None);
+        assert!(
+            !cursor.is_exhausted(),
+            "a not-done CRM cursor must keep the aggregate cursor alive"
+        );
+
+        cursor.crm_company_cursor = SearchCursorOption::Done;
+        cursor.channel_name_cursor = SearchCursorOption::NotDone(None);
+        assert!(
+            !cursor.is_exhausted(),
+            "a not-done channel name cursor must keep the aggregate cursor alive"
+        );
+    }
+}

@@ -1,0 +1,283 @@
+//! Redis command-bus listener composed around the harness domain service.
+
+use std::sync::Arc;
+
+use crate::model_providers::{MacrodModels, ModelProbeEvent};
+
+use agent_harness::domain::service::ForwardedCommands;
+use agent_harness::outbound::forward::{
+    COMMAND_CHANNEL, RuntimeCommandRequest, RuntimeCommandTarget,
+};
+use agent_session::domain::model::ReplicaId;
+use futures::StreamExt as _;
+use harness_id::HarnessId;
+use redis::AsyncCommands as _;
+use redis::{ExistenceCheck, SetExpiry, SetOptions};
+use tracing::Instrument as _;
+
+#[cfg(test)]
+mod test;
+
+/// Ask whichever replica holds the harness's runtime connection to hand it
+/// the agent teammate of `computer_id`. No credential travels on the bus:
+/// that replica issues the agent's environment itself (each issue retires
+/// the agent's previous key, so no other replica may) and sends it down
+/// macrod's authenticated socket.
+#[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub(crate) struct DeliverAgent {
+    pub(crate) deliver_agent_harness: HarnessId,
+    pub(crate) computer_id: hosted_runtimes::domain::ids::ComputerId,
+    pub(crate) generation: hosted_runtimes::domain::enrollment::EnrollmentGeneration,
+    /// W3C context of the operator's hand-off, so the delivery joins its trace.
+    #[serde(default)]
+    pub(crate) trace_context: std::collections::HashMap<String, String>,
+}
+
+impl DeliverAgent {
+    /// A hand-off under the current span.
+    pub(crate) fn new(
+        harness: HarnessId,
+        computer_id: hosted_runtimes::domain::ids::ComputerId,
+        generation: hosted_runtimes::domain::enrollment::EnrollmentGeneration,
+    ) -> Self {
+        use tracing_opentelemetry::OpenTelemetrySpanExt as _;
+        let context = tracing::Span::current().context();
+        let mut trace_context = std::collections::HashMap::new();
+        opentelemetry::global::get_text_map_propagator(|propagator| {
+            propagator.inject_context(&context, &mut trace_context);
+        });
+        Self {
+            deliver_agent_harness: harness,
+            computer_id,
+            generation,
+            trace_context,
+        }
+    }
+
+    fn span(&self) -> tracing::Span {
+        use tracing_opentelemetry::OpenTelemetrySpanExt as _;
+        let span = tracing::info_span!(
+            "computer.agent.deliver",
+            otel.kind = "consumer",
+            messaging.system = "redis",
+            computer_id = %self.computer_id,
+            harness_id = %self.deliver_agent_harness,
+            generation = i64::from(self.generation.get()),
+            delivered = tracing::field::Empty,
+        );
+        let parent = opentelemetry::global::get_text_map_propagator(|propagator| {
+            propagator.extract(&self.trace_context)
+        });
+        let _ = span.set_parent(parent);
+        span
+    }
+}
+
+/// The runtime bus could not carry a message.
+#[derive(Debug, thiserror::Error)]
+pub enum RuntimeBusError {
+    #[error("could not encode a runtime bus message")]
+    Encode(#[from] serde_json::Error),
+    #[error("could not publish on the runtime bus")]
+    Publish(#[from] redis::RedisError),
+}
+
+/// Broadcast a [`DeliverAgent`] to every replica.
+pub(crate) async fn publish_deliver_agent(
+    redis: &redis::Client,
+    request: &DeliverAgent,
+) -> Result<(), RuntimeBusError> {
+    let payload = serde_json::to_string(request)?;
+    redis
+        .get_multiplexed_async_connection()
+        .await?
+        .publish::<_, _, ()>(COMMAND_CHANNEL, payload)
+        .await?;
+    Ok(())
+}
+
+/// Sends an agent environment down a harness's runtime connection; whether
+/// this replica held it.
+pub(crate) type SendAgent = Arc<
+    dyn Fn(
+            HarnessId,
+            agent_runtime_protocol::domain::schema::v0::AgentEnvironment,
+        ) -> futures::future::BoxFuture<'static, bool>
+        + Send
+        + Sync,
+>;
+
+/// Carry out a [`DeliverAgent`] on this replica: only the one holding the
+/// harness's connection issues the agent's environment, then sends it down
+/// macrod's socket.
+pub(crate) async fn deliver_agent_to_runtime(
+    request: DeliverAgent,
+    agents: Arc<dyn hosted_runtimes::domain::agent::AgentEnrollmentSource>,
+    connected: Arc<dyn Fn(HarnessId) -> bool + Send + Sync>,
+    send: SendAgent,
+) {
+    if !connected(request.deliver_agent_harness) {
+        return;
+    }
+    let span = request.span();
+    async move {
+        let enrollment = match agents.issue(request.computer_id, request.generation).await {
+            Ok(Some(enrollment)) => enrollment,
+            Ok(None) => {
+                tracing::warn!("the computer runs no agent; nothing to hand over");
+                return;
+            }
+            Err(error) => {
+                tracing::warn!(%error, "could not issue the agent's environment");
+                return;
+            }
+        };
+        let environment = agent_runtime_protocol::domain::schema::v0::AgentEnvironment(
+            enrollment
+                .env
+                .expose()
+                .iter()
+                .map(|(key, value)| (key.as_str().to_owned(), value.clone()))
+                .collect(),
+        );
+        let delivered = send(request.deliver_agent_harness, environment).await;
+        tracing::Span::current().record("delivered", delivered);
+    }
+    .instrument(span)
+    .await;
+}
+
+// Untagged: an agent hand-off's required fields appear in no other event,
+// so it is tried first.
+#[derive(serde::Deserialize)]
+#[serde(untagged)]
+enum RuntimeBusEvent {
+    DeliverAgent(DeliverAgent),
+    Models(ModelProbeEvent),
+    Command(Box<RuntimeCommandRequest>),
+}
+
+pub(crate) async fn consume_runtime_commands<Harness>(
+    redis: redis::Client,
+    replica: ReplicaId,
+    connected: Arc<dyn Fn(HarnessId) -> bool + Send + Sync>,
+    harness_service: Arc<Harness>,
+    ready: tokio::sync::watch::Sender<bool>,
+    models: MacrodModels,
+    deliver_agent: Arc<
+        dyn Fn(DeliverAgent) -> futures::future::BoxFuture<'static, ()> + Send + Sync,
+    >,
+) -> anyhow::Result<()>
+where
+    Harness: ForwardedCommands,
+{
+    let mut subscriber = redis.get_async_pubsub().await?;
+    subscriber.subscribe(COMMAND_CHANNEL).await?;
+    ready.send_replace(true);
+    let mut requests = subscriber.into_on_message();
+    let mut probes = tokio::task::JoinSet::new();
+    loop {
+        let request = tokio::select! {
+            request = requests.next() => match request {
+                Some(request) => request,
+                None => break,
+            },
+            result = probes.join_next(), if !probes.is_empty() => {
+                if let Some(Err(error)) = result {
+                    tracing::error!(error = ?error, "runtime model observer task failed");
+                }
+                continue;
+            }
+        };
+        let payload: String = match request.get_payload() {
+            Ok(payload) => payload,
+            Err(error) => {
+                tracing::warn!(error = ?error, "dropping malformed runtime command broadcast");
+                continue;
+            }
+        };
+        let event: RuntimeBusEvent = match serde_json::from_str(&payload) {
+            Ok(request) => request,
+            Err(error) => {
+                tracing::warn!(error = ?error, "dropping malformed runtime command broadcast");
+                continue;
+            }
+        };
+        let request = match event {
+            RuntimeBusEvent::DeliverAgent(request) => {
+                // Only the replica holding the connection delivers; the rest
+                // find nothing to hand it to.
+                probes.spawn(deliver_agent(request));
+                continue;
+            }
+            RuntimeBusEvent::Command(request) => *request,
+            RuntimeBusEvent::Models(event) => {
+                let models = models.clone();
+                probes.spawn(async move {
+                    models
+                        .observe(event)
+                        .await
+                        .inspect_err(|error| {
+                            tracing::error!(error = ?error, "runtime model bus event failed");
+                        })
+                        .ok();
+                });
+                continue;
+            }
+        };
+        let redis = redis.clone();
+        let harness_service = Arc::clone(&harness_service);
+        let connected = Arc::clone(&connected);
+        let span = request.processing_span();
+        tokio::spawn(
+            async move {
+                let request_id = request.request_id();
+                let session = request.session();
+                let selected = match request.target() {
+                    RuntimeCommandTarget::Replica(target) => target == replica.as_uuid(),
+                    RuntimeCommandTarget::Harness(harness) if connected(harness) => {
+                        let mut connection = match redis.get_multiplexed_async_connection().await {
+                            Ok(connection) => connection,
+                            Err(error) => {
+                                tracing::error!(error = ?error, "failed to claim a harness command");
+                                return;
+                            }
+                        };
+                        connection
+                            .set_options::<_, _, Option<String>>(
+                                format!("agent-harness.runtime-command.claim.{request_id}"),
+                                replica.as_uuid().to_string(),
+                                SetOptions::default()
+                                    .conditional_set(ExistenceCheck::NX)
+                                    .with_expiration(SetExpiry::EX(120)),
+                            )
+                            .await
+                            .is_ok_and(|result| result.is_some())
+                    }
+                    RuntimeCommandTarget::Harness(_) => false,
+                };
+                if selected {
+                    // The forwarding replica answered its caller the moment it
+                    // published, so this is the only record that the command
+                    // arrived anywhere and what became of it. Logged on
+                    // success too: a session whose queue never drains is
+                    // debugged by asking whether its commands reached the
+                    // replica that manages it.
+                    match harness_service
+                        .execute_forwarded(session, request.into_command())
+                        .await
+                    {
+                        Ok(outcome) => {
+                            tracing::info!(%session, ?outcome, "executed a forwarded command");
+                        }
+                        Err(error) => {
+                            tracing::error!(error = ?error, %session, "forwarded command failed");
+                        }
+                    }
+                }
+            }
+            .instrument(span),
+        );
+    }
+    anyhow::bail!("runtime command Redis subscription ended")
+}

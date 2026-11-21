@@ -1,0 +1,41 @@
+import {
+  createPollAction,
+  FORM_ACTION,
+} from '@app/features/block-form/composer-actions';
+import type { Action } from '@core/component/LexicalMarkdown/plugins/actions/types';
+import {
+  createConfiguredMessageEditor,
+  type MessageEditorOptions,
+} from '@core/messages/configured-message-editor';
+
+/**
+ * With forms on, channel composers offer `/form`; one that can send
+ * (`sendMessage`) also offers `/poll`, which posts the poll at once.
+ */
+export function channelComposerActions(sendMessage?: () => void): Action[] {
+  return sendMessage
+    ? [createPollAction(sendMessage), FORM_ACTION]
+    : [FORM_ACTION];
+}
+
+/**
+ * Channel surfaces add group mentions, the floating format menu and the
+ * channel's own actions (`channelComposerActions`) to common editor setup.
+ */
+export function createConfiguredChannelMarkdownEditor({
+  sendMessage,
+  composerActions = true,
+  ...options
+}: MessageEditorOptions & {
+  sendMessage?: () => void;
+  /** Offer the channel's own `/poll` and `/form`. */
+  composerActions?: boolean;
+}) {
+  const actions = composerActions ? channelComposerActions(sendMessage) : [];
+  return createConfiguredMessageEditor({
+    groupMentions: true,
+    floatingFormatMenu: true,
+    additionalActions: actions.length ? actions : undefined,
+    ...options,
+  });
+}
