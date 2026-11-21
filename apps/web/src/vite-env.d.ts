@@ -3,6 +3,13 @@ interface ImportMetaEnv {
   readonly __APP_VERSION__: string;
   /** When this build was made, in ms since the epoch. Unset outside app builds. */
   readonly __APP_BUILD_TIME__?: number;
+  /** The path the web bundle is served from. Unset outside app builds, which run at `/app`. */
+  readonly __APP_BASE_PATH__?: string;
+  /**
+   * The origin of a self-hosted backend's single-origin proxy. Set, the bundle
+   * addresses every service under it and loads no upstream analytics.
+   */
+  readonly VITE_BACKEND_ORIGIN?: string;
   readonly __LOCAL_JWT__: string;
   readonly __GIT_BRANCH__: string;
 

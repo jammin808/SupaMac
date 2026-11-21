@@ -4,6 +4,7 @@ import { type Span, Telemetry } from '@macro-inc/observability';
 import { getDocumentPermissionToken } from '@service-storage/client';
 import { createSignal } from 'solid-js';
 import { developmentProxyUrl } from '../../core/constant/developmentProxy';
+import { selfHostedBackendUrl } from '../../core/constant/servers';
 import {
   type AiUsageLimitError,
   readAiUsageLimitError,
@@ -16,6 +17,7 @@ const overrideUrl: string | undefined = import.meta.env
 
 const AI_EDITING_WORKER_HOST =
   overrideUrl?.replace(/\/$/, '') ??
+  selfHostedBackendUrl('/ai-editing') ??
   developmentProxyUrl(
     import.meta.env.MODE === 'development'
       ? 'https://ai-editing-worker-dev.macroverse.workers.dev'

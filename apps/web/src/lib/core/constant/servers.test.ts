@@ -123,3 +123,42 @@ it.each([
     expect(usesLocalStackProxy()).toBe(expected);
   }
 );
+
+// A self-hosted bundle is served from one host and calls its backend on
+// another, so the configured origin must reach every client unchanged.
+it('addresses every service under a self-hosted backend origin', async () => {
+  vi.stubEnv('MODE', 'production');
+  vi.stubEnv('VITE_BACKEND_ORIGIN', 'https://api.example.com');
+  vi.stubGlobal('location', new URL('https://www.example.org/workspace/login'));
+  vi.resetModules();
+  const { SERVER_HOSTS, SYNC_SERVICE_HOSTS, selfHostedBackendUrl } =
+    await import('./servers');
+
+  expect(SERVER_HOSTS['auth-service']).toBe('https://api.example.com/auth');
+  expect(SERVER_HOSTS['connection-gateway']).toBe(
+    'wss://api.example.com/connection-gateway'
+  );
+  expect(SYNC_SERVICE_HOSTS).toEqual({
+    worker: 'https://api.example.com/sync',
+    ws: 'wss://api.example.com/sync',
+  });
+  expect(selfHostedBackendUrl('/ai-editing')).toBe(
+    'https://api.example.com/ai-editing'
+  );
+
+  const upstream = Object.values(SERVER_HOSTS).filter(
+    (host) => host.includes('macro.com') || host.includes('localhost')
+  );
+  expect(upstream).toEqual([]);
+});
+
+it('keeps the hosted services when no self-hosted origin is set', async () => {
+  vi.stubEnv('MODE', 'production');
+  vi.stubEnv('VITE_BACKEND_ORIGIN', undefined);
+  vi.stubGlobal('location', new URL('https://macro.com/app/login'));
+  vi.resetModules();
+  const { SERVER_HOSTS, selfHostedBackendUrl } = await import('./servers');
+
+  expect(SERVER_HOSTS['auth-service']).toBe('https://gateway.macro.com/auth');
+  expect(selfHostedBackendUrl('/ai-editing')).toBeUndefined();
+});

@@ -80,11 +80,36 @@ const serverHostRemote = Object.fromEntries(
 // exists in both windows and workers.)
 const rawLocalBackendOrigin: string | undefined = import.meta.env
   .VITE_LOCAL_BACKEND_ORIGIN;
-const proxyOrigin: string | undefined =
-  rawLocalBackendOrigin === 'same-origin'
-    ? globalThis.location?.origin
-    : resolveProxyOrigin(rawLocalBackendOrigin);
+
+// A self-hosted deployment puts every service behind one origin too, on the
+// same path prefixes, and builds with VITE_BACKEND_ORIGIN set to it. That
+// origin is used as given: the page and the backend can be on different hosts,
+// so nothing here follows the page's hostname.
+const selfHostedBackendOrigin: string | undefined = import.meta.env
+  .VITE_BACKEND_ORIGIN;
+
+/** True in a bundle built for a self-hosted backend (VITE_BACKEND_ORIGIN). */
+export const SELF_HOSTED = Boolean(selfHostedBackendOrigin);
+
+/**
+ * Where a self-hosted backend serves a route of its proxy that has no entry
+ * in `SERVER_HOSTS`, e.g. `/ai-editing`. Undefined in every other bundle.
+ */
+export function selfHostedBackendUrl(route: string): string | undefined {
+  if (!selfHostedBackendOrigin) return undefined;
+  return `${selfHostedBackendOrigin}${route}`;
+}
+
+const proxyOrigin: string | undefined = selectProxyOrigin();
 const wsProxyOrigin = proxyOrigin?.replace(/^http/, 'ws');
+
+function selectProxyOrigin(): string | undefined {
+  if (selfHostedBackendOrigin) return selfHostedBackendOrigin;
+  if (rawLocalBackendOrigin === 'same-origin') {
+    return globalThis.location?.origin;
+  }
+  return resolveProxyOrigin(rawLocalBackendOrigin);
+}
 
 // Follow the page's hostname (keeping the proxy's port) so the app works from
 // any `*.localhost` alias. Hostnames get separate cookie jars, so opening tabs
@@ -102,10 +127,15 @@ function resolveProxyOrigin(configured: string | undefined) {
   }
 }
 
-export const SERVER_HOSTS: Servers =
-  import.meta.env.MODE === 'development'
-    ? selectLocalServers()
-    : serverHostRemote;
+export const SERVER_HOSTS: Servers = selectServers();
+
+function selectServers(): Servers {
+  // A self-hosted bundle never addresses an upstream host, whatever its mode.
+  const selfHosted = selfHostedServers();
+  if (selfHosted) return selfHosted;
+  if (import.meta.env.MODE === 'development') return selectLocalServers();
+  return serverHostRemote;
+}
 
 /**
  * The app talks to a self-contained local stack (`run_local`, `just stack`)
@@ -143,6 +173,23 @@ function proxyServers(): Servers | undefined {
     'image-proxy-service': `${proxyOrigin}/image-proxy`,
     'scheduled-action': `${proxyOrigin}/scheduled-action`,
     'agent-git': `${proxyOrigin}/agent-git`,
+  };
+}
+
+/**
+ * The hosts of a self-hosted backend: the single-origin proxy's routes, with
+ * the two entries that have no route there. Signing out ends the session at
+ * the auth service, and there is no identity-provider page to visit after
+ * it, so `auth-logout` is the app's own login page. No PDF service runs.
+ */
+function selfHostedServers(): Servers | undefined {
+  if (!selfHostedBackendOrigin) return undefined;
+  const servers = proxyServers();
+  if (!servers) return undefined;
+  return {
+    ...servers,
+    'auth-logout': `${globalThis.location?.origin ?? ''}${import.meta.env.BASE_URL}`,
+    'pdf-service': `${selfHostedBackendOrigin}/pdf`,
   };
 }
 
@@ -213,6 +260,10 @@ function selectSyncServiceHost():
       worker: `https://${overrideHost}`,
       ws: `wss://${overrideHost}`,
     };
+  }
+  // The self-hosted proxy carries the sync service on its /sync route.
+  if (selfHostedBackendOrigin && proxyOrigin && wsProxyOrigin) {
+    return { worker: `${proxyOrigin}/sync`, ws: `${wsProxyOrigin}/sync` };
   }
   if (import.meta.env.MODE !== 'development') {
     return syncServiceHostRemote;
