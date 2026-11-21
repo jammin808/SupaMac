@@ -110,8 +110,14 @@ pub async fn handler(
         }
     };
 
-    cookies.add(create_access_token_cookie(&access_token));
-    cookies.add(create_refresh_token_cookie(&refresh_token));
+    cookies.add(create_access_token_cookie(
+        &access_token,
+        ctx.session_cookie_same_site,
+    ));
+    cookies.add(create_refresh_token_cookie(
+        &refresh_token,
+        ctx.session_cookie_same_site,
+    ));
 
     Ok((
         StatusCode::OK,

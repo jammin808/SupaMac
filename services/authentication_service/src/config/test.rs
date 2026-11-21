@@ -326,6 +326,13 @@ fn development_allowlist(value: Option<&'static str>) -> DevelopmentSignupAllowl
     }
 }
 
+fn signup_allowlist(value: Option<&'static str>) -> SignupAllowlistJson {
+    match value {
+        Some(value) => SignupAllowlistJson::new_testing(value),
+        None => SignupAllowlistJson::new_unset(),
+    }
+}
+
 const ALLOWLIST_SETTING_CASES: [Option<&str>; 5] = [
     None,
     Some(""),
@@ -409,9 +416,13 @@ fn production_and_local_config_allow_unlisted_signups() {
 #[test]
 fn develop_signup_policy_requires_configured_allowlist() {
     for value in [None, Some(""), Some(" \t ")] {
-        let error =
-            resolve_signup_policy(Environment::Develop, false, &development_allowlist(value))
-                .expect_err("Develop should require a nonblank allowlist setting");
+        let error = resolve_signup_policy(
+            Environment::Develop,
+            false,
+            &development_allowlist(value),
+            &signup_allowlist(None),
+        )
+        .expect_err("Develop should require a nonblank allowlist setting");
 
         assert!(
             error
@@ -429,6 +440,7 @@ fn develop_signup_policy_uses_configured_allowlist() {
         &development_allowlist(Some(
             r#"["Allowed.User@example.test", "allowed.user@example.test"]"#,
         )),
+        &signup_allowlist(None),
     )
     .expect("valid Develop allowlist should resolve");
 
@@ -449,6 +461,7 @@ fn develop_signup_policy_rejects_malformed_allowlist_without_leaking_value() {
         Environment::Develop,
         false,
         &development_allowlist(Some(configured_value)),
+        &signup_allowlist(None),
     )
     .expect_err("malformed Develop allowlist should be rejected");
     let message = error.to_string();
@@ -461,9 +474,13 @@ fn develop_signup_policy_rejects_malformed_allowlist_without_leaking_value() {
 #[test]
 fn develop_signup_policy_bypass_ignores_allowlist_setting() {
     for value in ALLOWLIST_SETTING_CASES {
-        let policy =
-            resolve_signup_policy(Environment::Develop, true, &development_allowlist(value))
-                .expect("Develop bypass should not parse the allowlist setting");
+        let policy = resolve_signup_policy(
+            Environment::Develop,
+            true,
+            &development_allowlist(value),
+            &signup_allowlist(None),
+        )
+        .expect("Develop bypass should not parse the allowlist setting");
 
         assert_eq!(policy.allowed_email_count(), None);
         assert_eq!(policy.authorize_public_email(UNLISTED_PUBLIC_EMAIL), Ok(()));
@@ -475,9 +492,13 @@ fn production_and_local_signup_policy_ignore_allowlist_and_bypass() {
     for environment in [Environment::Production, Environment::Local] {
         for bypass in [false, true] {
             for value in ALLOWLIST_SETTING_CASES {
-                let policy =
-                    resolve_signup_policy(environment, bypass, &development_allowlist(value))
-                        .expect("non-Develop environments should not parse the allowlist setting");
+                let policy = resolve_signup_policy(
+                    environment,
+                    bypass,
+                    &development_allowlist(value),
+                    &signup_allowlist(None),
+                )
+                .expect("non-Develop environments should not parse the allowlist setting");
 
                 assert_eq!(policy.allowed_email_count(), None);
                 policy
@@ -485,6 +506,212 @@ fn production_and_local_signup_policy_ignore_allowlist_and_bypass() {
                     .expect("non-Develop environments should allow all public signups");
             }
         }
+    }
+}
+
+#[test]
+fn local_config_with_signup_allowlist_admits_only_listed_addresses() {
+    let mut values = config_values();
+    values["SIGNUP_ALLOWLIST_JSON"] =
+        serde_json::json!(r#"["owner@example.test", "listed.user@macro.com"]"#);
+    let config: Config = serde_json::from_value(values).unwrap();
+
+    // Exercise both runtime startup and the Doppler validator's entry point.
+    for policy in [
+        config.signup_policy().unwrap(),
+        config
+            .signup_policy_for_environment(Environment::Local)
+            .unwrap(),
+    ] {
+        assert_eq!(policy.authorize_public_email("owner@example.test"), Ok(()));
+        assert_eq!(
+            policy.authorize_public_email("listed.user@macro.com"),
+            Ok(())
+        );
+        assert_eq!(
+            policy.authorize_public_email(UNLISTED_PUBLIC_EMAIL),
+            Err(SignupPolicyDenial::PublicEmailNotAllowed)
+        );
+        assert_eq!(
+            policy.authorize_public_email("new.user@macro.com"),
+            Err(SignupPolicyDenial::PublicEmailNotAllowed)
+        );
+    }
+}
+
+#[test]
+fn local_signup_allowlist_that_is_blank_or_malformed_fails_without_leaking_value() {
+    for configured_value in [
+        "",
+        " \t ",
+        "not-json-with-secret@example.test",
+        "[]",
+        r#"{"email":"secret-address@example.test"}"#,
+        r#"["secret-address@example.test", "@example.test"]"#,
+    ] {
+        let error = resolve_signup_policy(
+            Environment::Local,
+            false,
+            &development_allowlist(None),
+            &signup_allowlist(Some(configured_value)),
+        )
+        .expect_err("a set but unusable Local allowlist must not open signup");
+
+        for message in [error.to_string(), format!("{error:?}")] {
+            assert!(message.contains("SIGNUP_ALLOWLIST_JSON"), "{message}");
+            assert!(!message.contains("secret"), "{message}");
+        }
+    }
+}
+
+#[test]
+fn production_and_develop_ignore_the_local_signup_allowlist() {
+    for value in ALLOWLIST_SETTING_CASES {
+        let policy = resolve_signup_policy(
+            Environment::Production,
+            false,
+            &development_allowlist(None),
+            &signup_allowlist(value),
+        )
+        .expect("Production should not parse the Local allowlist setting");
+
+        assert_eq!(policy.allowed_email_count(), None);
+    }
+
+    let policy = resolve_signup_policy(
+        Environment::Develop,
+        false,
+        &development_allowlist(Some(r#"["allowed.user@example.test"]"#)),
+        &signup_allowlist(Some(r#"["owner@example.test"]"#)),
+    )
+    .expect("Develop should resolve its own allowlist");
+
+    assert_eq!(policy.authorize_public_email("new.user@macro.com"), Ok(()));
+    assert_eq!(
+        policy.authorize_public_email("allowed.user@example.test"),
+        Ok(())
+    );
+    assert_eq!(
+        policy.authorize_public_email("owner@example.test"),
+        Err(SignupPolicyDenial::PublicEmailNotAllowed)
+    );
+}
+
+#[test]
+fn local_session_cookies_cross_sites_only_with_the_dev_flag() {
+    let config: Config = serde_json::from_value(config_values()).unwrap();
+    assert_eq!(config.session_cookie_same_site().unwrap(), SameSite::Strict);
+
+    let mut values = config_values();
+    values["DEV_DANGEROUS_CROSS_SITE_COOKIES"] = serde_json::json!(false);
+    let config: Config = serde_json::from_value(values.clone()).unwrap();
+    assert_eq!(config.session_cookie_same_site().unwrap(), SameSite::Strict);
+
+    values["DEV_DANGEROUS_CROSS_SITE_COOKIES"] = serde_json::json!(true);
+    let config: Config = serde_json::from_value(values).unwrap();
+    assert_eq!(config.session_cookie_same_site().unwrap(), SameSite::None);
+}
+
+#[test]
+fn production_and_develop_keep_their_session_cookies_and_refuse_the_dev_flag() {
+    for (environment_name, same_site) in [
+        ("production", SameSite::Strict),
+        ("develop", SameSite::None),
+    ] {
+        let mut values = config_values();
+        values["ENVIRONMENT"] = serde_json::json!(environment_name);
+        let config: Config = serde_json::from_value(values.clone()).unwrap();
+        assert_eq!(
+            config.session_cookie_same_site().unwrap(),
+            same_site,
+            "{environment_name}"
+        );
+
+        values["DEV_DANGEROUS_CROSS_SITE_COOKIES"] = serde_json::json!(true);
+        let config: Config = serde_json::from_value(values).unwrap();
+        let error = config
+            .session_cookie_same_site()
+            .expect_err("the dev flag must be refused outside Local");
+        assert!(
+            error.to_string().contains(
+                "DEV_DANGEROUS_CROSS_SITE_COOKIES is only allowed when ENVIRONMENT=local"
+            ),
+            "{environment_name}"
+        );
+    }
+}
+
+#[test]
+fn support_channel_participants_keep_the_macro_team_unless_configured() {
+    let config: Config = serde_json::from_value(config_values()).unwrap();
+    assert_eq!(config.support_channel_participants().unwrap(), None);
+
+    let mut values = config_values();
+    values["SUPPORT_CHANNEL_PARTICIPANTS_JSON"] = serde_json::json!("[]");
+    let config: Config = serde_json::from_value(values).unwrap();
+    assert_eq!(
+        config.support_channel_participants().unwrap(),
+        Some(HashSet::new())
+    );
+
+    let mut values = config_values();
+    values["SUPPORT_CHANNEL_PARTICIPANTS_JSON"] =
+        serde_json::json!(r#"[" Owner@Example.Test ", "owner@example.test"]"#);
+    let config: Config = serde_json::from_value(values).unwrap();
+    assert_eq!(
+        config.support_channel_participants().unwrap(),
+        Some(HashSet::from([MacroUserIdStr::try_from_email(
+            "owner@example.test"
+        )
+        .unwrap()]))
+    );
+}
+
+#[test]
+fn support_channel_participants_that_are_blank_or_malformed_fail_without_leaking_value() {
+    for configured_value in [
+        "",
+        " \t ",
+        "secret-address@example.test",
+        r#"{"email":"secret-address@example.test"}"#,
+        r#"["secret-address@example.test", 42]"#,
+        r#"["secret-address@example.test", "not-an-email"]"#,
+    ] {
+        let error = resolve_support_channel_participants(
+            &SupportChannelParticipantsJson::new_testing(configured_value),
+        )
+        .expect_err("a set but unusable list must not fall back to the Macro team");
+
+        for message in [error.to_string(), format!("{error:?}")] {
+            assert!(
+                message.contains("SUPPORT_CHANNEL_PARTICIPANTS_JSON"),
+                "{message}"
+            );
+            assert!(!message.contains("secret"), "{message}");
+            assert!(!message.contains("not-an-email"), "{message}");
+        }
+    }
+}
+
+#[test]
+fn auth_sender_address_defaults_and_must_be_an_email_address() {
+    assert_eq!(
+        resolve_auth_sender_address(&AuthSenderAddress::new_unset()).unwrap(),
+        "auth@macro.com"
+    );
+
+    assert_eq!(
+        resolve_auth_sender_address(&AuthSenderAddress::new_testing("auth@example.test")).unwrap(),
+        "auth@example.test"
+    );
+
+    for invalid in ["", " \t ", "example.test", "Auth <auth@example.test>"] {
+        let error = resolve_auth_sender_address(&AuthSenderAddress::new_testing(invalid))
+            .expect_err("a sender that is not an address must fail startup");
+        assert!(
+            error.to_string().contains("AUTH_SENDER_ADDRESS"),
+            "{invalid}"
+        );
     }
 }
 

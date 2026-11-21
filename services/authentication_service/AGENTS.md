@@ -17,7 +17,8 @@ key issuance, and account merge/link flows.
 - `src/config.rs` + `src/doppler_config.rs`: env vars and the Doppler config
   validator binary (`authentication_service_doppler_config`).
 - `README.md`: the Develop signup allowlist (bypass flag, rollout/rollback
-  steps) and GTM invite links — read before touching signup policy.
+  steps), the settings a Local deployment on the internet needs, and GTM
+  invite links — read before touching signup policy or session cookies.
 
 ## Scope
 
@@ -261,8 +262,32 @@ inputs cannot select an agent, and ordinary user credentials remain unattributed
   user has no links or grants left, so answer the route's "not linked" outcome
   (404 no grant, 200 for an idempotent removal), not a 500.
 - Develop admits new accounts only for `@macro.com` and allowlisted addresses;
-  `DEVELOPMENT_BYPASS_SIGNUP_ALLOWLIST=true` opens it to everyone. See
-  `README.md` before changing signup behavior.
+  `DEVELOPMENT_BYPASS_SIGNUP_ALLOWLIST=true` opens it to everyone. Local admits
+  everyone unless `SIGNUP_ALLOWLIST_JSON` is set, and then only the addresses
+  it lists: `@macro.com` gets no exception there, and a present but blank or
+  malformed value fails startup instead of opening signup. No path is exempt
+  in either environment: an invited teammate, a relocated shared mailbox, and
+  an agent signing up by email must be listed. See `README.md` before changing
+  signup behavior.
+- Session cookies are `SameSite=Strict` in Production and Local and `None` in
+  Develop (`Config::session_cookie_same_site`, resolved once at startup into
+  `ApiContext::session_cookie_same_site`).
+  `DEV_DANGEROUS_CROSS_SITE_COOKIES=true` (default false, so no Doppler key;
+  startup fails if it is set unless `ENVIRONMENT=local`) makes Local's `None`;
+  `just run_local` sets it. Never set it where other people can sign in: any
+  page they open could then act as them. Set and clear the cookies only
+  through `api::utils::create_access_token_cookie` and
+  `create_refresh_token_cookie` with that value, so a logout names the cookie
+  the login set.
+- A person's new account gets a `Macro Support x <name>` channel with the
+  Macro support team (`MACRO_SUPPORT_EMAILS`), one of whom posts the welcome.
+  `SUPPORT_CHANNEL_PARTICIPANTS_JSON` replaces the team and drops the welcome;
+  `[]` means no channel (`support_channel` in the `user.create` webhook). Only
+  an absent variable keeps the Macro team.
+- This service's own mail (`/mobile-welcome-email`, and the unmounted merge
+  and email-link routes) is sent from `ApiContext::auth_sender_address`:
+  `AUTH_SENDER_ADDRESS`, default `auth@macro.com`. Sign-in codes come from
+  FusionAuth, whose sender is its tenant's and email template's setting.
 - Denial responses and policy errors must never disclose configured allowlist
   addresses; never paste operational addresses into code, logs, or docs.
 - New Outlook connections need the deployment switch

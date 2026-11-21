@@ -78,6 +78,85 @@ fn allowlist_policy_accepts_macro_domain_addresses() {
 }
 
 #[test]
+fn exact_allowlist_admits_only_listed_addresses() {
+    let policy = SignupPolicy::from_exact_allowlist_json(r#"[" Owner@Example.Test "]"#)
+        .expect("valid allowlist");
+
+    assert_eq!(policy.allowed_email_count(), Some(1));
+    assert_eq!(policy.authorize_public_email("owner@example.test"), Ok(()));
+    assert_eq!(
+        policy.authorize_public_email(" OWNER@EXAMPLE.TEST "),
+        Ok(())
+    );
+    for email in [
+        "stranger@example.test",
+        "owner+alias@example.test",
+        "owner@example.test.attacker.test",
+    ] {
+        assert_eq!(
+            policy.authorize_public_email(email),
+            Err(SignupPolicyDenial::PublicEmailNotAllowed),
+            "{email}"
+        );
+    }
+}
+
+#[test]
+fn exact_allowlist_admits_macro_domain_addresses_only_when_listed() {
+    let unlisted = SignupPolicy::from_exact_allowlist_json(r#"["owner@example.test"]"#)
+        .expect("valid allowlist");
+
+    for email in [
+        "new.user@macro.com",
+        " NEW.USER@MACRO.COM ",
+        "new.user+trial@macro.com",
+    ] {
+        assert_eq!(
+            unlisted.authorize_public_email(email),
+            Err(SignupPolicyDenial::PublicEmailNotAllowed),
+            "{email}"
+        );
+    }
+
+    let listed =
+        SignupPolicy::from_exact_allowlist_json(r#"["owner@example.test", "new.user@macro.com"]"#)
+            .expect("valid allowlist");
+
+    assert_eq!(listed.authorize_public_email("new.user@macro.com"), Ok(()));
+    assert_eq!(
+        listed.authorize_public_email("other.user@macro.com"),
+        Err(SignupPolicyDenial::PublicEmailNotAllowed)
+    );
+}
+
+#[test]
+fn exact_allowlist_rejects_what_the_develop_allowlist_rejects() {
+    for (raw_json, expected) in [
+        ("", SignupPolicyConfigError::MalformedJson),
+        ("not json", SignupPolicyConfigError::MalformedJson),
+        (
+            r#"{"email":"owner@example.test"}"#,
+            SignupPolicyConfigError::ExpectedArray,
+        ),
+        ("[]", SignupPolicyConfigError::EmptyAllowlist),
+        (
+            r#"["owner@example.test", 42]"#,
+            SignupPolicyConfigError::NonStringEntry { index: 1 },
+        ),
+        (
+            r#"["owner@example.test", "@example.test"]"#,
+            SignupPolicyConfigError::InvalidEmail { index: 1 },
+        ),
+    ] {
+        assert_eq!(
+            SignupPolicy::from_exact_allowlist_json(raw_json),
+            Err(expected),
+            "{raw_json}"
+        );
+    }
+}
+
+#[test]
 fn macro_domain_match_does_not_include_subdomains_or_similar_domains() {
     let policy =
         SignupPolicy::from_allowlist_json(r#"["person@example.test"]"#).expect("valid allowlist");

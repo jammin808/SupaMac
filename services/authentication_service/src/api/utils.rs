@@ -73,15 +73,10 @@ fn domain<'a>() -> Option<&'a str> {
     }
 }
 
-fn same_site() -> SameSite {
-    match Environment::new_or_prod() {
-        Environment::Production => SameSite::Strict,
-        Environment::Local | Environment::Develop => SameSite::None,
-    }
-}
-
-pub fn create_access_token_cookie(token: &str) -> Cookie<'static> {
-    let same_site = same_site();
+/// `same_site` is the deployment's startup-resolved value
+/// (`ApiContext::session_cookie_same_site`). Clearing a cookie builds it
+/// through here too, so it carries the attributes it was set with.
+pub fn create_access_token_cookie(token: &str, same_site: SameSite) -> Cookie<'static> {
     let domain = domain();
     let access_token_cookie_name = match Environment::new_or_prod() {
         Environment::Production => MACRO_ACCESS_TOKEN_COOKIE.to_string(),
@@ -106,8 +101,8 @@ pub fn create_access_token_cookie(token: &str) -> Cookie<'static> {
     cookie
 }
 
-pub fn create_refresh_token_cookie(token: &str) -> Cookie<'static> {
-    let same_site = same_site();
+/// See [`create_access_token_cookie`] for `same_site`.
+pub fn create_refresh_token_cookie(token: &str, same_site: SameSite) -> Cookie<'static> {
     let domain = domain();
     let refresh_token_cookie_name = match Environment::new_or_prod() {
         Environment::Production => MACRO_REFRESH_TOKEN_COOKIE.to_string(),

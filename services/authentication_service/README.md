@@ -23,6 +23,7 @@ FusionAuth-created users.
 | --- | --- | --- |
 | `DEVELOPMENT_SIGNUP_ALLOWLIST_JSON` | JSON array of exact email-address strings | No default |
 | `DEVELOPMENT_BYPASS_SIGNUP_ALLOWLIST` | Exactly `true` or `false` | `false` when absent |
+| `SIGNUP_ALLOWLIST_JSON` | JSON array of exact email-address strings | Absent: Local allows every signup |
 
 Synthetic allowlist example only:
 
@@ -40,14 +41,22 @@ or generated files.
 | `Environment::Develop` | `dev` | Off | Allows `@macro.com` addresses and the addresses in `DEVELOPMENT_SIGNUP_ALLOWLIST_JSON`, which must be present, nonblank, valid, and non-empty. Denies every other signup. |
 | `Environment::Develop` | `dev` | On | Allows all public signups. The allowlist setting is ignored even if missing or malformed. |
 | `Environment::Production` | `prd` | No effect | Allows all public signups. The allowlist setting is ignored even if present or malformed. |
-| `Environment::Local` | `lcl` | No effect | Allows all public signups. The allowlist setting is ignored even if present or malformed. |
+| `Environment::Local` | `lcl` | No effect | Without `SIGNUP_ALLOWLIST_JSON`, allows all public signups. With it, allows only the addresses it lists and denies every other signup, `@macro.com` addresses included. `DEVELOPMENT_SIGNUP_ALLOWLIST_JSON` is ignored even if present or malformed. |
 
 With the bypass off, Develop startup fails if the allowlist setting is missing,
 blank, malformed JSON, not a JSON array, empty, contains a non-string entry,
 contains a blank entry, or contains an invalid email address. With the bypass
 on, Develop neither requires nor parses the allowlist setting, so the bypass
 takes precedence over any allowlist value. Production and Local do not require
-the allowlist setting and do not parse it.
+`DEVELOPMENT_SIGNUP_ALLOWLIST_JSON` and do not parse it.
+
+`SIGNUP_ALLOWLIST_JSON` is read only in Local, and only its absence means
+"allow everyone": when the variable is present, startup fails if it is blank,
+malformed JSON, not a JSON array, empty, or contains a non-string, blank, or
+invalid entry. The config loader reads the literal value `null` as absent. A developer stack leaves it unset. A Local deployment that
+strangers can reach sets it; see
+[Running as Local on the internet](#running-as-local-on-the-internet).
+Production and Develop ignore it even if it is present or malformed.
 
 The bypass accepts only the exact values `true` and `false`. Values such as
 `True`, `1`, `yes`, or an empty string fail startup in every environment,
@@ -70,8 +79,9 @@ Matching rules:
 - Matching is exact after normalization.
 - Case differences do not matter.
 - `+` aliases remain distinct addresses.
-- Every `@macro.com` address is allowed without being listed; subdomains and
-  look-alike domains are not.
+- In Develop, every `@macro.com` address is allowed without being listed;
+  subdomains and look-alike domains are not. In Local, no address is allowed
+  without being listed.
 - Domains, wildcards, suffixes, patterns, and regular expressions are not
   supported in the allowlist.
 - Denial responses and policy errors must not disclose configured addresses.
@@ -96,13 +106,57 @@ Both settings are optional plain Doppler values (project
 Links live in the `gtm_invite_link` MacroDB table (crate `gtm_invite`); the
 dashboard reads it through `GET /gtm-invite/links`.
 
+## Running as Local on the internet
+
+`ENVIRONMENT=local` is also how a deployment outside Macro's own
+infrastructure runs. Local's defaults suit a developer machine; a deployment
+that strangers can reach changes them with these settings. All are optional
+and read once at startup. Production and Develop ignore the first and refuse
+the second; the last two apply in every environment.
+
+| Setting | Format | When absent | Internet-facing deployment |
+| --- | --- | --- | --- |
+| `SIGNUP_ALLOWLIST_JSON` | JSON array of exact email-address strings | Anyone can create an account | Set to the addresses that may sign up |
+| `DEV_DANGEROUS_CROSS_SITE_COOKIES` | Exactly `true` or `false` | `false`: session cookies are `SameSite=Strict` | Leave unset |
+| `SUPPORT_CHANNEL_PARTICIPANTS_JSON` | JSON array of email-address strings | The Macro support team joins every new person's support channel and posts its welcome | Set to `[]`, or to the deployment's own support addresses |
+| `AUTH_SENDER_ADDRESS` | One email address | `auth@macro.com` | Set to an address the deployment's mail relay may send from |
+
+- **Signup.** The allowlist is the same policy Develop enforces, without the
+  `@macro.com` exception, at the same boundary: the `user.create` webhook, so
+  FusionAuth must call it with `AbsoluteMajority` as the local kickstart and
+  the hosted stack configure it. No signup path is exempt. A person invited to
+  a team, a shared mailbox being relocated, and an agent signing up by email
+  must each be listed before their account can be created. Accounts created
+  before the allowlist was set remain.
+- **Session cookies.** `SameSite=Strict` requires the app and this service to
+  share a registrable domain, such as `example.com` and `api.example.com`.
+  `DEV_DANGEROUS_CROSS_SITE_COOKIES=true` sends the cookies on requests from
+  any site, so any page a signed-in person opens can act as them. `just
+  run_local` sets it, because a developer stack may serve the app and the API
+  from different sites. Startup fails if it is `true` outside Local.
+- **Support channel.** Every person's new account gets a private channel named
+  `Macro Support x <name>`. Unset, its participants are the Macro support team,
+  one of whom posts the welcome message. A configured list replaces that team
+  and posts no welcome; `[]` creates no channel, and the app then hides its
+  support link. Only the absence of the variable keeps the Macro team: a blank
+  or malformed value fails startup.
+- **Mail sender.** `AUTH_SENDER_ADDRESS` is the From address of the mail this
+  service sends itself (`/mobile-welcome-email`). Sign-in codes are sent by
+  FusionAuth, from the tenant's `emailConfiguration.defaultFromEmail` and the
+  passwordless email template's `fromEmail`, which are set in FusionAuth.
+
+Sign-up analytics and marketing are already off in Local unless configured:
+Loops is never called, and PostHog, Meta, and Google Analytics are called only
+when their keys are set.
+
 ## Shared mailboxes
 
 Internal shared-mailbox grant relocation creates ordinary FusionAuth users for
 mailbox grants. In Develop with the bypass off, those mailbox addresses must be
 listed explicitly in `DEVELOPMENT_SIGNUP_ALLOWLIST_JSON` before relocation
 creates the FusionAuth user. With the bypass on, Develop allows those addresses
-like any other signup. Shared mailboxes get no metadata-based exemption from the
+like any other signup. In Local with `SIGNUP_ALLOWLIST_JSON` set, they must be
+listed there. Shared mailboxes get no metadata-based exemption from the
 signup policy.
 
 ## Rollout
@@ -126,8 +180,8 @@ signup policy.
    unlisted synthetic/test accounts receive a generic `403` without onboarding
    side effects.
 
-Production and Local remain allow-all and can deploy independently of the
-Develop allowlist value.
+Production, and Local without `SIGNUP_ALLOWLIST_JSON`, remain allow-all and can
+deploy independently of the Develop allowlist value.
 
 ### Change the bypass
 

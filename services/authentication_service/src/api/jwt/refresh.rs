@@ -11,6 +11,7 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
+use cookie::SameSite;
 use fusionauth::{FusionAuthClient, error::FusionAuthClientError};
 use macro_auth::{
     error::MacroAuthError,
@@ -77,10 +78,11 @@ impl IntoResponse for RefreshError {
             (status = 500, body=String),
         )
     )]
-#[tracing::instrument(skip(auth_client, jwt, token_context, cookies))]
+#[tracing::instrument(skip(auth_client, jwt, same_site, token_context, cookies))]
 pub async fn handler(
     State(auth_client): State<Arc<FusionAuthClient>>,
     State(jwt): State<JwtValidationArgs>,
+    State(same_site): State<SameSite>,
     token_context: Extension<TokenContext>,
     cookies: Cookies,
 ) -> Result<Json<UserTokensResponse>, RefreshError> {
@@ -164,8 +166,8 @@ pub async fn handler(
         .ok();
 
     // Add in cookies to response
-    cookies.add(create_access_token_cookie(&access_token));
-    cookies.add(create_refresh_token_cookie(&refresh_token));
+    cookies.add(create_access_token_cookie(&access_token, same_site));
+    cookies.add(create_refresh_token_cookie(&refresh_token, same_site));
 
     Ok(Json(UserTokensResponse {
         access_token,

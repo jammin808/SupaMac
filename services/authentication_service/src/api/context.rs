@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{collections::HashSet, sync::Arc};
 
 use analytics_client::AnalyticsClient;
 use axum::extract::FromRef;
@@ -40,6 +40,7 @@ use macro_cache_client::MacroCache;
 use macro_env::Environment;
 use macro_env_var::env_var;
 use macro_event_broker::{KafkaEventPublisher, MacroEventBrokerService};
+use macro_user_id::user_id::MacroUserIdStr;
 use native_app_service::{domain::service::NativeAppServiceImpl, outbound::DefaultBundleFetcher};
 use notification::outbound::queue::SqsQueue;
 use notification::{
@@ -296,6 +297,14 @@ pub(crate) struct ApiContext {
     pub sqs_client: Arc<sqs_client::SQS>,
     pub environment: Environment,
     pub signup_policy: Arc<SignupPolicy>,
+    /// The `SameSite` attribute every session cookie is set and cleared with.
+    pub session_cookie_same_site: cookie::SameSite,
+    /// The addresses added to every new person's support channel in place of
+    /// the Macro support team. `None` keeps that team; an empty set means no
+    /// support channel.
+    pub support_channel_participants: Option<Arc<HashSet<MacroUserIdStr<'static>>>>,
+    /// The address this service sends its own mail from.
+    pub auth_sender_address: Arc<str>,
     pub jwt_args: JwtValidationArgs,
     pub authorization_state: MacroAuthorizationState<AuthorizationService>,
     pub token_context: MacroApiTokenContext,

@@ -43,12 +43,12 @@ pub async fn handler(
     }
     // Perform a logout for the user
     // Remove access token cookie
-    let mut access_token_cookie = create_access_token_cookie("");
+    let mut access_token_cookie = create_access_token_cookie("", ctx.session_cookie_same_site);
     access_token_cookie.set_expires(Some(time::OffsetDateTime::now_utc()));
     cookies.add(access_token_cookie);
 
     // Remove refresh token cookie
-    let mut refresh_token_cookie = create_refresh_token_cookie("");
+    let mut refresh_token_cookie = create_refresh_token_cookie("", ctx.session_cookie_same_site);
     refresh_token_cookie.set_expires(Some(time::OffsetDateTime::now_utc()));
     cookies.add(refresh_token_cookie);
 

@@ -1,13 +1,15 @@
-use std::sync::LazyLock;
+use std::{collections::HashSet, sync::LazyLock};
 
 use crate::account_link_state::AccountLinkStateKey;
 use crate::service::signup_policy::SignupPolicy;
 use anyhow::Context;
+use cookie::SameSite;
 use database_env_vars::{DatabaseUrl, RedisUri};
 use gtm_invite::domain::models::{GtmInviteConfig, PromoCode};
 use macro_auth::InternalApiKey;
 pub use macro_env::Environment;
 use macro_env_var::{env_vars, maybe_env_vars};
+use macro_user_id::{email::Email, user_id::MacroUserIdStr};
 
 // BASE_URL config value. This is validated when creating the config in main.rs
 pub static BASE_URL: LazyLock<String> = LazyLock::new(|| {
@@ -70,6 +72,12 @@ maybe_env_vars! {
     pub struct LoopsApiKey;
     /// JSON array of exact email addresses allowed to sign up in Develop.
     pub struct DevelopmentSignupAllowlistJson;
+    /// JSON array of the only exact email addresses allowed to sign up in Local.
+    pub struct SignupAllowlistJson;
+    /// JSON array of the email addresses added to every new person's support channel.
+    pub struct SupportChannelParticipantsJson;
+    /// The address this service sends its own mail from. Defaults to `auth@macro.com`.
+    pub struct AuthSenderAddress;
     /// Stripe promotion code GTM invite links grant at checkout. Defaults to `1MF`.
     pub struct GtmInvitePromoCode;
     /// Hours a GTM invite link stays openable after creation. Defaults to 48.
@@ -205,6 +213,32 @@ pub struct Config {
     /// `DEVELOPMENT_SIGNUP_ALLOWLIST_JSON`. Production and Local ignore it.
     #[macro_config_default(false)]
     pub development_bypass_signup_allowlist: bool,
+    /// JSON array of the only exact email addresses allowed to sign up in Local.
+    ///
+    /// Unset admits everyone, which is what a developer stack wants. A Local
+    /// deployment reachable from the internet sets it to close signup; no
+    /// `@macro.com` address is admitted unless listed. Production and Develop
+    /// ignore it.
+    pub signup_allowlist_json: SignupAllowlistJson,
+    /// Send the session cookies on cross-site requests (`SameSite=None`) in Local.
+    ///
+    /// Default off: any website could otherwise make signed-in requests from a
+    /// visitor's browser, so a Local deployment reachable from the internet
+    /// keeps `SameSite=Strict`. `just run_local` sets it, because a developer
+    /// stack may serve the app and the API from different sites. Refused at
+    /// boot unless `ENVIRONMENT=local`.
+    #[macro_config_default(false)]
+    pub dev_dangerous_cross_site_cookies: bool,
+    /// JSON array of the email addresses added to every new person's support
+    /// channel, replacing the Macro support team and its welcome message.
+    ///
+    /// Unset keeps the Macro support team. An empty array creates no support
+    /// channel, for a deployment that team does not serve.
+    pub support_channel_participants_json: SupportChannelParticipantsJson,
+    /// The address this service sends its own mail from (optional, defaults
+    /// to `auth@macro.com`). Sign-in codes are sent by FusionAuth, from the
+    /// address its tenant is configured with.
+    pub auth_sender_address: AuthSenderAddress,
     /// Stripe promotion code applied at checkout for accounts that signed up
     /// through a GTM invite link (optional, defaults to `1MF`).
     pub gtm_invite_promo_code: GtmInvitePromoCode,
@@ -449,7 +483,36 @@ impl Config {
             environment,
             self.development_bypass_signup_allowlist,
             &self.development_signup_allowlist_json,
+            &self.signup_allowlist_json,
         )
+    }
+
+    /// The `SameSite` attribute of the session cookies.
+    ///
+    /// # Errors
+    /// If `DEV_DANGEROUS_CROSS_SITE_COOKIES` is set outside Local.
+    pub(crate) fn session_cookie_same_site(&self) -> anyhow::Result<SameSite> {
+        resolve_session_cookie_same_site(self.environment, self.dev_dangerous_cross_site_cookies)
+    }
+
+    /// The addresses a deployment adds to every new person's support channel
+    /// in place of the Macro support team, when it names any.
+    ///
+    /// # Errors
+    /// If `SUPPORT_CHANNEL_PARTICIPANTS_JSON` is set to anything but a JSON
+    /// array of email addresses.
+    pub(crate) fn support_channel_participants(
+        &self,
+    ) -> anyhow::Result<Option<HashSet<MacroUserIdStr<'static>>>> {
+        resolve_support_channel_participants(&self.support_channel_participants_json)
+    }
+
+    /// The address this service sends its own mail from.
+    ///
+    /// # Errors
+    /// If `AUTH_SENDER_ADDRESS` is set to anything but an email address.
+    pub(crate) fn auth_sender_address(&self) -> anyhow::Result<&str> {
+        resolve_auth_sender_address(&self.auth_sender_address)
     }
 
     /// Resolves the offer GTM invite links carry.
@@ -492,9 +555,17 @@ fn resolve_signup_policy(
     environment: Environment,
     development_bypass_signup_allowlist: bool,
     development_signup_allowlist_json: &DevelopmentSignupAllowlistJson,
+    signup_allowlist_json: &SignupAllowlistJson,
 ) -> anyhow::Result<SignupPolicy> {
     match environment {
-        Environment::Production | Environment::Local => Ok(SignupPolicy::allow_all()),
+        Environment::Production => Ok(SignupPolicy::allow_all()),
+        // Only an absent setting opens signup. A blank or malformed value
+        // fails startup instead of admitting everyone.
+        Environment::Local => match signup_allowlist_json.value() {
+            None => Ok(SignupPolicy::allow_all()),
+            Some(raw_allowlist) => SignupPolicy::from_exact_allowlist_json(raw_allowlist)
+                .context("SIGNUP_ALLOWLIST_JSON is invalid"),
+        },
         Environment::Develop if development_bypass_signup_allowlist => {
             Ok(SignupPolicy::allow_all())
         }
@@ -505,6 +576,61 @@ fn resolve_signup_policy(
                 .context("DEVELOPMENT_SIGNUP_ALLOWLIST_JSON is invalid")
         }
     }
+}
+
+fn resolve_session_cookie_same_site(
+    environment: Environment,
+    dev_dangerous_cross_site_cookies: bool,
+) -> anyhow::Result<SameSite> {
+    match (environment, dev_dangerous_cross_site_cookies) {
+        (Environment::Local, true) => Ok(SameSite::None),
+        (Environment::Production | Environment::Develop, true) => {
+            anyhow::bail!("DEV_DANGEROUS_CROSS_SITE_COOKIES is only allowed when ENVIRONMENT=local")
+        }
+        (Environment::Production | Environment::Local, false) => Ok(SameSite::Strict),
+        (Environment::Develop, false) => Ok(SameSite::None),
+    }
+}
+
+/// Only an absent setting keeps the Macro support team. A blank or malformed
+/// value fails startup instead of adding that team to a deployment's channels.
+/// Errors never quote the setting, which holds operational addresses.
+fn resolve_support_channel_participants(
+    participants_json: &SupportChannelParticipantsJson,
+) -> anyhow::Result<Option<HashSet<MacroUserIdStr<'static>>>> {
+    let Some(raw_participants) = participants_json.value() else {
+        return Ok(None);
+    };
+
+    let emails = serde_json::from_str::<Vec<String>>(raw_participants).map_err(|_| {
+        anyhow::anyhow!("SUPPORT_CHANNEL_PARTICIPANTS_JSON must be a JSON array of email addresses")
+    })?;
+
+    let participants = emails
+        .iter()
+        .map(|email| MacroUserIdStr::try_from_email(email.trim()))
+        .collect::<Result<HashSet<_>, _>>()
+        .map_err(|_| {
+            anyhow::anyhow!("SUPPORT_CHANNEL_PARTICIPANTS_JSON contains an invalid email address")
+        })?;
+
+    Ok(Some(participants))
+}
+
+/// The sender of this service's own mail when `AUTH_SENDER_ADDRESS` is unset.
+const DEFAULT_AUTH_SENDER_ADDRESS: &str = "auth@macro.com";
+
+fn resolve_auth_sender_address(sender_address: &AuthSenderAddress) -> anyhow::Result<&str> {
+    // Only an absent value takes the default: a blank one is a deployment
+    // mistake, and must not quietly send mail as the default sender.
+    let Some(address) = sender_address.value() else {
+        return Ok(DEFAULT_AUTH_SENDER_ADDRESS);
+    };
+
+    Email::parse_from_str(address)
+        .map_err(|_| anyhow::anyhow!("AUTH_SENDER_ADDRESS must be an email address"))?;
+
+    Ok(address)
 }
 
 /// The promotion code applied when `GTM_INVITE_PROMO_CODE` is unset: 100% off

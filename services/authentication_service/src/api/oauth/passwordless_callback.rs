@@ -133,9 +133,13 @@ pub async fn handler(
     )
     .await;
 
-    cookies.add(create_access_token_cookie(&passwordless_response.token));
+    cookies.add(create_access_token_cookie(
+        &passwordless_response.token,
+        ctx.session_cookie_same_site,
+    ));
     cookies.add(create_refresh_token_cookie(
         &passwordless_response.refresh_token,
+        ctx.session_cookie_same_site,
     ));
 
     // remove the users passwordless login rate limits

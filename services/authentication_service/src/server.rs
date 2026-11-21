@@ -130,6 +130,19 @@ async fn run_server() -> anyhow::Result<()> {
             .signup_policy()
             .context("invalid signup policy configuration")?,
     );
+    // The policy's `Debug` names its kind and size, never its addresses.
+    tracing::info!(signup_policy = ?signup_policy, "resolved signup policy");
+    let session_cookie_same_site = config
+        .session_cookie_same_site()
+        .context("invalid session cookie configuration")?;
+    let support_channel_participants = config
+        .support_channel_participants()
+        .context("invalid support channel configuration")?
+        .map(Arc::new);
+    let auth_sender_address: Arc<str> = config
+        .auth_sender_address()
+        .context("invalid auth mail sender configuration")?
+        .into();
     let gtm_invite_config = config
         .gtm_invite_config()
         .context("invalid GTM invite link configuration")?;
@@ -979,6 +992,9 @@ async fn run_server() -> anyhow::Result<()> {
             sqs_client,
             environment: config.environment,
             signup_policy,
+            session_cookie_same_site,
+            support_channel_participants,
+            auth_sender_address,
             rate_limit_service: rate_limit,
             event_broker: macro_event_broker.clone(),
             calendar_scope_enabled: config.calendar_scope_enabled,
