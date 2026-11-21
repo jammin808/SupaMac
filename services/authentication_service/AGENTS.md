@@ -48,6 +48,7 @@ key issuance, and account merge/link flows.
 ## Computer billing identifiers
 
 - Treat the six `STRIPE_COMPUTER_*_PRICE_ID` values as an optional all-or-none group: none means computer prices are not configured; any partial group fails startup and Doppler validation independently of physical fleet attachment. Validate configured price syntax in both startup and the Doppler binary.
+- Set `COMPUTERS_AGENT_EFFECTS=true` wherever the computers rollout is on: it runs the computers agents worker, the only consumer of `UndoAgentInvite`. Absent means off, and those effects wait in the outbox until it is on.
 - Store computer and seat prices as `stripe::PriceId` and reject malformed configured IDs during configuration loading with `config::configured_price_id` (async-stripe's parse accepts any string), including when no fleet is attached. `Config::computer_prices` returns a validation result.
 
 ## Checks
@@ -360,6 +361,14 @@ subscription reconciliation still use them. Prices have no fallback. See [requir
   through team deletion; drop it before DSS RPC if data appeared.
 - Keep account deletion and membership compensation independent of vault items;
   team items retain their immutable creator after a person leaves.
+- Account deletion queues contacts `user_deleted` just before deleting each
+  profile (a retry no longer lists a deleted profile). The contacts worker
+  refuses it while the profile exists; after 5 receives it moves to
+  `contacts-dlq-<stack>` with no replay, which happens only when the profile
+  was never deleted, and a retried deletion queues it again. It, the teams `directory_changed`
+  sends and the channel interactions share one `ListWritesGate`
+  (`contacts-list-writes`, service context `contacts-list-writes`), so they are
+  no-ops until the flag is on; legacy contacts messages are not gated.
 
 - Compose `FlaggedCrmAccessRollout` from the shared flag provider for team CRM
   preference writes. `enable-crm-member-access-changes` is evaluated freshly for
