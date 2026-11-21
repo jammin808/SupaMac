@@ -4766,6 +4766,7 @@
       "crates/macro_aws_config",
       "crates/macro_config",
       "crates/macro_config_derive",
+      "crates/macro_cors",
       "crates/macro_entrypoint",
       "crates/macro_env",
       "crates/macro_env_var",
@@ -11496,6 +11497,7 @@
     ],
     "macro_cors": [
       "crates/macro_cors",
+      "crates/macro_env_var",
       "crates/workspace-hack"
     ],
     "macro_db_client": [

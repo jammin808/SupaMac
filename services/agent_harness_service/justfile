@@ -17,6 +17,7 @@ check:
 # @macro-new (INMEM_BOT_ID) runs on the in-process ACP runtime.
 run-local:
   ENVIRONMENT=local \
+    DEV_DANGEROUS_PRIVATE_MCP_ADDRESSES=true \
     DATABASE_URL=postgres://user:password@localhost:5432/macrodb \
     KAFKA_BROKERS=localhost:9092 \
     OVERRIDE_CONNECTION_GATEWAY_URL=http://localhost:8082 \

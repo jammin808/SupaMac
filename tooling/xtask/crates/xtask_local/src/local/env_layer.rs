@@ -286,6 +286,14 @@ fn apply_dev_overrides(instance: &Instance, env: &mut BTreeMap<String, String>) 
         "COMPOSE_PROJECT_NAME".to_string(),
         instance.project_name().to_string(),
     );
+    // run-dev serves a developer's browser the way run-local does, so it keeps
+    // the relaxations `LocalEnv` opts the local stack in to.
+    for flag in [
+        "DEV_DANGEROUS_CROSS_SITE_COOKIES",
+        "DEV_DANGEROUS_PRIVATE_WEBHOOK_ENDPOINTS",
+    ] {
+        env.insert(flag.to_string(), "true".to_string());
+    }
     // run-dev must not point at local infra.
     env.remove("LOCAL_AWS_URL");
     env.remove("SMTP_HOST");
