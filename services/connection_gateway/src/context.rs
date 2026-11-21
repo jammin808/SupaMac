@@ -10,6 +10,7 @@ use last_online_tracker::inbound::LastOnlineWorker;
 use macro_authorization::{
     MacroAuthJwtValidator, MacroAuthorizationServiceImpl, MacroAuthorizationState,
 };
+use macro_cors::OriginAllowList;
 use redis::{RedisError, aio::MultiplexedConnection};
 use std::sync::Arc;
 use stream::domain::StreamManager;
@@ -43,6 +44,8 @@ impl ApiContext {
 pub struct AppState {
     pub context: ApiContext,
     pub config: Arc<Config>,
+    /// The origins a browser may open a socket from.
+    pub allowed_origins: Arc<OriginAllowList>,
     pub authorization_state: MacroAuthorizationState<AuthorizationService>,
     pub frecency_worker: Arc<FrecencyAggregatorWorkerHandle>,
 }

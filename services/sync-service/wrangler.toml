@@ -36,6 +36,10 @@ DSS_URL = "http://localhost:8086"
 DSS_INTERNAL_AUTH_KEY = "local"
 LEXICAL_SERVICE_URL = "http://localhost:8096"
 LEXICAL_SERVICE_AUTH_KEY = "local"
+# Browser origins that may call this worker, comma-separated, each as sent in
+# `Origin` (scheme://host[:port]). Empty keeps the built-in list in
+# src/inbound/cors.rs.
+ALLOWED_ORIGINS = ""
 # Tags exported spans with deployment.environment=local, matching the
 # Datadog agent's DD_ENV so the env:local trace/log views include them.
 ENVIRONMENT = "local"
@@ -66,6 +70,7 @@ ENVIRONMENT = "development"
 SPS_URL = "https://dev-gateway.macro.com/search-processing"
 DSS_URL = "https://dev-gateway.macro.com/dss"
 LEXICAL_SERVICE_URL = "https://dev-gateway.macro.com/lexical"
+ALLOWED_ORIGINS = ""
 
 [env.playground.durable_objects]
 bindings = [
@@ -107,6 +112,7 @@ OTEL_EXPORTER_OTLP_ENDPOINT = "https://macro-prox-dev.macroverse.workers.dev/i/o
 SPS_URL = "https://dev-gateway.macro.com/search-processing"
 DSS_URL = "https://dev-gateway.macro.com/dss"
 LEXICAL_SERVICE_URL = "https://dev-gateway.macro.com/lexical"
+ALLOWED_ORIGINS = ""
 
 [env.dev.durable_objects]
 bindings = [
@@ -148,6 +154,7 @@ OTEL_EXPORTER_OTLP_ENDPOINT = "https://macro-prox-prod.macroverse.workers.dev/i/
 SPS_URL = "https://gateway.macro.com/search-processing"
 DSS_URL = "https://gateway.macro.com/dss"
 LEXICAL_SERVICE_URL = "https://gateway.macro.com/lexical"
+ALLOWED_ORIGINS = ""
 
 [env.prod.durable_objects]
 bindings = [

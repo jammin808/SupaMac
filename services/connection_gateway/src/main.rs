@@ -12,12 +12,7 @@ use crate::{
     context::{AppState, AuthorizationService},
 };
 use anyhow::{Context, Result};
-use axum::http::{
-    Method,
-    header::{AUTHORIZATION, CONTENT_TYPE},
-};
 use config::Config;
-use constants::ORIGINS;
 use entity_access::{domain::service::EntityAccessServiceImpl, outbound::PgAccessRepository};
 use frecency::{
     domain::services::{EventIngestorImpl, PullAggregatorImpl},
@@ -37,6 +32,7 @@ use macro_authorization::{
     InternalAuthConfig, MacroAuthJwtValidator, MacroAuthorizationState,
     PgUserApiKeyAuthorizationRepo, PgUserApiKeyAuthorizer,
 };
+use macro_cors::OriginAllowList;
 use macro_entrypoint::MacroEntrypoint;
 use macro_env::Environment;
 use macro_tower_layers::MacroRequestIdAndTracingLayer;
@@ -44,7 +40,6 @@ use service::dynamodb::create_dynamo_db_connection_manager;
 use service::redis::poll_messages;
 use sqlx::postgres::PgPoolOptions;
 use stream::outbound::redis_pg::{RedisPostgresStreamManager, RedisPostgresStreamRepo};
-use tower_http::cors::CorsLayer;
 
 #[tokio::main]
 #[tracing::instrument(ret, err)]
@@ -66,19 +61,8 @@ async fn main() -> Result<()> {
         JwtValidationArgs::new_with_secret_manager(config.environment, &secretsmanager_client)
             .await?;
 
-    // allow requests from any origin
-    let cors = CorsLayer::new()
-        .allow_credentials(true)
-        .allow_headers(vec![AUTHORIZATION, CONTENT_TYPE])
-        .allow_methods(vec![
-            Method::GET,
-            Method::POST,
-            Method::PUT,
-            Method::PATCH,
-            Method::DELETE,
-            Method::OPTIONS,
-        ])
-        .allow_origin(ORIGINS);
+    let cors = macro_cors::cors_layer();
+    let allowed_origins = Arc::new(OriginAllowList::from_env());
 
     let dynamodb_client = aws_sdk_dynamodb::Client::new(&aws_config);
 
@@ -151,6 +135,7 @@ async fn main() -> Result<()> {
     let app = router(AppState {
         context,
         config: Arc::clone(&config),
+        allowed_origins: Arc::clone(&allowed_origins),
         authorization_state,
         frecency_worker: Arc::new(FrecencyAggregatorWorkerHandle::new_worker(
             PullAggregatorImpl::new(FrecencyPgProcessor::new(pgpool), DefaultTime),
@@ -165,6 +150,7 @@ async fn main() -> Result<()> {
     ));
 
     tracing::info!(
+        websocket_origin_checked = matches!(*allowed_origins, OriginAllowList::Exact(_)),
         "connection gateway is up and running with environment {:?} on port {}",
         config.environment,
         config.port
