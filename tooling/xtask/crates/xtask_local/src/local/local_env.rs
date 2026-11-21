@@ -181,6 +181,16 @@ impl LocalEnv {
         // Deployed envs turn this on only after every email worker decodes
         // batches; a local stack runs producers and workers from one build.
         env.insert("GMAIL_LABEL_WRITE_BATCHES_ENABLED".into(), "true".into());
+        // Relaxations only a developer machine takes; each service refuses
+        // its own unless `ENVIRONMENT=local`, and an internet-facing instance
+        // leaves them unset. Document storage delivers webhooks to http
+        // receivers on the compose network (the SDK webhook relay), and the
+        // authentication service's session cookies are sent cross-site.
+        env.insert(
+            "DEV_DANGEROUS_PRIVATE_WEBHOOK_ENDPOINTS".into(),
+            "true".into(),
+        );
+        env.insert("DEV_DANGEROUS_CROSS_SITE_COOKIES".into(), "true".into());
         env.insert(
             "OVERRIDE_PREVIEW_GATEWAY_URL".into(),
             "http://agent-harness-service:8080/preview".into(),
@@ -543,8 +553,9 @@ struct AgentHarnessEnv {
     /// tunnel when one opened, otherwise the in-network address.
     egress_url: String,
     /// Macro's MCP service base URL, without its `/mcp` transport endpoint.
-    /// In-network and cleartext, which the proxy permits only locally:
-    /// this hop never leaves the compose bridge.
+    /// In-network and cleartext, which the harness permits only under
+    /// `DEV_DANGEROUS_PRIVATE_MCP_ADDRESSES`: this hop never leaves the
+    /// compose bridge.
     mcp_service_url: &'static str,
 }
 
@@ -577,6 +588,9 @@ impl AgentHarnessEnv {
         env.insert("DAYTONA_SNAPSHOT".into(), self.snapshot.into());
         env.insert("DAYTONA_API_KEY".into(), String::new());
         env.insert("DEV_DANGEROUS_LOCAL_CONTAINERS".into(), "true".into());
+        // The MCP and preview services, and a developer's own MCP servers,
+        // are on the compose network or this machine, in cleartext.
+        env.insert("DEV_DANGEROUS_PRIVATE_MCP_ADDRESSES".into(), "true".into());
         env.insert("LOCAL_CONTAINER_IMAGE".into(), self.image.into());
         env.insert("LOCAL_CONTAINER_NETWORK".into(), self.network.clone());
         env.insert(

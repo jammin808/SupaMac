@@ -5,6 +5,7 @@ use macro_auth::InternalApiKey;
 pub use macro_env::Environment;
 use macro_env_var::{env_vars, maybe_env_vars};
 use secretsmanager_client::LocalOrRemoteSecret;
+use webhook::domain::models::WebhookEndpointSchemePolicy;
 
 #[cfg(test)]
 mod test;
@@ -216,6 +217,16 @@ pub struct Config {
     #[macro_config_default(20)]
     pub webhook_queue_wait_time_seconds: i32,
 
+    /// Accept webhook endpoints that use http or name a loopback, private or
+    /// link-local address.
+    ///
+    /// Default off: an endpoint is a URL its owner typed, so each one is
+    /// https to a public address, also when `ENVIRONMENT=local`.
+    /// `just run_local` sets it for receivers on the compose network.
+    /// Refused at boot unless `ENVIRONMENT=local`.
+    #[macro_config_default(false)]
+    pub dev_dangerous_private_webhook_endpoints: bool,
+
     /// The document limit for free users
     #[macro_config_default(20)]
     pub document_limit: u64,
@@ -279,4 +290,22 @@ impl Config {
         NonUserOwners::from_config_value(self.enable_non_user_owners.value())
             .context("ENABLE_NON_USER_OWNERS must be `true` or `false`")
     }
+}
+
+/// Which webhook endpoints are accepted: https to public addresses only,
+/// unless a local environment opted in with
+/// `DEV_DANGEROUS_PRIVATE_WEBHOOK_ENDPOINTS`.
+pub fn webhook_endpoint_scheme_policy(
+    environment: Environment,
+    dev_dangerous_private_webhook_endpoints: bool,
+) -> anyhow::Result<WebhookEndpointSchemePolicy> {
+    if !dev_dangerous_private_webhook_endpoints {
+        return Ok(WebhookEndpointSchemePolicy::HttpsOnly);
+    }
+    if !matches!(environment, Environment::Local) {
+        anyhow::bail!(
+            "DEV_DANGEROUS_PRIVATE_WEBHOOK_ENDPOINTS is only allowed when ENVIRONMENT=local"
+        );
+    }
+    Ok(WebhookEndpointSchemePolicy::HttpAndHttps)
 }

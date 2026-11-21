@@ -1066,11 +1066,10 @@ async fn run_server() -> anyhow::Result<()> {
     let call_webhook_state = WebhookRouterState::new(call_service.clone());
 
     let webhook_repository = webhook::outbound::PgRepository::new(db.clone());
-    let webhook_endpoint_scheme_policy = if matches!(env, Environment::Local) {
-        webhook::domain::models::WebhookEndpointSchemePolicy::HttpAndHttps
-    } else {
-        webhook::domain::models::WebhookEndpointSchemePolicy::HttpsOnly
-    };
+    let webhook_endpoint_scheme_policy = crate::config::webhook_endpoint_scheme_policy(
+        env,
+        config.dev_dangerous_private_webhook_endpoints,
+    )?;
     let webhook_http_client =
         webhook::outbound::ReqwestWebhookDeliveryClient::new_with_endpoint_scheme_policy(
             webhook_endpoint_scheme_policy,

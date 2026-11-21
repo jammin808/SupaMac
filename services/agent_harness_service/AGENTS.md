@@ -434,6 +434,22 @@ glibc malloc kept freed memory resident as fragmentation under this
 workload. Tests and the library keep the system allocator, so the allocator
 stays in `main.rs` while everything else lives in `src/lib.rs`.
 
+By default MCP traffic reaches public addresses only, also when
+`ENVIRONMENT=local`: `Config::mcp_address_policy` gives `PublicOnly` to the
+guarded client for
+users' custom MCP servers (transport, OAuth, token refresh; shared with
+cognition), the egress forwarder and the actor MCP transport. The Macro MCP
+upstream (`McpServiceUrl`) and the preview MCP (`PreviewGatewayUrl`) go through
+the same forwarder, so both must be https URLs that resolve to public
+addresses, as the deployed gateway URLs are; an http one fails startup.
+`DEV_DANGEROUS_PRIVATE_MCP_ADDRESSES=true` (default false, so no Doppler key;
+startup fails if it is set unless `ENVIRONMENT=local`) lifts both limits: any
+address is reachable and those two upstreams may be http. `just run_local`
+sets it, because its MCP and preview services are http on the compose network.
+Never set it where other people can sign in: a custom server's URL is whatever
+its owner typed. Preview control's extra app and loopback hosts and its SSH
+fallback still follow `ENVIRONMENT=local` alone.
+
 `AGENT_SESSION_IDLE_TIMEOUT_SECS` (default 900, so no Doppler key) is how long
 a session's command worker waits before it releases a quiet session from
 memory and exits; lower it only to exercise the release end to end. Values

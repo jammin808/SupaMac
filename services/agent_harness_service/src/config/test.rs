@@ -125,6 +125,45 @@ fn the_idle_timeout_defaults_to_fifteen_minutes_and_refuses_less_than_thirty_sec
     }
 }
 
+#[test]
+fn mcp_traffic_reaches_private_addresses_only_by_local_opt_in() {
+    let mut local = config_values();
+    local["ENVIRONMENT"] = serde_json::json!("local");
+    let config: Config = serde_json::from_value(local.clone()).unwrap();
+    assert_eq!(
+        config.mcp_address_policy().unwrap(),
+        AddressPolicy::PublicOnly
+    );
+
+    local["DEV_DANGEROUS_PRIVATE_MCP_ADDRESSES"] = serde_json::json!(true);
+    let config: Config = serde_json::from_value(local).unwrap();
+    assert_eq!(
+        config.mcp_address_policy().unwrap(),
+        AddressPolicy::AnyAddress
+    );
+
+    for environment in ["dev", "prod"] {
+        let mut deployed = config_values();
+        deployed["ENVIRONMENT"] = serde_json::json!(environment);
+        let config: Config = serde_json::from_value(deployed.clone()).unwrap();
+        assert_eq!(
+            config.mcp_address_policy().unwrap(),
+            AddressPolicy::PublicOnly,
+            "{environment}"
+        );
+
+        deployed["DEV_DANGEROUS_PRIVATE_MCP_ADDRESSES"] = serde_json::json!(true);
+        let config: Config = serde_json::from_value(deployed).unwrap();
+        let error = config.mcp_address_policy().unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("DEV_DANGEROUS_PRIVATE_MCP_ADDRESSES"),
+            "{environment}: the error names the setting: {error}"
+        );
+    }
+}
+
 fn values() -> serde_json::Value {
     let mut values = serde_json::json!({
         "ENVIRONMENT": "local",

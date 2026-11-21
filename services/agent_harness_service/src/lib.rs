@@ -557,10 +557,16 @@ pub async fn run() -> anyhow::Result<()> {
         connectors = connectors.with_rollout(rollout);
     }
 
-    // Session egress reaches only public addresses, except on a local stack
-    // whose MCP and preview services sit on the compose network.
-    let mcp_address_policy =
-        mcp_client::outbound::guarded_http::AddressPolicy::for_environment(config.environment);
+    // Session egress and connections to users' own MCP servers reach only
+    // public addresses, except on a developer stack that opted in because its
+    // MCP and preview services sit on the compose network.
+    let mcp_address_policy = config.mcp_address_policy()?;
+    // The same opt-in is the one gate on cleartext to the Macro MCP upstream
+    // and the preview MCP: a developer stack dials both across the compose
+    // bridge, where TLS would be theater. Without it an http URL refuses to
+    // boot.
+    let local_mcp_cleartext =
+        mcp_address_policy == mcp_client::outbound::guarded_http::AddressPolicy::AnyAddress;
     let mcp_http = mcp_client::outbound::guarded_http::McpHttp::new(mcp_address_policy)?;
 
     // Every session's MCP servers: Macro's own under the reserved `macro`
@@ -580,10 +586,7 @@ pub async fn run() -> anyhow::Result<()> {
             config.macro_api_token_private_secret_key.as_ref(),
         ),
         macro_mcp_endpoint(&McpServiceUrl::new()?).context("MCP service endpoint is not a URL")?,
-        // The one gate on cleartext: a local stack's mcp-service is dialed
-        // across the compose bridge, where TLS would be theater. Everywhere
-        // else, an http URL refuses to boot.
-        matches!(config.environment, Environment::Local),
+        local_mcp_cleartext,
     )
     .context("the macro MCP upstream is misconfigured")?;
 
@@ -628,7 +631,7 @@ pub async fn run() -> anyhow::Result<()> {
                 "{}/mcp",
                 macro_service_urls::PreviewGatewayUrl::new()?
             ))?,
-            matches!(config.environment, Environment::Local),
+            local_mcp_cleartext,
         )?
         .with_owner_approvals(Arc::clone(&tool_approvals))
         // Each account's MCP exchanges are paced per upstream, after
