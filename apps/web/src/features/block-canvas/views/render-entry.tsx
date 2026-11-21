@@ -1,3 +1,4 @@
+import '@core/util/zodContentSecurityPolicy';
 import '../../../index.css';
 import '@fontsource-variable/inter';
 import '@fontsource-variable/roboto-mono';

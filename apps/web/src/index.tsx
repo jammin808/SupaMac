@@ -1,3 +1,4 @@
+import './lib/core/util/zodContentSecurityPolicy';
 import { initializeBrowserObservability } from './observability/browser';
 import './index.css';
 
