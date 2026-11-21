@@ -153,6 +153,16 @@ realtime appearance events do not re-ingest history.
 
 ## Gotchas
 
+- A document location is a CloudFront signed URL on AWS. With `LOCAL_AWS_URL`
+  set no CDN verifies one, so it is an S3 presigned GET from
+  `PresignedUploadUrlPort::get_document_storage_presigned_url` with the same
+  expiry, and `CloudFrontConfig`'s signer and distribution URL are unused here.
+  The distribution URL must still be `<LOCAL_AWS_PUBLIC_URL>/<document storage
+  bucket>`, the prefix those links fall under: code mode
+  (`agent_harness_service`) downloads documents only from it.
+- Under local AWS `S3UploadUrlAdapter` skips `copy_object`, `upload_snapshot`
+  and `delete_object` (which only undoes a copy): a copied document has no
+  object at its new key, and sync snapshots are never cached.
 - Features compose non-trivially (`inbound` pulls in `axum` and
   `document_create_adapters`; `ai_tools` pulls in `outbound` and `ports`) —
   check `Cargo.toml`'s `[features]` block before assuming a module compiles

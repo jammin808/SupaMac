@@ -58,7 +58,14 @@ threads, pins, recents, notifications, folders, activity.
 - `src/outbound/docx_export.rs`: primary-database parts and immutable DOCX export
   objects keyed by part paths/hashes. The export route maps the documents domain's
   pending result to 409 with `Retry-After`; never reuse document-id-only archives.
-  Location and export URLs share signing helpers in `src/service/cloudfront.rs`.
+  Location and export links come from `document_url` in
+  `src/service/cloudfront.rs`: a CloudFront signed URL on AWS, and with
+  `LOCAL_AWS_URL` set, where no CDN verifies one, an S3 presigned GET with the
+  same expiry that the store itself checks. The signer is then unused, but
+  `DOCUMENT_STORAGE_SERVICE_CLOUDFRONT_DISTRIBUTION_URL` must stay
+  `<LOCAL_AWS_PUBLIC_URL>/<document storage bucket>`, the prefix those links
+  fall under: code mode (`agent_harness_service`) downloads documents only
+  from it.
 - `src/outbound/calendar_refresh.rs`: the `refresh_calendar` nudge for a new
   request to join a calendar event, which this service hosts while answers
   belong to `calendar_service`. It finds delegates by `link_id` alone, as the
@@ -108,6 +115,13 @@ threads, pins, recents, notifications, folders, activity.
 
 ## Gotchas
 
+- Webhook endpoints are https to public addresses by default, also when
+  `ENVIRONMENT=local`. `DEV_DANGEROUS_PRIVATE_WEBHOOK_ENDPOINTS=true` (default
+  false, so no Doppler key; `config::webhook_endpoint_scheme_policy` fails
+  startup if it is set unless `ENVIRONMENT=local`) also admits http and
+  loopback, private and link-local targets. `just run_local` sets it for
+  receivers on the compose network. Never set it where other people can sign
+  in: an endpoint is a URL its owner typed.
 - The REST `/items` routes and `/search` hide Macro's own sign-in emails from a program (`hide_sign_in_emails_from_programs` in `src/api.rs`), so a code-mode run cannot read a sign-in code from workspace previews or search hits. GraphQL (`/items/soup/graphql` and its websocket) refuses programs outright: a query picks its own fields, so no rewrite can find the email. Nothing program-side calls it.
 - Inject the shared PostHog client into CRM's thread-exclusion gate; missing or
   failed `enable-crm-thread-exclusions` evaluation must refuse API writes.

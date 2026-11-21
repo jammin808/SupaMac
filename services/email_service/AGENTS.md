@@ -168,6 +168,13 @@ the gateway `/email` prefix.
   client.
 - Long attachment names are truncated to the DSS limit before upload (#7893);
   don't remove that truncation when touching `util/upload_attachment.rs`.
+- A received attachment's download link (`outbound/attachment_access.rs`) is a
+  CloudFront signed URL on AWS. With `LOCAL_AWS_URL` set no CDN verifies one,
+  so the link is an S3 presigned GET the store itself checks, rewritten for
+  browsers by `macro_aws_config::transform_aws_url`; the
+  `EMAIL_SERVICE_CLOUDFRONT_*` values are then unused. Both expire after
+  `EMAIL_SERVICE_PRESIGNED_URL_TTL_SECS`; presigning refuses more than seven
+  days.
 - An attachment's file type comes from a Macro file type's extension on its
   filename (`FileType::split_suffix_match`, as uploads use) unless its MIME
   type names a different Macro file type, and from the MIME type without such

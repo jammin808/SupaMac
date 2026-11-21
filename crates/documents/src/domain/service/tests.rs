@@ -139,6 +139,14 @@ impl PresignedUploadUrlPort for TestUploadUrlPort {
         Ok(String::new())
     }
 
+    async fn get_document_storage_presigned_url(
+        &self,
+        _key: &str,
+        _expires_in_seconds: u64,
+    ) -> anyhow::Result<String> {
+        Ok(String::new())
+    }
+
     async fn copy_object(&self, _source_key: &str, _destination_key: &str) -> anyhow::Result<()> {
         Ok(())
     }
@@ -2225,6 +2233,14 @@ impl PresignedUploadUrlPort for RecordingUploadUrlPort {
         _key: &str,
         _sha: &str,
         _content_type: ContentType,
+    ) -> anyhow::Result<String> {
+        Ok(String::new())
+    }
+
+    async fn get_document_storage_presigned_url(
+        &self,
+        _key: &str,
+        _expires_in_seconds: u64,
     ) -> anyhow::Result<String> {
         Ok(String::new())
     }

@@ -4,11 +4,10 @@ use std::io::{Cursor, Write};
 
 use documents_hex::domain::docx_export::DocxExportStore;
 use model::document::BomPart;
-use s3_key::document_key_url_path;
 use sha2::{Digest, Sha256};
 
 use crate::api::context::ApiContext;
-use crate::service::cloudfront::{get_cloudfront_signed_options, get_presigned_url};
+use crate::service::cloudfront::document_url;
 use crate::service::s3::S3;
 
 #[derive(Debug, thiserror::Error)]
@@ -69,23 +68,7 @@ impl DocxExportStore for ApiContext {
         parts: Vec<BomPart>,
     ) -> Result<String, Self::Err> {
         let key = store_export(&self.s3_client, document_id, parts).await?;
-        let signed_options = get_cloudfront_signed_options(
-            &self
-                .config
-                .document_storage_service_cloudfront_signer_public_key_id,
-            self.config
-                .document_storage_service_cloudfront_signer_private_key
-                .as_ref(),
-            self.config
-                .document_storage_service_presigned_url_expiry_seconds,
-        )?;
-        Ok(get_presigned_url(
-            &self
-                .config
-                .document_storage_service_cloudfront_distribution_url,
-            &document_key_url_path(&key),
-            &signed_options,
-        )?)
+        Ok(document_url(&self.s3_client, &self.config, &key).await?)
     }
 }
 

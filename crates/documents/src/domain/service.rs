@@ -438,17 +438,24 @@ impl<
         )
     }
 
-    fn make_presigned_url(&self, key: &str) -> anyhow::Result<String> {
+    /// The link an object is read from, good for the configured expiry.
+    async fn make_presigned_url(&self, key: &str) -> anyhow::Result<String> {
+        // Under local AWS no CDN stands in front of the bucket to verify a
+        // CloudFront signature, so the link is one the store itself checks.
+        if macro_aws_config::is_local_aws() {
+            return self
+                .upload_url_service
+                .get_document_storage_presigned_url(
+                    key,
+                    self.cloudfront_config.presigned_url_expiry_seconds,
+                )
+                .await;
+        }
+
         let constructed_url = self.cloudfront_url_for_key(key);
         let options = self.get_signed_options();
 
-        let signed_url = if !macro_aws_config::is_local_aws() {
-            get_signed_url(&constructed_url, &options)?
-        } else {
-            constructed_url
-        };
-
-        Ok(signed_url)
+        Ok(get_signed_url(&constructed_url, &options)?)
     }
 
     async fn get_editable_url(
@@ -471,7 +478,7 @@ impl<
         let document_key =
             build_cloud_storage_bucket_document_key(owner, document_id, document_version_id);
 
-        let signed_url = self.make_presigned_url(&document_key)?;
+        let signed_url = self.make_presigned_url(&document_key).await?;
         Ok(LocationResponseData::PresignedUrl(signed_url))
     }
 
@@ -490,7 +497,7 @@ impl<
         let document_key =
             build_cloud_storage_bucket_document_key(owner, document_id, document_version_id);
 
-        let signed_url = self.make_presigned_url(&document_key)?;
+        let signed_url = self.make_presigned_url(&document_key).await?;
         Ok(LocationResponseData::PresignedUrl(signed_url))
     }
 
@@ -501,7 +508,7 @@ impl<
     ) -> anyhow::Result<LocationResponseData> {
         let document_key = build_docx_to_pdf_converted_document_key(owner, document_id);
 
-        let signed_url = self.make_presigned_url(&document_key)?;
+        let signed_url = self.make_presigned_url(&document_key).await?;
         Ok(LocationResponseData::PresignedUrl(signed_url))
     }
 
@@ -521,6 +528,17 @@ impl<
                 .await
                 .map_err(Into::into)?
         };
+
+        // A part's key is its sha, so each is signed like any other object.
+        if macro_aws_config::is_local_aws() {
+            let mut presigned_urls = Vec::with_capacity(shas.len());
+            for sha in shas {
+                let presigned_url = self.make_presigned_url(&sha).await?;
+                presigned_urls.push(PresignedUrl { presigned_url, sha });
+            }
+
+            return Ok(LocationResponseData::PresignedUrls(presigned_urls));
+        }
 
         let options = self.get_signed_options();
         let distribution_url = &self.cloudfront_config.distribution_url;

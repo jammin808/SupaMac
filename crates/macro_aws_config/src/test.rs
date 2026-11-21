@@ -1,5 +1,8 @@
 use super::*;
 
+mod credentials;
+#[cfg(feature = "s3")]
+mod presigned_get;
 #[cfg(any(feature = "s3", feature = "sqs"))]
 mod transport;
 
