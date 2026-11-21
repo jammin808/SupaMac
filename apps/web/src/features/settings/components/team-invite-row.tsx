@@ -1,3 +1,4 @@
+import { WEB_BASE_PATH } from '@app/constants/routerBase';
 import { getWebOrigin } from '@core/util/webOrigin';
 import { formatRelativeTimestamp } from '@entity';
 import CheckIcon from '@phosphor/check.svg';
@@ -27,8 +28,8 @@ export function TeamInviteRow(props: {
     try {
       await navigator.clipboard.writeText(
         props.invite.is_agent
-          ? `${getWebOrigin()}/app/signup/agent?team_invite=${props.invite.id}`
-          : `${getWebOrigin()}/app/team-invite?id=${props.invite.id}`
+          ? `${getWebOrigin()}${WEB_BASE_PATH}/signup/agent?team_invite=${props.invite.id}`
+          : `${getWebOrigin()}${WEB_BASE_PATH}/team-invite?id=${props.invite.id}`
       );
     } catch (err) {
       console.error('Failed to copy to clipboard', err);

@@ -1,3 +1,4 @@
+import { WEB_BASE_PATH } from '@app/constants/routerBase';
 import LogoIcon from '@icon/macro-logo.svg';
 import { createSignal } from 'solid-js';
 
@@ -48,7 +49,7 @@ export function MobileWebWelcome(props: {
 
         <p class="text-sm text-ink/50 mt-20">Already have an account?</p>
         <a
-          href="/app/login"
+          href={`${WEB_BASE_PATH}/login`}
           onClick={(event) => {
             event.preventDefault();
             props.onLogin();

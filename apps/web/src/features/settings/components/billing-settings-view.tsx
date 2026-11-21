@@ -1,3 +1,4 @@
+import { WEB_BASE_PATH } from '@app/constants/routerBase';
 import { type PaidPlanTier, PLAN_BY_TIER } from '@app/features/paywall/plans';
 import { plural } from '@core/util/string';
 import CalendarIcon from '@icon/system/regular/calendar-blank.svg';
@@ -90,7 +91,7 @@ export function BillingSettingsView(props: {
                       each seat's plan in{' '}
                       <a
                         class="text-link hover:text-link-hover"
-                        href="/app/settings/team-members"
+                        href={`${WEB_BASE_PATH}/settings/team-members`}
                         onClick={props.onTeamSettings}
                       >
                         Team settings
@@ -111,7 +112,7 @@ export function BillingSettingsView(props: {
                       • set each seat's plan in{' '}
                       <a
                         class="text-link hover:text-link-hover"
-                        href="/app/settings/team-members"
+                        href={`${WEB_BASE_PATH}/settings/team-members`}
                         onClick={props.onTeamSettings}
                       >
                         Team settings

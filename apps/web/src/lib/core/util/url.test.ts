@@ -31,6 +31,31 @@ it('copies routine links using the canonical route', () => {
   ).toBe('/app/routines/routine-1');
 });
 
+describe('entity links under another base path', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
+  it('builds a link the same deployment opens in place', async () => {
+    vi.stubEnv('__APP_BASE_PATH__', '/workspace');
+    vi.resetModules();
+    const { buildSimpleEntityUrl } = await import('./url');
+    const { parseInternalAppLink } = await import('./macroAppUrl');
+
+    const link = buildSimpleEntityUrl(
+      { type: 'md', id: 'doc-1' },
+      { view: 'edit' }
+    );
+
+    expect(new URL(link).pathname).toBe('/workspace/md/doc-1');
+    expect(parseInternalAppLink(link)).toEqual({
+      path: '/md/doc-1',
+      query: 'view=edit',
+    });
+  });
+});
+
 describe('openExternalUrl', () => {
   let openSpy: MockInstance<typeof window.open>;
   const disposers: Array<() => void> = [];

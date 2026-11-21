@@ -1,3 +1,4 @@
+import { WEB_BASE_PATH } from '@app/constants/routerBase';
 import { t } from '@app/lib/i18n';
 import { useIsAuthenticated } from '@core/auth';
 import { LoadingSpinner } from '@core/component/LoadingSpinner';
@@ -92,7 +93,7 @@ export function AgentSetupPage() {
     agentSetupMarkdown({
       apiKey,
       teamJoinFailed,
-      openAppUrl: `${getWebOrigin()}/app/agent-setup/done`,
+      openAppUrl: `${getWebOrigin()}${WEB_BASE_PATH}/agent-setup/done`,
       copy: {
         title: t('agentSetup.title'),
         intro: t('agentSetup.intro'),

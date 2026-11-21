@@ -1,3 +1,4 @@
+import { WEB_BASE_PATH } from '@app/constants/routerBase';
 import {
   clearSignupDraft,
   Onboarding,
@@ -57,7 +58,9 @@ export function Login(props: { signupMode?: boolean }) {
           const referral = new URLSearchParams(window.location.search).get(
             'referral'
           );
-          if (referral) window.location.href = `/app?referral=${referral}`;
+          if (referral) {
+            window.location.href = `${WEB_BASE_PATH}?referral=${referral}`;
+          }
         }}
         signupJourney={
           desktopSignup()

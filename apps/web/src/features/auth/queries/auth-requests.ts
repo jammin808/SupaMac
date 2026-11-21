@@ -1,10 +1,11 @@
+import { WEB_BASE_PATH } from '@app/constants/routerBase';
 import { SERVER_HOSTS } from '@core/constant/servers';
 import { platformFetch } from '@core/util/platformFetch';
 import { authServiceClient } from '@service-auth/client';
 import type { SendCodeResult, VerifyCodeResult } from '../context/auth-context';
 
 /** Where the passwordless magic link returns. */
-const REDIRECT_URI = `${window.location.origin}/app`;
+const REDIRECT_URI = `${window.location.origin}${WEB_BASE_PATH}`;
 
 /** The one account that signs in with a password instead of a code. */
 const PASSWORD_LOGIN_EMAIL_SHA256 =

@@ -1,3 +1,4 @@
+import { WEB_BASE_PATH } from '@app/constants/routerBase';
 import { useIsAuthenticated } from '@core/auth';
 import { useNavigate } from '@solidjs/router';
 import { Button } from '@ui';
@@ -8,7 +9,7 @@ export function openLoginModal() {
 
   const params = new URLSearchParams(window.location.search);
   const queryString = params.size > 0 ? `?${params.toString()}` : '';
-  window.location.href = `${window.location.origin}/app/login${queryString}`;
+  window.location.href = `${window.location.origin}${WEB_BASE_PATH}/login${queryString}`;
 }
 
 export function LoginButton() {

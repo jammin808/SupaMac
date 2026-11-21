@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   attachCalendarMacroCall,
   calendarMacroCallUrl,
@@ -124,5 +124,36 @@ describe('Macro calendar call links', () => {
       location: 'Room 2',
     };
     expect(removeCalendarMacroCall(content, URL)).toEqual(content);
+  });
+});
+
+// A deployment served from its own host and folder shares meeting links under
+// both, so an event must recognize exactly those as its Macro call.
+describe('Macro calendar call links under another base path', () => {
+  afterEach(() => {
+    vi.doUnmock('@core/util/webOrigin');
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
+  it('recognizes the links the deployment shares, on its own origin and base only', async () => {
+    vi.stubEnv('__APP_BASE_PATH__', '/workspace');
+    vi.doMock('@core/util/webOrigin', () => ({
+      getWebOrigin: () => 'https://example.com',
+    }));
+    vi.resetModules();
+    const { getMeetingUrl } = await import('@channel/Call/call-link');
+    const { macroCallUrl } = await import('./macro-call-link');
+
+    const shared = getMeetingUrl('8m8mGwzHqxzYjeIN5-nJRquRbzyTEhGF');
+
+    expect(shared).toBe(
+      'https://example.com/workspace/meet/join/8m8mGwzHqxzYjeIN5-nJRquRbzyTEhGF'
+    );
+    expect(macroCallUrl(shared)).toBe(shared);
+    expect(
+      macroCallUrl(shared.replace('example.com', 'other.example'))
+    ).toBeUndefined();
+    expect(macroCallUrl(shared.replace('/workspace', '/app'))).toBeUndefined();
   });
 });

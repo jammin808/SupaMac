@@ -1,0 +1,42 @@
+id: ts-no-app-base-path-literal
+language: typescript
+# Twin of tsx-no-app-base-path-literal — ast-grep rules are single-language, and
+# `tsx` only scans .tsx files.
+severity: warning
+message: Don't hardcode the `/app` base path in a URL. Build web app URLs on `WEB_BASE_PATH` and parse them with `fromWebBasePath` from `@app/constants/routerBase`.
+note: |-
+  The folder the web bundle is served from is a build input
+  (`MACRO_APP_BASE_PATH`, read in `apps/web/vite.base.ts`); `/app` is only its
+  default. `apps/web/src/lib/constants/routerBase.ts` is the one place that
+  reads it. A literal `/app/...` link opens nothing on a deployment served
+  from another folder, and a parser that matches `/app` rejects that
+  deployment's own links. Paths given to `navigate()` and route definitions
+  are base-relative and take no prefix at all.
+
+  Matches a string or template text that starts with `/app/`, `/app?` or
+  `/app#`, and a template whose text is exactly `/app` next to an
+  interpolation, as in `${origin}/app${path}`.
+files:
+  - apps/web/src/**
+ignores:
+  # Where the default lives.
+  - apps/web/src/lib/constants/routerBase.ts
+  # Redacts a meeting token wherever `/meet/` sits in a URL; `/app/meet/`
+  # there names one capture of that unanchored match, not a base.
+  - apps/web/src/lib/core/util/telemetryUrl.ts
+  # Links staff hand to prospects always open the hosted product.
+  - apps/web/src/features/gtm-invite/core/invite-link.ts
+  - '**/generated/**'
+  - '**/*.test.ts'
+  - '**/*.spec.ts'
+  - '**/test/**'
+  - '**/tests/**'
+  - '**/browser-test/**'
+rule:
+  kind: string_fragment
+  any:
+    - regex: ^/app[/?#]
+    - all:
+        - regex: ^/app$
+        - inside:
+            kind: template_string

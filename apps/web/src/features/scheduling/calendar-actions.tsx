@@ -1,4 +1,5 @@
 import { ViewSidebar } from '@app/components/view-shell';
+import { WEB_BASE_PATH } from '@app/constants/routerBase';
 import { useNavigate } from '@app/lib/split-router';
 import { bookingLinksRoute } from '@app/routes/routes';
 import { toast } from '@core/component/Toast/Toast';
@@ -42,8 +43,8 @@ function Actions(props: { sidebar?: boolean; compact?: boolean }) {
 
     const slug = event?.slug;
     const url = slug
-      ? `${getWebOrigin()}/app/book/${encodeURIComponent(profile.id)}/${encodeURIComponent(slug)}`
-      : `${getWebOrigin()}/app/book/${encodeURIComponent(profile.id)}`;
+      ? `${getWebOrigin()}${WEB_BASE_PATH}/book/${encodeURIComponent(profile.id)}/${encodeURIComponent(slug)}`
+      : `${getWebOrigin()}${WEB_BASE_PATH}/book/${encodeURIComponent(profile.id)}`;
 
     if (await writeClipboardData({ 'text/plain': url }))
       toast.success('Booking link copied');

@@ -1,3 +1,4 @@
+import { WEB_BASE_PATH } from '@app/constants/routerBase';
 import { copyCalendarEventMentionTarget } from '@app/features/calendar-view/copy-event-mention';
 import { toast } from '@core/component/Toast/Toast';
 import { buildSimpleEntityUrl } from '@core/util/url';
@@ -35,7 +36,9 @@ export async function copyNotificationLink(notification: UnifiedNotification) {
   }
   // Items have no route of their own; the link opens Passwords.
   if (metadata.tag === 'password_access_requested') {
-    await navigator.clipboard.writeText(`${getWebOrigin()}/app/passwords`);
+    await navigator.clipboard.writeText(
+      `${getWebOrigin()}${WEB_BASE_PATH}/passwords`
+    );
     toast.success('Link copied to clipboard');
     return;
   }

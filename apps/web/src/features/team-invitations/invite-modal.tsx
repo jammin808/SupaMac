@@ -1,3 +1,4 @@
+import { WEB_BASE_PATH } from '@app/constants/routerBase';
 import { toast } from '@core/component/Toast/Toast';
 import { useReferralCode } from '@core/context/user';
 import { getWebOrigin } from '@core/util/webOrigin';
@@ -29,7 +30,7 @@ export const InviteModal = () => {
   const referralUrl = () => {
     const code = referralCode();
     if (!code) return undefined;
-    return `${getWebOrigin()}/app/signup?referral_code=${code}`;
+    return `${getWebOrigin()}${WEB_BASE_PATH}/signup?referral_code=${code}`;
   };
 
   const copyReferralUrl = async (url: string) => {

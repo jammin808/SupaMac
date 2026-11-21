@@ -1,3 +1,4 @@
+import { WEB_BASE_PATH } from '@app/constants/routerBase';
 import { t } from '@app/lib/i18n';
 import { replacePaneSearchParams } from '@app/lib/split-router';
 import { HeaderActionGroup } from '@components/app/HeaderActionGroup';
@@ -486,7 +487,10 @@ async function copySavedViewLink(id: string) {
     savedView: id,
   });
   if (!params) return;
-  const url = new URL('/app/component/tasks', window.location.origin);
+  const url = new URL(
+    `${WEB_BASE_PATH}/component/tasks`,
+    window.location.origin
+  );
   replacePaneSearchParams(url.searchParams, [
     { [tasksTabSearch.namespace]: params },
   ]);

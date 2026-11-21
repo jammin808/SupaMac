@@ -1,3 +1,4 @@
+import { fromWebBasePath } from '@app/constants/routerBase';
 import { isTauri } from './platform';
 
 const Hosts = {
@@ -56,10 +57,11 @@ type InternalAppLink = {
  * Parses an absolute URL pointing at the Macro web app (e.g.
  * `https://macro.com/app/channel/<id>?message=<id>`) into a router path, query
  * and fragment; a booking receipt link keeps its private token in the fragment.
- * Returns null for anything that is not a Macro `/app` URL.
+ * Returns null for anything that is not a URL under the web app's base path.
  *
- * The `/app` prefix is stripped because the Tauri router uses `/` as its
- * base (mirrors `MacroScheme::from_url` on the Rust side).
+ * The base path (`/app` on hosted deployments) is stripped because routes are
+ * base-relative and the Tauri router uses `/` as its base (mirrors
+ * `MacroScheme::from_url` on the Rust side).
  */
 export function parseInternalAppLink(url: string): InternalAppLink | null {
   let parsed: URL;
@@ -68,15 +70,15 @@ export function parseInternalAppLink(url: string): InternalAppLink | null {
   } catch {
     return null;
   }
-  const pathname = parsed.pathname;
-  if (pathname !== '/app' && !pathname.startsWith('/app/')) {
+  const path = fromWebBasePath(parsed.pathname);
+  if (path === undefined) {
     return null;
   }
   if (!isValidMacroAppHostname(parsed.hostname)) {
     return null;
   }
   return {
-    path: pathname.slice('/app'.length) || '/',
+    path,
     query: parsed.search.slice(1),
     fragment: parsed.hash.slice(1) || undefined,
   };

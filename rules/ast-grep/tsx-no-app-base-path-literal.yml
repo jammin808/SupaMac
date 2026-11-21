@@ -1,0 +1,27 @@
+id: tsx-no-app-base-path-literal
+language: tsx
+# Twin of ts-no-app-base-path-literal — ast-grep rules are single-language.
+severity: warning
+message: Don't hardcode the `/app` base path in a URL. Build web app URLs on `WEB_BASE_PATH` and parse them with `fromWebBasePath` from `@app/constants/routerBase`.
+note: |-
+  See ts-no-app-base-path-literal for the rationale: the folder the web bundle
+  is served from is a build input, and
+  `apps/web/src/lib/constants/routerBase.ts` is the one place that reads it.
+files:
+  - apps/web/src/**
+ignores:
+  # The native shells open this page of the hosted product in a browser.
+  - apps/web/src/lib/core/pipedream/connect-native.tsx
+  - '**/*.test.tsx'
+  - '**/*.spec.tsx'
+  - '**/test/**'
+  - '**/tests/**'
+  - '**/browser-test/**'
+rule:
+  kind: string_fragment
+  any:
+    - regex: ^/app[/?#]
+    - all:
+        - regex: ^/app$
+        - inside:
+            kind: template_string

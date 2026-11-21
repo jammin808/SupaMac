@@ -1,4 +1,5 @@
 import { DEFAULT_ROUTE } from '@app/constants/defaultRoute';
+import { WEB_BASE_PATH } from '@app/constants/routerBase';
 import { openAddInboxDialog } from '@app/features/inbox/AddInboxDialog';
 import { AdminConsentRequiredDialog } from '@app/features/inbox/AdminConsentRequiredDialog';
 import { ShareInboxConflictDialog } from '@app/features/inbox/ShareInboxConflictDialog';
@@ -567,7 +568,7 @@ function EmailSignUp(
     analytics.pageView('signup');
   });
 
-  const withAppPrefix = (path: string) => `/app${path}`;
+  const withAppPrefix = (path: string) => `${WEB_BASE_PATH}${path}`;
 
   onMount(() => {
     if (emailLinks.data && emailLinks.data.links.length > 0) {

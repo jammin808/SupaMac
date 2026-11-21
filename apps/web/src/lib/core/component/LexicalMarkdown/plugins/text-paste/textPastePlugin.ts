@@ -1,3 +1,4 @@
+import { fromWebBasePath } from '@app/constants/routerBase';
 import {
   type PrRef,
   prDisplayName,
@@ -83,10 +84,8 @@ const ValidBlockNames = [...BlockRegistry, ...BlockAliasRegistry];
 export function parseMacroAppUrl(text: string): MacroAppUrlParsed {
   try {
     const url: URL = new URL(text);
-    if (
-      !url.pathname.startsWith('/app/') ||
-      !isValidMacroAppHostname(url.hostname)
-    ) {
+    const path = fromWebBasePath(url.pathname);
+    if (path === undefined || !isValidMacroAppHostname(url.hostname)) {
       return {
         isValid: false,
         id: undefined,
@@ -95,8 +94,8 @@ export function parseMacroAppUrl(text: string): MacroAppUrlParsed {
       };
     }
 
-    const pathParts: string[] = url.pathname.split('/').filter((part) => part);
-    if (pathParts.length !== 3) {
+    const pathParts: string[] = path.split('/').filter((part) => part);
+    if (pathParts.length !== 2) {
       return {
         isValid: false,
         id: undefined,
@@ -105,7 +104,7 @@ export function parseMacroAppUrl(text: string): MacroAppUrlParsed {
       };
     }
 
-    const routeBlock = pathParts[1] === 'agents' ? 'agent' : pathParts[1];
+    const routeBlock = pathParts[0] === 'agents' ? 'agent' : pathParts[0];
     const block = ValidBlockNames.find((name) => name === routeBlock);
     if (!block) {
       return {
@@ -118,7 +117,7 @@ export function parseMacroAppUrl(text: string): MacroAppUrlParsed {
 
     const idRegex =
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!idRegex.test(pathParts[2])) {
+    if (!idRegex.test(pathParts[1])) {
       return {
         isValid: false,
         id: undefined,
@@ -127,7 +126,7 @@ export function parseMacroAppUrl(text: string): MacroAppUrlParsed {
       };
     }
 
-    const id: string = pathParts[2];
+    const id: string = pathParts[1];
     const params: Record<string, string> = {};
     url.searchParams.forEach((value, key) => {
       if (IgnoredParams.has(key)) return;

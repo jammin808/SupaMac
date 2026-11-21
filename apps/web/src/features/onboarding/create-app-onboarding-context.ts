@@ -1,4 +1,4 @@
-import { ROUTER_BASE_CONCAT } from '@app/constants/routerBase';
+import { ROUTER_BASE_CONCAT, WEB_BASE_PATH } from '@app/constants/routerBase';
 import { teamInviteLinkUrl } from '@app/features/settings/TeamInviteLinkSection';
 import { useAnalytics } from '@app/lib/analytics/analytics-context';
 import { toast } from '@core/component/Toast/Toast';
@@ -366,7 +366,7 @@ export function createAppOnboardingContext(): OnboardingContext {
         throw new Error('No referral code');
       }
       await copyLink(
-        `${getWebOrigin()}/app/signup?referral_code=${code}`,
+        `${getWebOrigin()}${WEB_BASE_PATH}/signup?referral_code=${code}`,
         'Referral link copied',
         'Failed to copy link'
       );

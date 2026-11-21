@@ -118,3 +118,34 @@ describe('parseInternalAppLink', () => {
     expect(parseInternalAppLink('/app/component/abc')).toBeNull();
   });
 });
+
+// A bundle served from another folder builds its links on that folder, so
+// those are the links it opens in place; the hosted `/app` shape is foreign.
+describe('parseInternalAppLink under another base path', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
+  it('reads links under the configured base and no other folder', async () => {
+    vi.stubEnv('__APP_BASE_PATH__', '/workspace');
+    vi.resetModules();
+    const { parseInternalAppLink } = await import('./macroAppUrl');
+
+    expect(
+      parseInternalAppLink(
+        'http://localhost:3000/workspace/channel/123?message=456'
+      )
+    ).toEqual({ path: '/channel/123', query: 'message=456' });
+    expect(parseInternalAppLink('http://localhost:3000/workspace')).toEqual({
+      path: '/',
+      query: '',
+    });
+    expect(
+      parseInternalAppLink('http://localhost:3000/app/channel/123')
+    ).toBeNull();
+    expect(
+      parseInternalAppLink('http://localhost:3000/workspaces/channel/123')
+    ).toBeNull();
+  });
+});

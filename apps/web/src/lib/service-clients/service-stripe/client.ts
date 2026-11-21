@@ -1,3 +1,4 @@
+import { WEB_BASE_PATH } from '@app/constants/routerBase';
 import { registerClient } from '@core/util/mockClient';
 import type { PaidPlan } from '@service-auth/ai-billing-types';
 import { authServiceClient } from '@service-auth/client';
@@ -67,9 +68,10 @@ export const stripeServiceClient = {
     const result = await authServiceClient.createCheckoutSessionV2({
       successUrl:
         successUrl ??
-        `${window.location.origin}/app/?subscriptionSuccess=true${type ? `&type=${type}` : ''}`,
+        `${window.location.origin}${WEB_BASE_PATH}/?subscriptionSuccess=true${type ? `&type=${type}` : ''}`,
       cancelUrl:
-        cancelUrl ?? `${window.location.origin}/app?subscriptionCancel=true`,
+        cancelUrl ??
+        `${window.location.origin}${WEB_BASE_PATH}?subscriptionCancel=true`,
       discount: discount ?? null,
       metadata: {
         gaClientId: gaClientId ?? null,
@@ -99,7 +101,7 @@ export const stripeServiceClient = {
    */
   createPortalSession: async () => {
     const result = await authServiceClient.createPortalSession({
-      returnUrl: `${window.location.origin}/app`,
+      returnUrl: `${window.location.origin}${WEB_BASE_PATH}`,
     });
 
     if (!result.isOk()) {

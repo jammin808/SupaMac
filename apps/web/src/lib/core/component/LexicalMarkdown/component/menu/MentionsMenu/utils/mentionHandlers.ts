@@ -1,3 +1,4 @@
+import { WEB_BASE_PATH } from '@app/constants/routerBase';
 import { toast } from '@core/component/Toast/Toast';
 import type { EntityItem } from '@core/context/quickAccess';
 import { trackMention } from '@core/signal/mention';
@@ -179,7 +180,7 @@ function buildBookingUrl(profileId: string, slug: string): string {
   const hostname = window.location.hostname;
   const cleanHost =
     hostname === 'localhost' ? 'dev.macro.com' : hostname.replace('www.', '');
-  return `https://${cleanHost}/app/book/${encodeURIComponent(profileId)}/${encodeURIComponent(slug)}`;
+  return `https://${cleanHost}${WEB_BASE_PATH}/book/${encodeURIComponent(profileId)}/${encodeURIComponent(slug)}`;
 }
 
 /**

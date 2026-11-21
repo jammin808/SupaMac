@@ -1,3 +1,4 @@
+import { fromWebBasePath } from '@app/constants/routerBase';
 import {
   BlockAliasRegistry,
   BlockRegistry,
@@ -20,7 +21,8 @@ function parseHtml(html: string): Document {
   return new DOMParser().parseFromString(html, 'text/html');
 }
 
-const APP_LINK_PATTERN = /^\/app\/([a-z0-9_-]+)\/([A-Za-z0-9_-]+)\/?$/i;
+/** A base-relative `/<block>/<id>` path. */
+const ENTITY_PATH_PATTERN = /^\/([a-z0-9_-]+)\/([A-Za-z0-9_-]+)\/?$/i;
 
 const BLOCK_NAMES: ReadonlySet<string> = new Set([
   ...BlockRegistry,
@@ -28,8 +30,8 @@ const BLOCK_NAMES: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Which Macro entity an `/app/<block>/<id>` link opens, if it is one. App pages
- * with the same shape that are not entities, such as `/app/booking/<id>`,
+ * Which Macro entity a web app `/<block>/<id>` link opens, if it is one. App
+ * pages with the same shape that are not entities, such as `/booking/<id>`,
  * open as ordinary links.
  */
 export function parseMacroAppLink(
@@ -47,7 +49,9 @@ export function parseMacroAppLink(
     'https://macro.com',
   ]);
   if (!origins.has(url.origin)) return undefined;
-  const match = APP_LINK_PATTERN.exec(url.pathname);
+  const path = fromWebBasePath(url.pathname);
+  if (path === undefined) return undefined;
+  const match = ENTITY_PATH_PATTERN.exec(path);
   if (!match || !BLOCK_NAMES.has(match[1])) return undefined;
   return { blockName: match[1], documentId: match[2] };
 }

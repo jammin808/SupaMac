@@ -1,10 +1,16 @@
+import { fromWebBasePath } from '@app/constants/routerBase';
+import { getWebOrigin } from '@core/util/webOrigin';
+
 interface CalendarCallContent {
   conferenceUrl?: string | null;
   location?: string | null;
   description?: string | null;
 }
 
-/** Accept only Macro meeting links, including local development links. */
+/**
+ * Accept only Macro meeting links: this deployment's own, the hosted
+ * product's, and local development links.
+ */
 export function macroCallUrl(value: string): string | undefined {
   try {
     const url = new URL(value);
@@ -12,16 +18,17 @@ export function macroCallUrl(value: string): string | undefined {
       url.hostname === 'localhost' ||
       url.hostname.endsWith('.localhost') ||
       url.hostname === '127.0.0.1';
+    const own = url.origin === getWebOrigin();
+    const path = fromWebBasePath(url.pathname) ?? url.pathname;
     if (
       (url.protocol !== 'https:' && !(local && url.protocol === 'http:')) ||
       (!local &&
+        !own &&
         url.hostname !== 'macro.com' &&
         url.hostname !== 'dev.macro.com') ||
       url.username ||
       url.password ||
-      !/^\/(?:app\/)?meet\/(?:join\/)?[A-Za-z0-9_-]{16,128}\/?$/.test(
-        url.pathname
-      )
+      !/^\/meet\/(?:join\/)?[A-Za-z0-9_-]{16,128}\/?$/.test(path)
     ) {
       return undefined;
     }

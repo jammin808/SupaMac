@@ -1,3 +1,4 @@
+import { WEB_BASE_PATH } from '@app/constants/routerBase';
 import { getPreferredCalendarPeriodView } from '@app/features/calendar/calendar-preferences';
 import type { CalendarEvent } from '@app/features/calendar/types';
 import {
@@ -51,7 +52,7 @@ export function calendarEventDeepLink(target: {
     [calendarFocusedEventSearchKey()]: target.eventId,
   });
   const path = calendarPath(getPreferredCalendarPeriodView());
-  return `${getWebOrigin()}/app${path}?${params.toString()}`;
+  return `${getWebOrigin()}${WEB_BASE_PATH}${path}?${params.toString()}`;
 }
 
 /**

@@ -1,3 +1,4 @@
+import { WEB_BASE_PATH } from '@app/constants/routerBase';
 import { pollBodyHeight } from '@app/features/block-form/core/poll-card-layout';
 import { openChatWithAgent } from '@app/features/chat/ChatWithAgentButton';
 import { globalSplitManager } from '@app/signal/splitLayout';
@@ -468,7 +469,7 @@ function DocumentCardInner(props: DocumentCardDecoratorProps) {
       if (hostname === 'localhost') {
         hostname = 'dev.macro.com';
       }
-      let link = `https://${hostname}/app/${props.blockName}/${props.documentId}`;
+      let link = `https://${hostname}${WEB_BASE_PATH}/${props.blockName}/${props.documentId}`;
 
       if (props.blockParams && Object.keys(props.blockParams).length > 0) {
         const queryParams = new URLSearchParams(props.blockParams).toString();

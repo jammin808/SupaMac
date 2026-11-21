@@ -1,3 +1,4 @@
+import { WEB_BASE_PATH } from '@app/constants/routerBase';
 import type { DocumentMentionInfo } from '@macro-inc/lexical-core';
 
 /** Replace Macro document-mention elements with portable HTML links. */
@@ -27,7 +28,7 @@ export function convertDocumentMentionsToLinks(
     }
 
     const link = document.createElement('a');
-    link.href = `${window.location.origin}/app/${mention.blockName}/${mention.documentId}`;
+    link.href = `${window.location.origin}${WEB_BASE_PATH}/${mention.blockName}/${mention.documentId}`;
     link.textContent = mention.documentName;
 
     // Preserve mention data attributes so importing this HTML into Macro can

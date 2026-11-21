@@ -1,3 +1,4 @@
+import { WEB_BASE_PATH } from '@app/constants/routerBase';
 import { throwOnErr } from '@core/util/result';
 import { getWebOrigin } from '@core/util/webOrigin';
 import { authServiceClient } from '@service-auth/client';
@@ -23,7 +24,8 @@ export function useInitOutlookLink() {
  * app: the link is copied for someone else, often on another device, so a
  * desktop deep link or native callback would not reach them.
  */
-const adminConsentReturnUrl = () => `${getWebOrigin()}/app/inbox-link-callback`;
+const adminConsentReturnUrl = () =>
+  `${getWebOrigin()}${WEB_BASE_PATH}/inbox-link-callback`;
 
 /** Per user: Outlook follows the server's `enable-outlook` flag. */
 const emailConnectionProvidersQuery = () =>

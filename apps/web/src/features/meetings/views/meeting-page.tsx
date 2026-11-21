@@ -1,3 +1,4 @@
+import { WEB_BASE_PATH } from '@app/constants/routerBase';
 import { getCallExitPath } from '@channel/Call/call-exit';
 import { HeaderIsland } from '@components/app/split-layout/components/HeaderIsland';
 import type { BackgroundEffect } from '@core/media/background-effect';
@@ -212,7 +213,7 @@ export function MeetingPage(props: {
             fallback={
               <Show when={!inCall()}>
                 <a
-                  href="/app"
+                  href={WEB_BASE_PATH}
                   class="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-ink-muted hover:bg-hover focus-visible:outline-2 focus-visible:outline-accent"
                 >
                   <ArrowLeft class="size-4" />

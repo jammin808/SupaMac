@@ -1,3 +1,4 @@
+import { WEB_BASE_PATH } from '@app/constants/routerBase';
 import { hideImportPromotion } from '@app/features/connector-import/primitives/promotion';
 import {
   IntegrationRow,
@@ -86,7 +87,7 @@ function SlackImportSettings(props: {
   };
   function channelHref(id: string): string | undefined {
     if (!channelsById()[id]) return undefined;
-    return `/app/channel/${encodeURIComponent(id)}`;
+    return `${WEB_BASE_PATH}/channel/${encodeURIComponent(id)}`;
   }
   async function onCompleted(job: ImportJob): Promise<void> {
     if (

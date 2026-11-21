@@ -27,6 +27,11 @@
   and the ast-grep rules `ts-browser-floor-apis` and `tsx-browser-floor-apis`
   ban APIs that turned out to be newer; add one there when it bites, or raise
   the floor.
+- The folder the bundle is served from is a build input: `MACRO_APP_BASE_PATH`
+  (default `/app`, read in `vite.base.ts`). Build web app URLs on
+  `WEB_BASE_PATH` and parse them with `fromWebBasePath` from
+  `src/lib/constants/routerBase.ts`, never a `/app/...` literal; the ast-grep
+  rules `ts-no-app-base-path-literal` and `tsx-no-app-base-path-literal` flag one.
 - The app does not register a service worker. Keep `public/sw.js` as a retirement
   endpoint for existing installations; see the [startup bundle rule](../../.agents/rules/web/startup-bundle.md).
   Loro uses async WASM loading and HTML preloads independently of service workers.

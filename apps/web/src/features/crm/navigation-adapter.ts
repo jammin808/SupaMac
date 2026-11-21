@@ -1,3 +1,4 @@
+import { WEB_BASE_PATH } from '@app/constants/routerBase';
 import { useSplitLayout } from '@components/app/split-layout/layout';
 import { useSplitPanel } from '@components/app/split-layout/layoutUtils';
 import { toast } from '@core/component/Toast/Toast';
@@ -13,7 +14,7 @@ import {
 } from './queries/saved-view-codec';
 /** Share link for a CRM view, including its selected pipeline. */
 export function buildCrmViewShareUrl(config: CrmViewConfig): string {
-  const url = new URL('/app/companies', getWebOrigin());
+  const url = new URL(`${WEB_BASE_PATH}/companies`, getWebOrigin());
   url.searchParams.set(CRM_VIEW_URL_PARAM, encodeCrmViewParam(config));
   return url.toString();
 }
@@ -28,7 +29,7 @@ export async function copyCrmViewLink(
 export async function copyCrmPipelineLink(pipelineId: string) {
   await copyCrmLink(
     new URL(
-      `/app/companies/pipeline/${encodeURIComponent(pipelineId)}`,
+      `${WEB_BASE_PATH}/companies/pipeline/${encodeURIComponent(pipelineId)}`,
       getWebOrigin()
     ).toString()
   );

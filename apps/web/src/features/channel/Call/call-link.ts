@@ -1,3 +1,4 @@
+import { fromWebBasePath, WEB_BASE_PATH } from '@app/constants/routerBase';
 import { getWebOrigin } from '@core/util/webOrigin';
 
 /** Router-relative setup path used by a persistent meeting invitation. */
@@ -12,11 +13,12 @@ export function getActiveMeetingPath(shareToken: string) {
 
 /** Browser URL also usable outside the desktop application. */
 export function getMeetingUrl(shareToken: string) {
-  return `${getWebOrigin()}/app${getMeetingPath(shareToken)}`;
+  return `${getWebOrigin()}${WEB_BASE_PATH}${getMeetingPath(shareToken)}`;
 }
 
 function meetingShareTokenFromPath(pathname: string): string | undefined {
-  const match = pathname.match(/^\/(?:app\/)?meet\/(?:join\/)?([^/?#]+)\/?$/);
+  const path = fromWebBasePath(pathname) ?? pathname;
+  const match = path.match(/^\/meet\/(?:join\/)?([^/?#]+)\/?$/);
   if (!match) return undefined;
   try {
     const token = decodeURIComponent(match[1]);
