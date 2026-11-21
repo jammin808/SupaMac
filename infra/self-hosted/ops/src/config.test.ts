@@ -22,7 +22,7 @@ test('every variable the kickstart uses is defined, and every secret comes from 
   const fixed = Object.entries(variables)
     .filter(([, value]) => !/^#\{ENV\.[A-Z_]+\}$/.test(value))
     .map(([name]) => name);
-  expect(fixed).toEqual(['defaultTenantId']);
+  expect(fixed).toEqual(['defaultTenantId', 'claimsLambdaId']);
 });
 
 test('the admin account is created before the webhooks that would roll it back', async () => {

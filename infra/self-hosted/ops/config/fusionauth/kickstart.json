@@ -1,6 +1,7 @@
 {
   "variables": {
     "defaultTenantId": "11111111-1111-4111-8111-111111111111",
+    "claimsLambdaId": "a7f3e8d2-4b91-4c5a-9e6f-1a2b3c4d5e6f",
     "apiKey": "#{ENV.FUSIONAUTH_API_KEY}",
     "jwtSecret": "#{ENV.JWT_SECRET_KEY}",
     "clientSecret": "#{ENV.FUSIONAUTH_CLIENT_SECRET_KEY}",
@@ -137,7 +138,7 @@
             "refreshTokenExpirationPolicy": "SlidingWindow"
           },
           "lambdaConfiguration": {
-            "accessTokenPopulateId": "a7f3e8d2-4b91-4c5a-9e6f-1a2b3c4d5e6f"
+            "accessTokenPopulateId": "#{claimsLambdaId}"
           },
           "passwordlessConfiguration": { "enabled": true }
         }
