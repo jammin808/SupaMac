@@ -76,7 +76,8 @@ through `rmcp`, returning the result to the caller's tool-calling loop.
   non-public addresses on the address actually connected to, ignores system
   proxies, and follows only same-origin 307/308 transport redirects. Build
   `McpHttp` once at startup in each composition root from
-  `AddressPolicy::for_environment`; only `Local` reaches loopback and private
+  `AddressPolicy::for_opt_in`; only a local environment that sets
+  `DEV_DANGEROUS_PRIVATE_MCP_ADDRESSES` reaches loopback and private
   addresses. Never dial a stored server with `reqwest::Client::new()`,
   `StreamableHttpClientTransport::from_uri`, or `AuthorizationManager::new`.
 

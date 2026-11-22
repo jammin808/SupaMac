@@ -447,8 +447,10 @@ startup fails if it is set unless `ENVIRONMENT=local`) lifts both limits: any
 address is reachable and those two upstreams may be http. `just run_local`
 sets it, because its MCP and preview services are http on the compose network.
 Never set it where other people can sign in: a custom server's URL is whatever
-its owner typed. Preview control's extra app and loopback hosts and its SSH
-fallback still follow `ENVIRONMENT=local` alone.
+its owner typed. The import selector's MCP client, built in
+`ai_tools::build_tool_service_context_from_env` for this service and
+document_storage_service, reads the same flag. Preview control's extra app and
+loopback hosts and its SSH fallback still follow `ENVIRONMENT=local` alone.
 
 `AGENT_SESSION_IDLE_TIMEOUT_SECS` (default 900, so no Doppler key) is how long
 a session's command worker waits before it releases a quiet session from

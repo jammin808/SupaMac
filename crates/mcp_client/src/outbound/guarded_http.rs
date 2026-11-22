@@ -20,7 +20,7 @@ use rmcp::transport::auth::{
 };
 use url::{Host, Url};
 
-pub use crate::domain::models::{AddressPolicy, RefusedAddress};
+pub use crate::domain::models::{AddressPolicy, PrivateAddressesOutsideLocal, RefusedAddress};
 use crate::domain::ports::McpServerHttp;
 
 #[cfg(test)]
