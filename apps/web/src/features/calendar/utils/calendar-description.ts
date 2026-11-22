@@ -6,6 +6,7 @@ import {
 import { editorIsEmpty } from '@core/component/LexicalMarkdown/utils';
 import { convertBookingLinkMentionsToLinks } from '@core/component/LexicalMarkdown/utils/convertBookingLinkMentionsToLinks';
 import { convertDocumentMentionsToLinks } from '@core/component/LexicalMarkdown/utils/convertDocumentMentionsToLinks';
+import { SELF_HOSTED } from '@core/constant/servers';
 import { getWebOrigin } from '@core/util/webOrigin';
 import { $generateHtmlFromNodes } from '@lexical/html';
 import type { LexicalEditor } from 'lexical';
@@ -30,6 +31,14 @@ const BLOCK_NAMES: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * The hosted product's web app origin. A self-hosted instance treats only its
+ * own links as entities.
+ */
+const HOSTED_APP_ORIGINS: readonly string[] = SELF_HOSTED
+  ? []
+  : ['https://macro.com'];
+
+/**
  * Which Macro entity a web app `/<block>/<id>` link opens, if it is one. App
  * pages with the same shape that are not entities, such as `/booking/<id>`,
  * open as ordinary links.
@@ -46,7 +55,7 @@ export function parseMacroAppLink(
   const origins = new Set([
     window.location.origin,
     getWebOrigin(),
-    'https://macro.com',
+    ...HOSTED_APP_ORIGINS,
   ]);
   if (!origins.has(url.origin)) return undefined;
   const path = fromWebBasePath(url.pathname);

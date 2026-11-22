@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { detectPrOrigin, toolForHarness } from './pr-origin';
 
 describe('detectPrOrigin', () => {
@@ -99,5 +99,41 @@ describe('toolForHarness', () => {
     [undefined, 'macro'],
   ] as const)('maps %s to %s', (harness, tool) => {
     expect(toolForHarness(harness)).toBe(tool);
+  });
+});
+
+describe('detectPrOrigin on a self-hosted instance', () => {
+  afterEach(() => {
+    vi.doUnmock('@core/constant/servers');
+    vi.doUnmock('@core/util/webOrigin');
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
+  it('reads the instance’s own session links and none of the hosted product', async () => {
+    vi.stubEnv('__APP_BASE_PATH__', '/supamac');
+    vi.doMock('@core/constant/servers', async (importOriginal) => ({
+      ...(await importOriginal<typeof import('@core/constant/servers')>()),
+      SELF_HOSTED: true,
+    }));
+    vi.doMock('@core/util/webOrigin', () => ({
+      getWebOrigin: () => 'https://ui.example.org',
+    }));
+    vi.resetModules();
+    const { detectPrOrigin: detect } = await import('./pr-origin');
+
+    const own = 'https://ui.example.org/supamac/agent/0198a4cc-e138-7670';
+    expect(detect({ description: `From ${own}` })).toEqual({
+      tool: 'macro',
+      signal: 'session-link',
+      url: own,
+    });
+    for (const other of [
+      'https://macro.com/app/agent/0198a4cc-e138-7670',
+      'https://uiXexample.org/supamac/agent/0198a4cc-e138-7670',
+      'https://ui.example.org/app/agent/0198a4cc-e138-7670',
+    ]) {
+      expect(detect({ description: `From ${other}` }), other).toBeUndefined();
+    }
   });
 });

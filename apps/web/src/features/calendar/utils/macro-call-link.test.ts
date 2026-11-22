@@ -182,3 +182,59 @@ describe('Macro calendar call links under another base path', () => {
     expect(macroCallUrl(shared.replace('/workspace', '/app'))).toBeUndefined();
   });
 });
+
+// A self-hosted instance's calls are its own: an invitation from the hosted
+// product is not a way into one of them.
+describe('Macro calendar call links on a self-hosted instance', () => {
+  afterEach(() => {
+    vi.doUnmock('@core/constant/servers');
+    vi.doUnmock('@core/util/webOrigin');
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
+  it('recognizes its own and local links, and none of the hosted product', async () => {
+    vi.stubEnv('__APP_BASE_PATH__', '/supamac');
+    vi.doMock('@core/constant/servers', async (importOriginal) => ({
+      ...(await importOriginal<typeof import('@core/constant/servers')>()),
+      SELF_HOSTED: true,
+    }));
+    vi.doMock('@core/util/webOrigin', () => ({
+      getWebOrigin: () => 'https://ui.example.org',
+    }));
+    vi.resetModules();
+    const { calendarMacroCallUrl, macroCallUrl, removeCalendarMacroCall } =
+      await import('./macro-call-link');
+
+    const own =
+      'https://ui.example.org/supamac/meet/join/8m8mGwzHqxzYjeIN5-nJRquRbzyTEhGF';
+    expect(macroCallUrl(own)).toBe(own);
+    expect(
+      macroCallUrl(
+        'http://localhost:3003/supamac/meet/8m8mGwzHqxzYjeIN5-nJRquRbzyTEhGF'
+      )
+    ).toBe(
+      'http://localhost:3003/supamac/meet/8m8mGwzHqxzYjeIN5-nJRquRbzyTEhGF'
+    );
+    for (const hosted of [
+      URL,
+      SETUP_URL,
+      URL.replace('https://macro.com/app', 'https://macro.com/supamac'),
+      URL.replace('https://macro.com/app', 'https://dev.macro.com/supamac'),
+    ]) {
+      expect(macroCallUrl(hosted)).toBeUndefined();
+      expect(calendarMacroCallUrl({ location: hosted })).toBeUndefined();
+    }
+
+    // The hosted product's wording still marks a generated paragraph.
+    expect(
+      removeCalendarMacroCall(
+        {
+          description: `<p>Notes</p><p>Join Macro call: <a href="${own}">${own}</a></p>`,
+          location: '',
+        },
+        own
+      ).description
+    ).toBe('<p>Notes</p>');
+  });
+});

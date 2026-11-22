@@ -216,8 +216,14 @@ export function OnboardingFlowView(props: {
       wide
       onBack={back()}
       overlay={
+        // The hosted service's staff are no one's staff on a self-hosted
+        // instance, so only local development offers Bypass there.
         <Show
-          when={(LOCAL_ONLY || canBypassOnboarding(viewerEmail())) && step()}
+          when={
+            (LOCAL_ONLY ||
+              (!SELF_HOSTED && canBypassOnboarding(viewerEmail()))) &&
+            step()
+          }
         >
           {(current) => (
             <BypassButton
@@ -243,7 +249,9 @@ export function OnboardingFlowView(props: {
               )
             }
           />
-        ) : showTrustDetails() ? (
+        ) : // A plain SELF_HOSTED test, which the compiler leaves unwrapped,
+        // folds the trust details out of a self-hosted bundle.
+        SELF_HOSTED ? undefined : showTrustDetails() ? (
           <OnboardingTrustDetails
             topic={step() === 'security' ? 'security' : 'google'}
             microsoft={step() === 'work' && outlookAvailable()}

@@ -17,7 +17,7 @@ function EvidenceLink(props: { href: string; children: JSX.Element }) {
 
 type TrustQuestion = { title: string; answer: JSX.Element };
 
-const GOOGLE_QUESTIONS: TrustQuestion[] = [
+const googleQuestions = (): TrustQuestion[] => [
   {
     title: 'Why does Google ask for these permissions?',
     answer: (
@@ -68,7 +68,7 @@ const GOOGLE_QUESTIONS: TrustQuestion[] = [
 ];
 
 /** Microsoft sign-in is identity-only; Outlook access is its own consent. */
-const MICROSOFT_QUESTIONS: TrustQuestion[] = [
+const microsoftQuestions = (): TrustQuestion[] => [
   {
     title: 'What does Microsoft sign-in share with Macro?',
     answer: (
@@ -106,7 +106,7 @@ const MICROSOFT_QUESTIONS: TrustQuestion[] = [
   },
 ];
 
-const SECURITY_QUESTIONS: TrustQuestion[] = [
+const securityQuestions = (): TrustQuestion[] => [
   {
     title: 'What does zero data retention mean?',
     answer: (
@@ -175,10 +175,10 @@ export function OnboardingTrustDetails(props: {
   const google = () => props.topic === 'google';
   const microsoft = () => google() && props.microsoft === true;
   const questions = () => {
-    if (!google()) return SECURITY_QUESTIONS;
+    if (!google()) return securityQuestions();
     return microsoft()
-      ? [...GOOGLE_QUESTIONS, ...MICROSOFT_QUESTIONS]
-      : GOOGLE_QUESTIONS;
+      ? [...googleQuestions(), ...microsoftQuestions()]
+      : googleQuestions();
   };
 
   return (

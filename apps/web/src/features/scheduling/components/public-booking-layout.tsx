@@ -56,24 +56,22 @@ function BrandName() {
  * which a self-hosted instance does not have: there it is plain text.
  */
 export function PublicBookingBrand(props: { target?: '_blank' }) {
-  return (
-    <Show
-      when={!SELF_HOSTED}
-      fallback={
-        <p class="inline-flex items-center gap-2 self-start text-sm font-semibold tracking-tight">
-          <BrandName />
-        </p>
-      }
-    >
-      <a
-        href="https://macro.com"
-        aria-label={`${PRODUCT_NAME} Scheduling`}
-        target={props.target}
-        rel={props.target ? 'noopener noreferrer' : undefined}
-        class="inline-flex items-center gap-2 self-start text-sm font-semibold tracking-tight"
-      >
+  if (SELF_HOSTED) {
+    return (
+      <p class="inline-flex items-center gap-2 self-start text-sm font-semibold tracking-tight">
         <BrandName />
-      </a>
-    </Show>
+      </p>
+    );
+  }
+  return (
+    <a
+      href="https://macro.com"
+      aria-label={`${PRODUCT_NAME} Scheduling`}
+      target={props.target}
+      rel={props.target ? 'noopener noreferrer' : undefined}
+      class="inline-flex items-center gap-2 self-start text-sm font-semibold tracking-tight"
+    >
+      <BrandName />
+    </a>
   );
 }

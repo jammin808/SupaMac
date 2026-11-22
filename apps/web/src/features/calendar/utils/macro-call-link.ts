@@ -1,5 +1,6 @@
 import { fromWebBasePath } from '@app/constants/routerBase';
 import { PRODUCT_NAME } from '@app/lib/constants/product';
+import { SELF_HOSTED } from '@core/constant/servers';
 import { getWebOrigin } from '@core/util/webOrigin';
 
 interface CalendarCallContent {
@@ -38,8 +39,16 @@ function generatedCallLinkUrl(text: string): string | undefined {
 }
 
 /**
+ * The hosted product's hosts, whose meeting links its invitations carry. A
+ * self-hosted instance joins only its own calls.
+ */
+const HOSTED_CALL_HOSTS: readonly string[] = SELF_HOSTED
+  ? []
+  : ['macro.com', 'dev.macro.com'];
+
+/**
  * Accept only Macro meeting links: this deployment's own, the hosted
- * product's, and local development links.
+ * product's outside a self-hosted instance, and local development links.
  */
 export function macroCallUrl(value: string): string | undefined {
   try {
@@ -52,10 +61,7 @@ export function macroCallUrl(value: string): string | undefined {
     const path = fromWebBasePath(url.pathname) ?? url.pathname;
     if (
       (url.protocol !== 'https:' && !(local && url.protocol === 'http:')) ||
-      (!local &&
-        !own &&
-        url.hostname !== 'macro.com' &&
-        url.hostname !== 'dev.macro.com') ||
+      (!local && !own && !HOSTED_CALL_HOSTS.includes(url.hostname)) ||
       url.username ||
       url.password ||
       !/^\/meet\/(?:join\/)?[A-Za-z0-9_-]{16,128}\/?$/.test(path)

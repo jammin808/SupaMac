@@ -80,9 +80,11 @@ export function SignupJourneyView(props: {
       }
       explainer={
         // The trust details and sign-up terms are the hosted service's own;
-        // they say nothing about a self-hosted instance.
-        !SELF_HOSTED &&
-        (journey.step() === 'security' || journey.step() === 'work') ? (
+        // they say nothing about a self-hosted instance. A plain SELF_HOSTED
+        // test, which the compiler leaves unwrapped, folds them out of its
+        // bundle.
+        SELF_HOSTED ? undefined : journey.step() === 'security' ||
+          journey.step() === 'work' ? (
           <OnboardingTrustDetails
             topic={journey.step() === 'security' ? 'security' : 'google'}
             microsoft={journey.step() === 'work' && !!props.onMicrosoft}

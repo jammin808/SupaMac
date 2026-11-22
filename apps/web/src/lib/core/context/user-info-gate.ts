@@ -1,12 +1,16 @@
+import { SELF_HOSTED } from '@core/constant/selfHosted';
 import { hasLoginCookie } from '@core/util/cookies';
 import { createSignal } from 'solid-js';
 
-// Preview hosts share HttpOnly dev auth cookies on .macro.com, but not the
-// host-only login hint or localStorage from dev.macro.com. Probe identity there
-// even without a hint; account services still require confirmed authentication.
+// The hosted service's preview hosts share HttpOnly dev auth cookies on
+// .macro.com, but not the host-only login hint or localStorage from
+// dev.macro.com. Probe identity there even without a hint; account services
+// still require confirmed authentication. A self-hosted instance has no
+// preview hosts, so only its login hint starts the probe.
 const [shouldQueryUserInfo, setShouldQueryUserInfo] = createSignal(
   hasLoginCookie() ||
-    (typeof window !== 'undefined' &&
+    (!SELF_HOSTED &&
+      typeof window !== 'undefined' &&
       window.location.hostname.endsWith('.preview.macro.com'))
 );
 

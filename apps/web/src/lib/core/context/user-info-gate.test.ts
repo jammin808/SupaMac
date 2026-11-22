@@ -13,7 +13,10 @@ beforeEach(() => {
     })
   );
 });
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
+});
 
 it('checks shared dev credentials on a fresh preview origin without a local login marker', async () => {
   window.location.hostname = 'branch-abc123.preview.macro.com';
@@ -29,6 +32,15 @@ it.each([
   'branch.preview.macro.com.example.com',
 ])('keeps anonymous identity checks disabled on %s', async (hostname) => {
   window.location.hostname = hostname;
+  const { shouldQueryUserInfo } = await import('./user-info-gate');
+  expect(shouldQueryUserInfo()).toBe(false);
+});
+
+// A self-hosted instance has no preview hosts of the hosted service to share
+// cookies with, so a host that looks like one gets no anonymous probe.
+it('keeps anonymous identity checks disabled in a self-hosted bundle on a preview-like host', async () => {
+  vi.stubEnv('VITE_BACKEND_ORIGIN', 'https://api.example.com');
+  window.location.hostname = 'branch-abc123.preview.macro.com';
   const { shouldQueryUserInfo } = await import('./user-info-gate');
   expect(shouldQueryUserInfo()).toBe(false);
 });

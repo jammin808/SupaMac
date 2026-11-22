@@ -1,4 +1,5 @@
 import { fromWebBasePath } from '@app/constants/routerBase';
+import { SELF_HOSTED } from '@core/constant/selfHosted';
 import { isTauri } from './platform';
 
 const Hosts = {
@@ -24,6 +25,10 @@ export function isValidMacroAppHostname(hostname: string): boolean {
   const target = cleanHostname(hostname);
   if (current === target) {
     return true;
+  }
+  // A self-hosted instance opens in place only links to the host serving it.
+  if (SELF_HOSTED) {
+    return false;
   }
   if (
     (target === Hosts.Dev && current === Hosts.Localhost) ||

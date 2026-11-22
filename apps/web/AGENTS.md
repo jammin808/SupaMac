@@ -682,13 +682,13 @@ Selections across adjacent quotes stay quoted; ranges containing unquoted blocks
 retain normal paste behavior.
 Keep pasted paragraphs quoted through the shared clipboard insertion command.
 
-A frontend dev server runs against the **dev** backend, so this needs no local stack, Docker, Rust build, or `sudo`:
+A frontend dev server runs against the upstream project's hosted **dev** backend, so this needs no local stack, Docker, Rust build, or `sudo`. In SupaMac no account exists on that backend: to sign in and exercise a change end to end, run the local stack ([below](#when-the-change-needs-a-local-backend)). A bundle built with `VITE_BACKEND_ORIGIN` (`docs/supamac/static-publishing.md`) addresses no upstream host, whatever its mode.
 
 ```sh
 cd apps/web && PORT=3003 bun run dev   # any free port in 3000-3009
 ```
 
-`import.meta.env.MODE === 'development'` resolves the service clients to `https://dev.macro.com` through Vite’s same-origin development proxy. Sign in on the development hostname; existing `.macro.com` cookies are separate. Vite prints `https://<hostname>:<port>/app/`; `https://localhost:<port>/app/` also works. Trust `infra/local/certs/ca.pem` once in the visiting browser (see `infra/local/certs/README.md`). `MACRO_DEV_HTTPS=false` restores HTTP for workflows that require it. Notes:
+`import.meta.env.MODE === 'development'` resolves the service clients to the hosted development services (`DEVELOPMENT_PROXY_TARGETS` in `src/lib/core/constant/developmentProxy.ts`) through Vite’s same-origin development proxy; with `MACRO_DEV_PROXY=false` the clients address those hosts directly. Sign in on the development hostname; the hosted domain's existing cookies are separate. Vite prints `https://<hostname>:<port>/app/`; `https://localhost:<port>/app/` also works. Trust `infra/local/certs/ca.pem` once in the visiting browser (see `infra/local/certs/README.md`). `MACRO_DEV_HTTPS=false` restores HTTP for workflows that require it. Notes:
 
 - On a remote devbox, open `https://<hostname>:<port>/app/` directly. The dev server serves HTTP/2, gzips modules and links source maps instead of inlining them, so a cold load of the ~7k dev modules moves ~13 MB instead of ~100 MB. Trust the CA on the visiting machine: Chrome caches nothing from a site whose certificate warning was clicked through, so every reload re-downloads every module. Tailscale Serve is an alternative that needs no CA: `sudo tailscale serve --bg --https=443 https+insecure://localhost:<port>`, then open `https://<devbox>.<tailnet>.ts.net/app/` and sign in again there (Serve offers HTTPS ports 443, 8443, and 10000). `MACRO_DEV_COMPRESSION=false` and `MACRO_DEV_INLINE_SOURCEMAPS=true` restore Vite's defaults.
 - Never assume port 3000 or 3002 is yours. Check with `lsof -nP -iTCP:<port> -sTCP:LISTEN -t` and confirm the owner's worktree via `lsof -p <pid> | awk '$4=="cwd"'`. Take a free port instead of killing another session's server, and reuse one only if its cwd is this worktree.

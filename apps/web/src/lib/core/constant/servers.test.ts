@@ -161,6 +161,39 @@ it('addresses every service under a self-hosted backend origin', async () => {
   expect([...hostnames].sort()).toEqual(['api.example.com', 'www.example.org']);
 });
 
+// The backends of a self-hosted instance embed and fetch its own addresses,
+// so nothing the bundle derives from them trusts or names a hosted host.
+it('derives every backend-facing address from a self-hosted backend origin', async () => {
+  vi.stubEnv('MODE', 'production');
+  vi.stubEnv('VITE_BACKEND_ORIGIN', 'https://api.example.com');
+  vi.stubGlobal('location', new URL('https://www.example.org/workspace/login'));
+  vi.resetModules();
+  const servers = await import('./servers');
+
+  expect(servers.SELF_HOSTED).toBe(true);
+  // Read-receipt pixels are recognised only at the instance's own email host.
+  expect(servers.EMAIL_SERVICE_EMBEDDED_HOSTS).toEqual([
+    'https://api.example.com/email',
+  ]);
+  expect(servers.staticFileReferenceEndpoint('image-1')).toBe(
+    'https://api.example.com/static-file/file/image-1'
+  );
+  expect(servers.SYNC_PERMISSION_TOKEN_DSS_HOST).toBe(
+    'https://api.example.com/dss'
+  );
+  for (const url of servers.NATIVE_SESSION_SERVICE_URLS) {
+    expect(new URL(url).hostname).toBe('api.example.com');
+  }
+  expect(
+    JSON.stringify([
+      servers.SERVER_HOSTS,
+      servers.SYNC_SERVICE_HOSTS,
+      servers.NATIVE_SESSION_SERVICE_URLS,
+      servers.EMAIL_SERVICE_EMBEDDED_HOSTS,
+    ])
+  ).not.toMatch(/macro\.com|macroverse/);
+});
+
 it('keeps the hosted services when no self-hosted origin is set', async () => {
   vi.stubEnv('MODE', 'production');
   vi.stubEnv('VITE_BACKEND_ORIGIN', undefined);
@@ -170,4 +203,28 @@ it('keeps the hosted services when no self-hosted origin is set', async () => {
 
   expect(SERVER_HOSTS['auth-service']).toBe('https://gateway.macro.com/auth');
   expect(selfHostedBackendUrl('/ai-editing')).toBeUndefined();
+});
+
+it('keeps the hosted sync, permission-token and mail hosts when no self-hosted origin is set', async () => {
+  vi.stubEnv('MODE', 'production');
+  vi.stubEnv('VITE_BACKEND_ORIGIN', undefined);
+  vi.stubGlobal('location', new URL('https://macro.com/app/login'));
+  vi.resetModules();
+  const servers = await import('./servers');
+
+  expect(servers.SELF_HOSTED).toBe(false);
+  expect(servers.SYNC_SERVICE_HOSTS).toEqual({
+    worker: 'https://sync-service-prod2.macroverse.workers.dev',
+    ws: 'wss://sync-service-prod2.macroverse.workers.dev',
+  });
+  expect(servers.SYNC_PERMISSION_TOKEN_DSS_HOST).toBe(
+    'https://gateway.macro.com/dss'
+  );
+  expect(servers.EMAIL_SERVICE_EMBEDDED_HOSTS).toEqual([
+    'https://gateway.macro.com/email',
+    'http://localhost:8087',
+  ]);
+  expect(servers.staticFileReferenceEndpoint('image-1')).toBe(
+    'https://static-file-service.macro.com/file/image-1'
+  );
 });

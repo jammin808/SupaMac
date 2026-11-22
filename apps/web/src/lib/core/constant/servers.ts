@@ -1,4 +1,10 @@
 import { developmentProxyUrl } from './developmentProxy';
+import {
+  SELF_HOSTED,
+  SELF_HOSTED_BACKEND_ORIGIN as selfHostedBackendOrigin,
+} from './selfHosted';
+
+export { SELF_HOSTED };
 
 const serverHostLocal: Servers = {
   'auth-service': 'http://localhost:8080',
@@ -24,47 +30,90 @@ const serverHostLocal: Servers = {
   'agent-git': 'http://localhost:8101/agent-git',
 } as const;
 
-const devServerSuffix = import.meta.env.MODE === 'development' ? '-dev' : '';
+/** The hosted service's hosts, as its backends address them. */
+function hostedDirectServers() {
+  const devServerSuffix = import.meta.env.MODE === 'development' ? '-dev' : '';
 
-const gatewayHost =
-  import.meta.env.MODE === 'development'
-    ? 'https://dev-gateway.macro.com'
-    : 'https://gateway.macro.com';
+  const gatewayHost =
+    import.meta.env.MODE === 'development'
+      ? 'https://dev-gateway.macro.com'
+      : 'https://gateway.macro.com';
 
-const authLogoutUrl =
-  import.meta.env.MODE === 'development'
-    ? 'https://fusionauth-dev.macro.com/oauth2/logout?client_id=eb75fe7a-0ef1-4186-96d9-cc62cfb1d10c&tenantId=5e13f524-8d32-0454-81f8-061936256aa4'
-    : 'https://auth.macro.com/oauth2/logout?client_id=75409999-7dc4-4241-b73b-a51818c3a71c&tenantId=a3e53c3d-8d6a-3e92-d64c-fa3bf30a60be';
+  const authLogoutUrl =
+    import.meta.env.MODE === 'development'
+      ? 'https://fusionauth-dev.macro.com/oauth2/logout?client_id=eb75fe7a-0ef1-4186-96d9-cc62cfb1d10c&tenantId=5e13f524-8d32-0454-81f8-061936256aa4'
+      : 'https://auth.macro.com/oauth2/logout?client_id=75409999-7dc4-4241-b73b-a51818c3a71c&tenantId=a3e53c3d-8d6a-3e92-d64c-fa3bf30a60be';
 
-const directServerHostRemote = {
-  'auth-service': `${gatewayHost}/auth`,
-  'auth-logout': authLogoutUrl,
-  'pdf-service': `https://pdf-service${devServerSuffix}.macro.com`,
-  'document-storage-service': `${gatewayHost}/dss`,
-  'websocket-service': `wss://services${devServerSuffix}.macro.com`,
-  'cognition-service': `${gatewayHost}/cognition`,
-  'connection-gateway': `${gatewayHost.replace(/^http/, 'ws')}/connection-gateway`,
-  'notification-service': `${gatewayHost}/notification`,
-  'static-file': `https://static-file-service${devServerSuffix}.macro.com`,
-  'unfurl-service': `${gatewayHost}/unfurl`,
-  contacts: `${gatewayHost}/contacts`,
-  'email-service': `${gatewayHost}/email`,
-  'calendar-service': `${gatewayHost}/calendar`,
-  'image-proxy-service': `${gatewayHost}/image-proxy`,
-  'scheduled-action': `${gatewayHost}/scheduled-action`,
-  'agent-harness': `${gatewayHost}/agent-harness`,
-  preview: `${gatewayHost}/preview`,
-  'agent-git': `${gatewayHost}/agent-git`,
-} as const;
+  return {
+    'auth-service': `${gatewayHost}/auth`,
+    'auth-logout': authLogoutUrl,
+    'pdf-service': `https://pdf-service${devServerSuffix}.macro.com`,
+    'document-storage-service': `${gatewayHost}/dss`,
+    'websocket-service': `wss://services${devServerSuffix}.macro.com`,
+    'cognition-service': `${gatewayHost}/cognition`,
+    'connection-gateway': `${gatewayHost.replace(/^http/, 'ws')}/connection-gateway`,
+    'notification-service': `${gatewayHost}/notification`,
+    'static-file': `https://static-file-service${devServerSuffix}.macro.com`,
+    'unfurl-service': `${gatewayHost}/unfurl`,
+    contacts: `${gatewayHost}/contacts`,
+    'email-service': `${gatewayHost}/email`,
+    'calendar-service': `${gatewayHost}/calendar`,
+    'image-proxy-service': `${gatewayHost}/image-proxy`,
+    'scheduled-action': `${gatewayHost}/scheduled-action`,
+    'agent-harness': `${gatewayHost}/agent-harness`,
+    preview: `${gatewayHost}/preview`,
+    'agent-git': `${gatewayHost}/agent-git`,
+  } as const;
+}
 
-type Servers = Record<keyof typeof directServerHostRemote, string>;
+type Servers = Record<keyof ReturnType<typeof hostedDirectServers>, string>;
 
-const serverHostRemote = Object.fromEntries(
-  Object.entries(directServerHostRemote).map(([name, url]) => [
-    name,
-    developmentProxyUrl(url),
-  ])
-) as Servers;
+type SyncServiceHosts = { worker: string; ws: string };
+
+type HostedServices = {
+  /** As the hosted backends address them, e.g. in the mail they send. */
+  direct: Servers;
+  /** As this page reaches them: through the development proxy when it runs. */
+  servers: Servers;
+  sync: SyncServiceHosts;
+};
+
+// Only a bundle that may address the hosted service builds its table, so a
+// self-hosted bundle names none of its hosts.
+const hostedServiceHosts: HostedServices | undefined = SELF_HOSTED
+  ? undefined
+  : buildHostedServices();
+
+/** The hosted service's hosts; a self-hosted bundle has none to give. */
+function hostedServices(): HostedServices {
+  if (!hostedServiceHosts) {
+    throw new Error('A self-hosted bundle addresses no hosted service');
+  }
+  return hostedServiceHosts;
+}
+
+function buildHostedServices(): HostedServices {
+  const direct = hostedDirectServers();
+  const syncServiceSuffix =
+    import.meta.env.MODE === 'development' ? '-dev3' : '-prod2';
+  return {
+    direct,
+    servers: Object.fromEntries(
+      Object.entries(direct).map(([name, url]) => [
+        name,
+        developmentProxyUrl(url),
+      ])
+    ) as Servers,
+    sync: {
+      worker: developmentProxyUrl(
+        `https://sync-service${syncServiceSuffix}.macroverse.workers.dev`
+      ),
+      ws: developmentProxyUrl(
+        `wss://sync-service${syncServiceSuffix}.macroverse.workers.dev`
+      ),
+    },
+  };
+}
 
 // Single-origin local backend: when the xtask orchestrator's reverse proxy is
 // in use it sets VITE_LOCAL_BACKEND_ORIGIN to the proxy origin, and the whole
@@ -80,16 +129,6 @@ const serverHostRemote = Object.fromEntries(
 // exists in both windows and workers.)
 const rawLocalBackendOrigin: string | undefined = import.meta.env
   .VITE_LOCAL_BACKEND_ORIGIN;
-
-// A self-hosted deployment puts every service behind one origin too, on the
-// same path prefixes, and builds with VITE_BACKEND_ORIGIN set to it. That
-// origin is used as given: the page and the backend can be on different hosts,
-// so nothing here follows the page's hostname.
-const selfHostedBackendOrigin: string | undefined = import.meta.env
-  .VITE_BACKEND_ORIGIN;
-
-/** True in a bundle built for a self-hosted backend (VITE_BACKEND_ORIGIN). */
-export const SELF_HOSTED = Boolean(selfHostedBackendOrigin);
 
 /**
  * Where a self-hosted backend serves a route of its proxy that has no entry
@@ -134,7 +173,7 @@ function selectServers(): Servers {
   const selfHosted = selfHostedServers();
   if (selfHosted) return selfHosted;
   if (import.meta.env.MODE === 'development') return selectLocalServers();
-  return serverHostRemote;
+  return hostedServices().servers;
 }
 
 /**
@@ -198,6 +237,7 @@ function selfHostedServers(): Servers | undefined {
 }
 
 function selectLocalServers(): Servers {
+  const serverHostRemote = hostedServices().servers;
   const selectedLocalServers: string = import.meta.env.VITE_LOCAL_SERVERS;
   if (!selectedLocalServers || selectedLocalServers.length === 0) {
     return serverHostRemote;
@@ -236,27 +276,12 @@ function selectLocalServers(): Servers {
   return servers;
 }
 
-const syncServiceSuffix =
-  import.meta.env.MODE === 'development' ? '-dev3' : '-prod2';
-
 const syncServiceHostLocal = {
   worker: 'http://localhost:8787',
   ws: 'ws://localhost:8787',
 } as const;
 
-const syncServiceHostRemote = {
-  worker: developmentProxyUrl(
-    `https://sync-service${syncServiceSuffix}.macroverse.workers.dev`
-  ),
-  ws: developmentProxyUrl(
-    `wss://sync-service${syncServiceSuffix}.macroverse.workers.dev`
-  ),
-} as const;
-
-function selectSyncServiceHost():
-  | typeof syncServiceHostRemote
-  | typeof syncServiceHostLocal
-  | { worker: string; ws: string } {
+function selectSyncServiceHost(): SyncServiceHosts {
   const overrideHost: string | undefined = import.meta.env
     .VITE_SYNC_SERVICE_HOST;
   if (overrideHost) {
@@ -270,7 +295,7 @@ function selectSyncServiceHost():
     return { worker: `${proxyOrigin}/sync`, ws: `${wsProxyOrigin}/sync` };
   }
   if (import.meta.env.MODE !== 'development') {
-    return syncServiceHostRemote;
+    return hostedServices().sync;
   }
   const selectedLocalServers: string = import.meta.env.VITE_LOCAL_SERVERS;
   if (
@@ -283,7 +308,7 @@ function selectSyncServiceHost():
     }
     return syncServiceHostLocal;
   }
-  return syncServiceHostRemote;
+  return hostedServices().sync;
 }
 
 export const SYNC_SERVICE_HOSTS = selectSyncServiceHost();
@@ -318,8 +343,8 @@ const nativeSessionServices = {
  * because they need to be signed with the matching JWT secret.
  */
 export const SYNC_PERMISSION_TOKEN_DSS_HOST =
-  SYNC_SERVICE_HOSTS === syncServiceHostRemote
-    ? serverHostRemote['document-storage-service']
+  hostedServiceHosts && SYNC_SERVICE_HOSTS === hostedServiceHosts.sync
+    ? hostedServiceHosts.servers['document-storage-service']
     : SERVER_HOSTS['document-storage-service'];
 
 export const NATIVE_SESSION_SERVICE_URLS = [
@@ -328,15 +353,18 @@ export const NATIVE_SESSION_SERVICE_URLS = [
   SYNC_PERMISSION_TOKEN_DSS_HOST,
 ];
 
-/** Hosts the email service may have embedded in sent mail. Development
- * proxies rewrite `SERVER_HOSTS`, while the backend embeds its direct URL. */
-export const EMAIL_SERVICE_EMBEDDED_HOSTS: readonly string[] = [
-  ...new Set([
-    SERVER_HOSTS['email-service'],
-    directServerHostRemote['email-service'],
-    serverHostLocal['email-service'],
-  ]),
-];
+/** Hosts the email service may have embedded in sent mail. A self-hosted
+ * backend embeds its own. On the hosted service, development proxies rewrite
+ * `SERVER_HOSTS`, while the backend embeds its direct URL. */
+export const EMAIL_SERVICE_EMBEDDED_HOSTS: readonly string[] = SELF_HOSTED
+  ? [SERVER_HOSTS['email-service']]
+  : [
+      ...new Set([
+        SERVER_HOSTS['email-service'],
+        hostedServices().direct['email-service'],
+        serverHostLocal['email-service'],
+      ]),
+    ];
 
 /** Creates endpoint URL for accessing a static file by its ID */
 export function staticFileIdEndpoint(id: string): string {
@@ -345,8 +373,11 @@ export function staticFileIdEndpoint(id: string): string {
 
 /** A static-file reference consumed by a backend, outside the browser proxy. */
 export function staticFileReferenceEndpoint(id: string): string {
+  // A self-hosted bundle has no development proxy: its backends and the page
+  // reach static files at the same address.
+  if (SELF_HOSTED) return staticFileIdEndpoint(id);
   const host = SERVER_HOSTS['static-file'];
-  const remote = directServerHostRemote['static-file'];
+  const remote = hostedServices().direct['static-file'];
   const referenceHost = host === developmentProxyUrl(remote) ? remote : host;
   return `${referenceHost}/file/${id}`;
 }

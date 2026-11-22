@@ -2,6 +2,7 @@ import { WEB_BASE_PATH } from '@app/constants/routerBase';
 import { t } from '@app/lib/i18n';
 import { useIsAuthenticated } from '@core/auth';
 import { LoadingSpinner } from '@core/component/LoadingSpinner';
+import { SELF_HOSTED, SERVER_HOSTS } from '@core/constant/servers';
 import { getWebOrigin } from '@core/util/webOrigin';
 import { useAgentSetupMutation } from '@queries/auth/agent-setup';
 import { useCompleteTutorialMutation } from '@queries/auth/tutorial';
@@ -10,7 +11,57 @@ import { useNavigate } from '@solidjs/router';
 import { Button } from '@ui';
 import { createEffect, For, Match, type ParentProps, Switch } from 'solid-js';
 import { match } from 'ts-pattern';
-import { agentSetupMarkdown, markdownParts } from './core/agent-setup-markdown';
+import {
+  type AgentSetupDocs,
+  agentSetupMarkdown,
+  markdownParts,
+  type SdkService,
+  type SelfHostedDeployment,
+} from './core/agent-setup-markdown';
+
+/** The hosted service's documentation; a self-hosted instance has none. */
+const HOSTED_DOCS: AgentSetupDocs | undefined = SELF_HOSTED
+  ? undefined
+  : {
+      product: 'https://macro.com/docs',
+      sdk: 'https://sdk.macro.com',
+      macrod: 'https://macro.com/docs/AI/bring-your-own',
+    };
+
+/** The app's host that serves each SDK service. */
+const SDK_SERVICE_HOSTS = {
+  'agent-harness': 'agent-harness',
+  storage: 'document-storage-service',
+  auth: 'auth-service',
+  email: 'email-service',
+  calendar: 'calendar-service',
+  cognition: 'cognition-service',
+  notification: 'notification-service',
+  properties: 'document-storage-service',
+  search: 'document-storage-service',
+  'scheduled-action': 'scheduled-action',
+  'static-files': 'static-file',
+  connection: 'connection-gateway',
+  contacts: 'contacts',
+  unfurl: 'unfurl-service',
+} as const satisfies Record<SdkService, keyof typeof SERVER_HOSTS>;
+
+/** The instance's own hosts, on a self-hosted instance. */
+function selfHostedDeployment(): SelfHostedDeployment | undefined {
+  if (!SELF_HOSTED) return undefined;
+  const entries = Object.entries(SDK_SERVICE_HOSTS) as [
+    SdkService,
+    keyof typeof SERVER_HOSTS,
+  ][];
+  // The SDK opens its own sockets from an https host.
+  const sdkHosts = Object.fromEntries(
+    entries.map(([service, server]) => [
+      service,
+      SERVER_HOSTS[server].replace(/^ws(s?):/, 'http$1:'),
+    ])
+  ) as Record<SdkService, string>;
+  return { sdkHosts, webAppUrl: `${getWebOrigin()}${WEB_BASE_PATH}` };
+}
 
 /** Who is looking at a setup page, and whether setup is theirs to finish. */
 function useSetupStatus() {
@@ -94,6 +145,8 @@ export function AgentSetupPage() {
       apiKey,
       teamJoinFailed,
       openAppUrl: `${getWebOrigin()}${WEB_BASE_PATH}/agent-setup/done`,
+      docs: HOSTED_DOCS,
+      selfHosted: selfHostedDeployment(),
       copy: {
         title: t('agentSetup.title'),
         intro: t('agentSetup.intro'),

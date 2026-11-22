@@ -2,7 +2,7 @@
 import { setEditorStateFromHtml } from '@core/component/LexicalMarkdown/utils';
 import { HtmlRenderNode, RegisteredNodesByType } from '@macro-inc/lexical-core';
 import { createEditor } from 'lexical';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   calendarDescriptionToEditorHtml,
   exportCalendarDescription,
@@ -183,6 +183,28 @@ describe('calendarDescriptionToEditorHtml', () => {
       .parseFromString(html, 'text/html')
       .body.querySelector('a');
     expect(anchor?.hasAttribute('data-document-mention')).toBe(false);
+  });
+});
+
+describe('parseMacroAppLink on a self-hosted instance', () => {
+  afterEach(() => {
+    vi.doUnmock('@core/constant/servers');
+    vi.resetModules();
+  });
+
+  it('recognizes its own app links and none of the hosted product', async () => {
+    vi.doMock('@core/constant/servers', async (importOriginal) => ({
+      ...(await importOriginal<typeof import('@core/constant/servers')>()),
+      SELF_HOSTED: true,
+    }));
+    vi.resetModules();
+    const { parseMacroAppLink: parse } = await import('./calendar-description');
+
+    expect(parse(`${window.location.origin}/app/task/${DOCUMENT_ID}`)).toEqual({
+      blockName: 'task',
+      documentId: DOCUMENT_ID,
+    });
+    expect(parse(`https://macro.com/app/task/${DOCUMENT_ID}`)).toBeUndefined();
   });
 });
 

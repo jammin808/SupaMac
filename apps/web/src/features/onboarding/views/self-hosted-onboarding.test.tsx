@@ -19,6 +19,12 @@ vi.mock(import('@core/constant/servers'), async (importOriginal) => ({
   SELF_HOSTED: true,
 }));
 
+// A self-hosted bundle is a production build: no local-development bypass.
+vi.mock(import('@core/constant/featureFlags'), async (importOriginal) => ({
+  ...(await importOriginal()),
+  LOCAL_ONLY: false,
+}));
+
 beforeEach(() => {
   sessionStorage.clear();
   localStorage.clear();
@@ -117,6 +123,21 @@ describe('self-hosted onboarding', () => {
       .map((e) => e.data);
     for (const step of ['vision', 'security', 'plan'])
       expect(steps).not.toContainEqual(expect.objectContaining({ step }));
+  });
+
+  it('offers no staff Bypass to an account of the hosted service’s domain', async () => {
+    setupFlow({
+      world: {
+        viewer: {
+          id: 'macro|staff@macro.com',
+          email: 'staff@macro.com',
+          tutorialComplete: false,
+          licensed: false,
+        },
+      },
+    });
+    await heading('Create your workspace');
+    expect(screen.queryByRole('button', { name: 'Bypass' })).toBeNull();
   });
 
   it('goes back from the first account to the workspace step', async () => {

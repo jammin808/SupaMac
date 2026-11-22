@@ -207,14 +207,20 @@ export const inviteRoute = defineRoute({
   externalSearch: '*',
 });
 
-/** Macro staff only: create and track GTM invite links. */
+/**
+ * The hosted service's staff only: create and track GTM invite links. A
+ * self-hosted instance does not register it (`appRouteElements`).
+ */
 export const internalInviteLinksRoute = defineRoute({
   id: 'internal-invite-links',
   path: 'internal/invite-links',
   externalSearch: '*',
 });
 
-/** Macro staff only: set the status banner every user sees. */
+/**
+ * The hosted service's staff only: set the status banner every user sees. A
+ * self-hosted instance does not register it (`appRouteElements`).
+ */
 export const internalSystemStatusRoute = defineRoute({
   id: 'internal-system-status',
   path: 'internal/status',

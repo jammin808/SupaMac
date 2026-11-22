@@ -27,7 +27,7 @@ function RespondFooter() {
       <p>Never submit passwords through {PRODUCT_NAME} Forms.</p>
       {/* Reports go to the hosted service's abuse desk, which does not answer
           for the forms of a self-hosted instance. */}
-      <Show when={!SELF_HOSTED}>
+      {SELF_HOSTED ? undefined : (
         <p>
           <a
             href="mailto:abuse@macro.com?subject=Report%20a%20form"
@@ -36,7 +36,7 @@ function RespondFooter() {
             Report this form
           </a>
         </p>
-      </Show>
+      )}
     </footer>
   );
 }

@@ -195,11 +195,11 @@ const App: Component = () => {
       <div class="flex flex-wrap gap-2 justify-center">
         <LiveIndicators
           userIds={[
-            'macro|teo@macro.com',
-            'macro|hutch@macro.com',
-            'macro|jacob@macro.com',
-            'macro|seamus@macro.com',
-            'macro|gab@macro.com',
+            'macro|alex@example.com',
+            'macro|sam@example.com',
+            'macro|jordan@example.com',
+            'macro|casey@example.com',
+            'macro|riley@example.com',
           ]}
         />
       </div>

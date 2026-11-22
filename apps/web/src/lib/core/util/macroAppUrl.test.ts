@@ -1,13 +1,12 @@
-import { isTauri } from '@core/util/platform';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { parseInternalAppLink } from './macroAppUrl';
 
-vi.mock('@core/util/platform', () => ({
-  isTauri: vi.fn(() => false),
-}));
+// One mock for every module instance, including those a test re-imports.
+const isTauri = vi.hoisted(() => vi.fn(() => false));
+vi.mock('@core/util/platform', () => ({ isTauri }));
 
 afterEach(() => {
-  vi.mocked(isTauri).mockReturnValue(false);
+  isTauri.mockReturnValue(false);
 });
 
 // jsdom's window.location.hostname is 'localhost', which
@@ -49,7 +48,7 @@ describe('parseInternalAppLink', () => {
     // Only a leading `www.` is stripped, so `macro.www.com` (a subdomain of
     // the foreign `www.com`) must not collapse to `macro.com`. Checked under
     // Tauri, where localhost is paired with the prod/dev/staging hosts.
-    vi.mocked(isTauri).mockReturnValue(true);
+    isTauri.mockReturnValue(true);
     expect(
       parseInternalAppLink('https://macro.www.com/app/component/abc')
     ).toBeNull();
@@ -73,7 +72,7 @@ describe('parseInternalAppLink', () => {
   });
 
   it('accepts prod macro links under Tauri', () => {
-    vi.mocked(isTauri).mockReturnValue(true);
+    isTauri.mockReturnValue(true);
     expect(parseInternalAppLink('https://macro.com/app/component/abc')).toEqual(
       {
         path: '/component/abc',
@@ -83,7 +82,7 @@ describe('parseInternalAppLink', () => {
   });
 
   it('accepts staging macro links under Tauri', () => {
-    vi.mocked(isTauri).mockReturnValue(true);
+    isTauri.mockReturnValue(true);
     expect(
       parseInternalAppLink('https://staging.macro.com/app/component/abc')
     ).toEqual({
@@ -95,7 +94,7 @@ describe('parseInternalAppLink', () => {
   it('accepts macro links under Tauri when served from tauri.localhost', () => {
     // Under the http asset scheme (e.g. Windows/Android) the webview origin is
     // tauri.localhost, not localhost.
-    vi.mocked(isTauri).mockReturnValue(true);
+    isTauri.mockReturnValue(true);
     const original = window.location;
     Object.defineProperty(window, 'location', {
       configurable: true,
@@ -147,5 +146,40 @@ describe('parseInternalAppLink under another base path', () => {
     expect(
       parseInternalAppLink('http://localhost:3000/workspaces/channel/123')
     ).toBeNull();
+  });
+});
+
+// A self-hosted instance is served from one host of its own: links to it open
+// in place, and the hosted service's hosts are foreign wherever it runs.
+describe('parseInternalAppLink in a self-hosted bundle', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
+  async function selfHostedParser() {
+    vi.stubEnv('VITE_BACKEND_ORIGIN', 'https://api.example.com');
+    vi.resetModules();
+    return (await import('./macroAppUrl')).parseInternalAppLink;
+  }
+
+  it('opens links to the host serving it', async () => {
+    const parse = await selfHostedParser();
+    expect(parse('http://localhost:3000/app/channel/123')).toEqual({
+      path: '/channel/123',
+      query: '',
+    });
+  });
+
+  it('treats the hosted development host as foreign on localhost', async () => {
+    const parse = await selfHostedParser();
+    expect(parse('https://dev.macro.com/app/component/abc')).toBeNull();
+  });
+
+  it('treats the hosted hosts as foreign under Tauri', async () => {
+    isTauri.mockReturnValue(true);
+    const parse = await selfHostedParser();
+    expect(parse('https://macro.com/app/component/abc')).toBeNull();
+    expect(parse('https://staging.macro.com/app/component/abc')).toBeNull();
   });
 });
