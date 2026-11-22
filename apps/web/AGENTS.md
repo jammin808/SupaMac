@@ -1418,7 +1418,7 @@ resolved session ID; keep the existing `AgentSessionProvider` subscription to
   in the other languages. See the [i18n rule](../../.agents/rules/web/i18n.md).
   The resolved interface language is reported to PostHog as the person
   property `interface_language` when the account language loads.
-- When adding or changing a feature flag, follow the `feature-flags` skill.
+- When adding or changing a feature flag, follow the `feature-flags` skill, including its line in `self-hosted-flags.ts`.
 - Gate routine template actions, pages, dialogs, and message cards on `enable-routine-sharing`; keep ordinary routines usable while it is off.
 - When adding or changing a view's feature tour, follow the `add-tour` skill.
 - Keep Tasks date ranges on view-owned date-bucket boundaries in `features/tasks-view/core/task-due-date.ts`; send `sort_method=property` with the selected definition and direction, use keyed `date_ranges` grouping, and restart pages when midnight/timezone/resume changes the query key; preserve text-search ordering.

@@ -16,6 +16,7 @@ import { devExternalSourcemaps } from './scripts/dev-sourcemaps';
 import { hostedDevProxy } from './scripts/hosted-dev-proxy';
 import { keepImportMetaDev } from './scripts/keep-import-meta-dev';
 import { localDevServer } from './scripts/local-dev-server';
+import { selfHostedFlagDefines } from './self-hosted-flags';
 
 function readShortSha(): string {
   try {
@@ -859,6 +860,9 @@ function defineEnv(mode: string, command: string) {
     localBackendOrigin: process.env.VITE_LOCAL_BACKEND_ORIGIN,
   });
   return {
+    // A self-hosted bundle has no PostHog project to decide its features;
+    // the checked-in set does, unless the build's environment names a flag.
+    ...(selfHostedBackendOrigin ? selfHostedFlagDefines(process.env) : {}),
     'import.meta.env.__APP_VERSION__': JSON.stringify(appVersion),
     'import.meta.env.__APP_BUILD_TIME__': JSON.stringify(appBuildTime),
     'import.meta.env.ASSETS_PATH': JSON.stringify(getAssetsPath(mode, command)),

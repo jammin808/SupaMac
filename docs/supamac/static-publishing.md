@@ -39,6 +39,42 @@ MODE=production NODE_ENV=production NODE_OPTIONS=--max-old-space-size=8192 \
 The build needs the WebAssembly packages (`just build-wasm` in `apps/web`,
 which needs the Rust toolchain and `wasm-pack`).
 
+## Features and sign-in
+
+A self-hosted bundle has no PostHog project to switch features on, so its
+feature set is decided at build time. `apps/web/self-hosted-flags.ts` lists
+every feature flag of the web app with its value in such a bundle and the
+reason. A build with `VITE_BACKEND_ORIGIN` set applies the list; other builds
+do not read it.
+
+- To change a flag for one build, set `VITE_<name>` to `true` or `false` in
+  the environment of the build, with the name the file uses. The environment
+  wins over the file. A `.env` file does not.
+- To change it for good, edit the file.
+- A flag turned on here does not turn on a feature the backend refuses: the
+  services ask PostHog for some flags themselves and get no answer. The file
+  keeps those off and says so.
+- `bunx vitest run scripts/self-hosted-flags.test.ts`, from `apps/web`, fails
+  when a flag defined in `src/lib/core/constant/featureFlags.ts` has no line
+  in the file. A flag that a newer upstream snapshot adds gets its decision
+  that way.
+
+Sign-in is by emailed code. With nothing else turned on, the sign-in page
+opens on the email field. Each other method is hidden until the backend can
+serve it and the build turns it on:
+
+| Variable | Shows |
+| --- | --- |
+| `VITE_ENABLE_GOOGLE_SIGN_IN` | Continue with Google, and the sign-up slides that lead to it |
+| `VITE_ENABLE_MICROSOFT_SIGNUP` | Continue with Microsoft |
+| `VITE_ENABLE_APPLE_SIGN_IN` | Continue with Apple, in the iOS app only |
+| `VITE_ENABLE_PASSWORD_SIGN_IN` | The password field, for an account that signs in with one |
+| `VITE_ENABLE_DOMAIN_SSO_SIGN_IN` | Sending an address on to its organization's identity provider |
+
+A self-hosted bundle also leaves out copy that promises open sign-up: the
+mobile-web sign-up page goes to sign-in, and the prompt shown to signed-out
+visitors drops its line about creating an account and its Sign Up button.
+
 ## Package
 
 ```sh
@@ -53,7 +89,7 @@ bundle and of the folder.
 
 | Flag | Effect |
 | --- | --- |
-| `--omit-videos` | Leaves out `web-hosted/`, the tutorial videos (about 105 MB). The tutorial dialogs then have nothing to play. |
+| `--omit-videos` | Leaves out `web-hosted/`, the tutorial videos (about 105 MB). A self-hosted bundle shows no tutorial entries (`ENABLE_VIDEO_TUTORIALS` is off in the list), so nothing plays them; a build that turns them on must publish the folder. |
 | `--keep-source-maps` | Publishes the `*.map` files, which are left out by default. |
 | `--enforce-csp` | Sends the Content Security Policy as an enforced header. The default is report-only. |
 
@@ -199,6 +235,11 @@ applies the same routing rules and sends the headers read from the generated
 `.htaccess`:
 
 - `bun test tooling/supamac` passes.
+- `bunx vitest run scripts/self-hosted-flags.test.ts` passes: every flag has
+  a line in `self-hosted-flags.ts`, and the build configuration carries the
+  list only with `VITE_BACKEND_ORIGIN` set, minus the flags the environment
+  names. The sign-in tests under `apps/web/src/features/auth` pass for both
+  kinds of build.
 - Packaging a real build: 3082 files (352.5 MB) became 1745 files (215.9 MB),
   and 1728 files (111.3 MB) with `--omit-videos`.
 - A bundle whose `index.html` loads `/team/app/app-<hash>.js` was refused for
@@ -223,6 +264,9 @@ applies the same routing rules and sends the headers read from the generated
 
 Not verified:
 
+- No bundle was built with the flag list. That its values reach the app
+  rests on reading how the build tool merges them into `import.meta.env`,
+  and no feature it turns on has been used against a self-hosted backend.
 - LiteSpeed and Apache. Neither was available, so no rewrite rule in the file
   has run on a real server. Unknown there: that a missing file the rules
   leave alone gets the server's 404 and not a page from the site root's own

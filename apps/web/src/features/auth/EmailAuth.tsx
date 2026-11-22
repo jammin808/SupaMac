@@ -6,6 +6,7 @@ import { ShareInboxConflictDialog } from '@app/features/inbox/ShareInboxConflict
 import { onboardingPathWithStep } from '@app/features/onboarding/core/next-target';
 import { useAnalytics } from '@app/lib/analytics/analytics-context';
 import type { AppEvents } from '@app/lib/analytics/app-events';
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { t } from '@app/lib/i18n';
 import { useFlow, usePending } from '@app/observability/flow';
 import { updateUserAuth } from '@core/auth';
@@ -216,7 +217,7 @@ function promptForEmailAccess(scopes: ConsentScopes | undefined) {
       titleColor: 'var(--color-failure)',
       dismissLabel: t('common.maybeLater'),
       content: () =>
-        "Macro connects an account's email and calendar together, so keep the email permissions checked. The account was not connected.",
+        `${PRODUCT_NAME} connects an account's email and calendar together, so keep the email permissions checked. The account was not connected.`,
       actions: [
         {
           label: 'Try again',
