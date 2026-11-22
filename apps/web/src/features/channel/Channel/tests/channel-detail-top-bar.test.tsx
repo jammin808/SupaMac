@@ -200,15 +200,15 @@ describe('channel top bar title menu', () => {
   });
 });
 
-/** The header's actions read Ask Macro, Invite, then Call, left to right. */
+/** The header's actions read Ask SupaMac, Invite, then Call, left to right. */
 describe('channel top bar actions', () => {
-  it('offers Ask Macro on this channel before Invite and Call', async () => {
+  it('offers Ask SupaMac on this channel before Invite and Call', async () => {
     render(() => <ChannelDetailTopBar channelId="channel-1" />);
 
-    const askMacro = await screen.findByRole('button', { name: 'Ask Macro' });
+    const askMacro = await screen.findByRole('button', { name: 'Ask SupaMac' });
     expect(askMacro.dataset.entity).toBe('channel-1:Design:private');
 
-    const order = ['Ask Macro', 'Invite', 'Call'].map((name) =>
+    const order = ['Ask SupaMac', 'Invite', 'Call'].map((name) =>
       screen.getByRole('button', { name })
     );
     for (const [before, after] of [
