@@ -14,7 +14,10 @@ same values in both. The differences are what an internet-facing instance needs:
 - Redirect URLs are matched exactly and the OAuth client must authenticate.
 - Sign-in codes go out through the in-network mail relay and expire after ten
   minutes.
-- No identity provider is defined: sign-in is by emailed code.
+- Sign-in is by emailed code. The one identity provider, `google_gmail`, is
+  disabled and enabled for no application, with a client nobody accepts: it
+  exists because the agent harness looks it up by name when it starts and
+  exits without it. Nobody can sign in through it.
 - The admin account's address is not one a person signs in to the app with. An
   address that exists in FusionAuth before its first app sign-in gets no app
   profile.

@@ -146,6 +146,32 @@
     },
     {
       "method": "POST",
+      "url": "/api/identity-provider/55555555-5555-4555-8555-555555555555",
+      "body": {
+        "identityProvider": {
+          "type": "OpenIDConnect",
+          "name": "google_gmail",
+          "enabled": false,
+          "buttonText": "Google",
+          "linkingStrategy": "LinkByEmail",
+          "oauth2": {
+            "authorization_endpoint": "https://accounts.google.com/o/oauth2/v2/auth",
+            "token_endpoint": "https://oauth2.googleapis.com/token",
+            "userinfo_endpoint": "https://openidconnect.googleapis.com/v1/userinfo",
+            "client_id": "not-configured",
+            "client_secret": "not-configured",
+            "clientAuthenticationMethod": "client_secret_basic",
+            "scope": "openid profile email",
+            "uniqueIdClaim": "sub",
+            "emailClaim": "email",
+            "emailVerifiedClaim": "email_verified",
+            "usernameClaim": "preferred_username"
+          }
+        }
+      }
+    },
+    {
+      "method": "POST",
       "url": "/api/user/registration",
       "body": {
         "user": {
