@@ -177,6 +177,31 @@ x-rust-env: &rust-env
   OVERRIDE_CALENDAR_SERVICE_BACKFILL_QUEUE: http://localstack:4566/000000000000/calendar-service-backfill-queue
   ENABLE_EMAIL_SCHEDULED_QUEUE: "true"
   ENABLE_GMAIL_OPS_QUEUE: "true"
+  # Most services take a queue from crates/macro_queues, whose value for this
+  # environment is the bare queue name, and send it as the queue's URL. AWS
+  # accepts that; the queue service here answers 400 to anything that is not
+  # a URL or a path. Each of those queues is therefore named by its URL,
+  # under the one name macro_queues reads: OVERRIDE_<type name>.
+  OVERRIDE_CHAT_DELETE_QUEUE: http://localstack:4566/000000000000/delete-chat-handler-queue
+  OVERRIDE_CONTACTS_QUEUE: http://localstack:4566/000000000000/contacts-queue
+  OVERRIDE_CONVERT_QUEUE: http://localstack:4566/000000000000/convert-service-queue
+  OVERRIDE_DOCUMENT_DELETE_QUEUE: http://localstack:4566/000000000000/delete-document-handler-queue
+  OVERRIDE_DOCUMENT_TEXT_EXTRACTOR_QUEUE: http://localstack:4566/000000000000/document-text-extractor-lambda-queue
+  OVERRIDE_DOCUMENT_UPLOAD_FINALIZER_QUEUE: http://localstack:4566/000000000000/document-upload-finalizer-queue
+  OVERRIDE_EMAIL_BACKFILL_QUEUE: http://localstack:4566/000000000000/email-service-backfill-queue
+  OVERRIDE_EMAIL_SCHEDULED_QUEUE: http://localstack:4566/000000000000/email-service-scheduled-queue
+  OVERRIDE_GMAIL_INBOX_SYNC_QUEUE: http://localstack:4566/000000000000/email-service-gmail-inbox-sync-queue
+  OVERRIDE_GMAIL_INBOX_SYNC_RETRY_QUEUE: http://localstack:4566/000000000000/email-service-gmail-inbox-retry-queue
+  OVERRIDE_GMAIL_OPS_QUEUE: http://localstack:4566/000000000000/email-service-gmail-ops-queue
+  OVERRIDE_GMAIL_OPS_RETRY_QUEUE: http://localstack:4566/000000000000/email-service-gmail-ops-retry-queue
+  OVERRIDE_LINK_MANAGER_QUEUE: http://localstack:4566/000000000000/email-service-refresh-queue
+  OVERRIDE_NOTIFICATION_QUEUE: http://localstack:4566/000000000000/notification-queue
+  OVERRIDE_NOTIFICATION_INGRESS_QUEUE: http://localstack:4566/000000000000/notification-ingress-queue
+  OVERRIDE_PUSH_NOTIFICATION_EVENT_HANDLER_QUEUE: http://localstack:4566/000000000000/push-delivery-queue
+  OVERRIDE_SEARCH_EVENT_QUEUE: http://localstack:4566/000000000000/search-event-queue
+  OVERRIDE_SFS_DELETE_QUEUE: http://localstack:4566/000000000000/email-sfs-delete-queue
+  OVERRIDE_SFS_UPLOADER_QUEUE: http://localstack:4566/000000000000/email-service-sfs-mapper-queue
+  OVERRIDE_STATIC_FILE_SERVICE_S3_EVENT_QUEUE_URL: http://localstack:4566/000000000000/static-file-s3-event-notification-queue
 
   # Identity. Not secrets: fixed ids shared with ops/config/fusionauth, and
   # the names tokens are issued under.
@@ -275,6 +300,12 @@ x-rust-healthcheck: &rust-healthcheck
 
 # What every Rust service needs before it starts: a migrated database, the
 # AWS-shaped resources, the event topics and Redis.
+#
+# `restart: true` on a dependency that keeps running: a container that is
+# replaced gets a new address, the network's DNS hands every name out for ten
+# minutes, and the Rust services keep what they resolved for that long. A
+# service that outlived its dependency would call the old address until then,
+# so Compose restarts it whenever it replaces or restarts the dependency.
 x-backing: &backing
   migrate:
     condition: service_completed_successfully
@@ -282,8 +313,18 @@ x-backing: &backing
     condition: service_completed_successfully
   init-kafka-topics:
     condition: service_completed_successfully
+  postgres:
+    condition: service_healthy
+    restart: true
   redis:
     condition: service_healthy
+    restart: true
+  kafka:
+    condition: service_healthy
+    restart: true
+  router:
+    condition: service_healthy
+    restart: true
 
 services:
   # ==========================================================================
@@ -778,6 +819,7 @@ services:
       <<: *backing
       fusionauth:
         condition: service_healthy
+        restart: true
     healthcheck: *rust-healthcheck
     mem_limit: 320m
 
@@ -822,12 +864,16 @@ services:
       <<: *backing
       authentication-service:
         condition: service_healthy
+        restart: true
       connection-gateway:
         condition: service_healthy
+        restart: true
       sync-service:
         condition: service_healthy
+        restart: true
       lexical-service:
         condition: service_healthy
+        restart: true
     healthcheck: *rust-healthcheck
     mem_limit: 896m
 
@@ -838,8 +884,10 @@ services:
       <<: *backing
       sync-service:
         condition: service_healthy
+        restart: true
       lexical-service:
         condition: service_healthy
+        restart: true
     mem_limit: 192m
 
   notification-service:
@@ -853,6 +901,7 @@ services:
       <<: *backing
       connection-gateway:
         condition: service_healthy
+        restart: true
     healthcheck: *rust-healthcheck
     # Besides delivery it checks, for an agent's notification, what each
     # recipient may see, with the document, mail, CRM and chat readers that
@@ -892,10 +941,13 @@ services:
       <<: *backing
       fusionauth:
         condition: service_healthy
+        restart: true
       connection-gateway:
         condition: service_healthy
+        restart: true
       lexical-service:
         condition: service_healthy
+        restart: true
     healthcheck: *rust-healthcheck
     # Every program an agent writes is type-checked before it runs: about
     # 250 MB a check, up to four at once, beside the programs themselves.
@@ -931,6 +983,7 @@ services:
     depends_on:
       sync-service:
         condition: service_healthy
+        restart: true
     healthcheck:
       test: ["CMD", "bun", "-e", "fetch('http://localhost:8096/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
       interval: 30s
@@ -951,7 +1004,19 @@ services:
     depends_on:
       sync-service:
         condition: service_healthy
-    mem_limit: 512m
+        restart: true
+    healthcheck:
+      # Any answer: the worker has no health route. Without this check a
+      # worker whose bundling was killed stays "up" and listens on nothing.
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8933/').then(() => process.exit(0)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    # The image bundles the worker when it starts and keeps the bundler
+    # running: about 1 GB resident, measured. Below that the bundler is killed
+    # and the worker never listens.
+    mem_limit: 1280m
 
   # Stands in for the EventBridge rule that ticks the reminder sweep.
   scheduler:
@@ -1024,12 +1089,16 @@ services:
       <<: *backing
       authentication-service:
         condition: service_healthy
+        restart: true
       document-storage-service:
         condition: service_healthy
+        restart: true
       connection-gateway:
         condition: service_healthy
+        restart: true
       static-file-service:
         condition: service_healthy
+        restart: true
     healthcheck: *rust-healthcheck
     mem_limit: 512m
 
@@ -1042,6 +1111,7 @@ services:
       <<: *backing
       email-service:
         condition: service_healthy
+        restart: true
     mem_limit: 512m
 
   calendar-service:
@@ -1052,8 +1122,10 @@ services:
       <<: *backing
       authentication-service:
         condition: service_healthy
+        restart: true
       connection-gateway:
         condition: service_healthy
+        restart: true
     healthcheck: *rust-healthcheck
     mem_limit: 256m
 
@@ -1152,6 +1224,7 @@ services:
         condition: service_completed_successfully
       lexical-service:
         condition: service_healthy
+        restart: true
     healthcheck: *rust-healthcheck
     # Two sets of event workers, one for mail and one for everything else,
     # beside the queue workers.

@@ -171,32 +171,38 @@ the stack's README. How a new upstream snapshot is taken into the fork is in
 ## Verified, and not
 
 The repository has held two upstream snapshots, of 2026-11-19 and of
-2026-11-21. Most of what was checked was checked on the first.
+2026-11-21. The stack was started only on the first.
 
-Verified on the snapshot of 2026-11-19, on a development machine, without
-starting the stack: the Compose files parse with example values; the
-bootstrap script creates its files once and prints no values; the ops image
-builds, and its build validates the gateway configuration and runs the
-tests of the small programs in it. Inside image build steps, against
-servers that lived only for the step: the object store's and the database's
-health checks, the creation of the event topics, and one backup and restore
-of both databases, the objects and the state volumes.
+Verified in one rehearsal on a development machine, on the snapshot of
+2026-11-19: the five images were built, the bootstrap project wrote its
+secrets into a scratch directory, and the stack was started from empty
+volumes behind a stand-in for Traefik, with the packaged web bundle on a
+sibling hostname and a mail catcher in place of the SMTP provider. In a
+headless browser a person's path worked end to end: a sign-in code
+requested, mailed, and accepted; onboarding and a team; a document typed
+into and read back; a file uploaded and finalised; a CRM company and
+contact; sign-out. An address outside the allow-list was refused and got no
+mail, the code was never in a response, a second request within 30 seconds
+was throttled, and internal, webhook and documentation paths answered 404.
+The stack came back healthy from a restart with its data, and used 3.3 GB
+of memory idle.
 
-Of these, run again on the snapshot of 2026-11-21: the Compose files parse
-with example values, the tests pass, and the scripts pass a syntax check.
-The tests now also hold the stack's queues to the developer stack's and run
-the queue script against a stand-in for the AWS command line. The ops image
-was not rebuilt. It would carry more migrations, another topic list and
-more tests than the one that was built: the 876 migrations have not been
-applied, and no topic or queue of this snapshot has been created in a broker
-or a queue service. The stack's README lists what was run under
+Run again on the snapshot of 2026-11-21: the Compose files parse with
+example values, the tests pass, and the scripts pass a syntax check. The
+tests now also hold the stack's queues to the developer stack's and run the
+queue script against a stand-in for the AWS command line. The stack was not
+started on it: its 876 migrations have not been applied, and no topic or
+queue of this snapshot has been created in a broker or a queue service. The
+stack's README lists what was run under
 [After the snapshot of 2026-11-21](../../infra/self-hosted/README.md#after-the-snapshot-of-2026-11-21).
 
-Not verified: everything that needs the stack running. It has not been
-started, so sign-in, uploads, collaborative editing, the AI assistant,
-backups and restore have not been observed working on it. A restore brings
-back the objects' bytes but not their content types. No security scanner
-result is claimed for it. The full list is in the README's
+Not verified: a real server, Traefik, a real domain and a real SMTP
+provider; the `email` and `search` profiles; the AI assistant answering
+(the rehearsal had no provider key); restore on a started stack; anything
+under load. Known to be wrong, and outside these files: signing out does not
+revoke the session on the server, so a copied session cookie works until its
+tokens expire. No security scanner result is claimed. The full list is in
+the README's
 [Not covered, not verified](../../infra/self-hosted/README.md#not-covered-not-verified).
 
 Deploying, and any action that resets data, is the operator's decision on the

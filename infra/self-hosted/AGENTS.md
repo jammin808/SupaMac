@@ -28,10 +28,13 @@ on the box. The Pulumi stacks next to it are upstream's AWS and are not used.
   script instead, and into README's rotation table.
 - Add a queue, or change one's attributes: `resources.rs` →
   `ops/config/elasticmq/elasticmq.conf` → the `queue` lines of
-  `ops/scripts/init-aws.sh` → `x-rust-env`. `bun test` in `ops/src`, run
-  from the checkout, fails until the four agree; the ops image's build has
-  no `resources.rs` and skips that comparison. A bucket or table:
+  `ops/scripts/init-aws.sh` → `x-rust-env`, as `OVERRIDE_<type name in
+  macro_queues>` with the queue's URL. `bun test` in `ops/src`, run from the
+  checkout, fails until the four agree; the ops image's build has no
+  `resources.rs` and skips that comparison. A bucket or table:
   `resources.rs` → `ops/scripts/init-aws.sh` → `x-rust-env`.
+- Add a long-running dependency of a Rust service: `condition:
+  service_healthy` with `restart: true`.
 - Add a volume: give it a `name:` in `compose.yaml`. One that holds data
   nothing else can rebuild also goes into `ops/scripts/backup.sh`,
   `ops/scripts/restore.sh`, the `backup` container's mounts and
@@ -55,7 +58,15 @@ on the box. The Pulumi stacks next to it are upstream's AWS and are not used.
 
 ## Gotchas
 
-- Never start this stack to "try it" on a shared machine: it wants 11 GB.
+- Never start this stack to "try it" on a shared machine: its limits add up
+  to 12 GB.
+- The queue service refuses a bare queue name where AWS accepts one. A queue
+  a service names without its URL fails every poll with a 400.
+- The network's DNS answers are kept ten minutes by the Rust services. A
+  service that outlives a replaced dependency calls the old address until
+  then, hence `restart: true`.
+- A container with no health check hides a process that never listened: the
+  AI editing worker did, for want of memory.
 - Compose cannot put an `env_file` value into another value. Anything built
   from a secret (a database URL) is written whole by the bootstrap script.
 - `environment:` wins over `env_file:`, so a variable the owner may set in
