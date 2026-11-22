@@ -320,15 +320,17 @@ Not verified:
 - `supamac-sync`, `supamac-ops` and `supamac-search` built by this workflow.
 - `just build-wasm` on a hosted runner. It builds ten packages in parallel;
   its peak memory there is not measured.
-- That the published bundle sends nothing to an upstream host. The packaging
-  tool shows that a script addresses the backend, not that no script
-  addresses anything else. The scripts of a bundle built here for
-  `/workspace` and `https://api.example.com` still name `gateway.macro.com`,
-  `us.i.posthog.com`, `status.macro.com`, `auth.macro.com` and
-  `static-file-service.macro.com`. Whether a self-hosted bundle ever requests
-  one of them was not traced. The Content Security Policy lists none of them,
-  but it is report-only unless `SUPAMAC_WEB_ENFORCE_CSP` is `true`, and a
-  report-only policy stops nothing.
+- That the published bundle sends nothing to an upstream host. The folder the
+  packaging tool writes for `/supamac` and `https://api.example.com` names
+  `macro.com` once, as the domain of the Content-ID the email composer gives an
+  inline attachment (`<id>@attachments.macro.com`, which the email service
+  writes too). The tool leaves out the chunks nothing loads, such as the
+  hosted service's staff pages. `posthog.com` remains inside the analytics
+  library, which a self-hosted bundle never starts, and as an MCP server in the
+  connections catalogue. A run in a browser that records every request was not
+  repeated after these changes. The Content Security Policy lists none of
+  these hosts, but it is report-only unless `SUPAMAC_WEB_ENFORCE_CSP` is
+  `true`, and a report-only policy stops nothing.
 - Any image running in the stack. Both Workers run on `wrangler dev`, a
   development server, which asks Cloudflare's and npm's hosts for request
   metadata and its own latest version when it starts. Whether it starts

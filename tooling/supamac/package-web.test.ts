@@ -20,6 +20,7 @@ import {
 	parseBackendOrigin,
 	parseBasePath,
 	readScripts,
+	unreferencedChunks,
 	uploadOrder,
 } from "./package-web";
 
@@ -334,6 +335,23 @@ RewriteRule \\.[^/]+$ - [L]
 		]);
 	});
 
+	test("chunks nothing can load are found, also through other such chunks", () => {
+		const files: Record<string, string> = {
+			"index.html": '<script type="module" src="/workspace/app-AAAAAAAA.js"></script>',
+			"app-AAAAAAAA.js": 'import("./page-BBBBBBBB.js");',
+			"page-BBBBBBBB.js": "export {};",
+			"assets/style-EEEEEEEE.css": "a{}",
+			// Named only by a chunk nothing names.
+			"orphan-CCCCCCCC.js": 'import("./deep-DDDDDDDD.js");',
+			"deep-DDDDDDDD.js": "export {};",
+			// A script without a content hash is never left out.
+			"sw.js": "self.registration.unregister();",
+		};
+		expect(
+			unreferencedChunks(Object.keys(files), (file) => files[file] ?? ""),
+		).toEqual(["orphan-CCCCCCCC.js", "deep-DDDDDDDD.js"]);
+	});
+
 	test("a bundle is packaged only for the folder and backend it was built for", () => {
 		const root = mkdtempSync(join(tmpdir(), "supamac-package-web-test-"));
 		try {
@@ -352,6 +370,9 @@ RewriteRule \\.[^/]+$ - [L]
 			writeFileSync(join(dist, "assets", "katex-B7QeSwCL.css"), "a{}");
 			writeFileSync(join(dist, "web-hosted", "databases-C9a9ytc_.mp4"), "v");
 			writeFileSync(join(dist, "manifest.json"), "{}");
+			// A page the build left unregistered: nothing names its chunk.
+			writeFileSync(join(dist, "staff-page-Ab12Cd34.js"), "export {};");
+			writeFileSync(join(dist, "staff-page-Ab12Cd34.js.map"), "{}");
 
 			expect(() =>
 				assertBuiltFor(dist, "/app", "https://api.example.com"),
@@ -417,8 +438,9 @@ RewriteRule \\.[^/]+$ - [L]
 				"manifest.json",
 				"web-hosted/databases-C9a9ytc_.mp4",
 			]);
-			expect(result.bundle.files).toBe(6);
+			expect(result.bundle.files).toBe(8);
 			expect(result.published.files).toBe(6);
+			expect(result.unloadable).toEqual(["staff-page-Ab12Cd34.js"]);
 			expect(result.manifest).toBe(join(root, "site.publish.json"));
 			expect(JSON.parse(readFileSync(result.manifest, "utf8"))).toEqual({
 				basePath: "/workspace",

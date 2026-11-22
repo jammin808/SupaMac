@@ -84,8 +84,12 @@ bun run supamac:package-web --dist apps/web/dist --base-path /workspace \
 
 The tool copies the bundle to the output folder, writes `.htaccess` at its
 root, and writes the upload order beside the folder, in
-`/tmp/workspace-site.publish.json`. It prints the file count and size of the
-bundle and of the folder.
+`/tmp/workspace-site.publish.json`. It leaves out the chunks nothing can load:
+a hashed script that no other page, script, stylesheet or manifest of the
+bundle names, such as a page the self-hosted build does not register (the
+bundler still writes a module whose dynamic import it dropped). It prints the
+file count and size of the bundle and of the folder, and how many chunks it
+left out.
 
 | Flag | Effect |
 | --- | --- |

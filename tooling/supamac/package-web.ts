@@ -354,6 +354,48 @@ export function assertBuiltFor(
 	}
 }
 
+/** A script chunk the bundler wrote, named with its content hash. */
+const CHUNK_FILE = /-[A-Za-z0-9_-]{8}\.js$/;
+
+/** Files whose text can name a chunk to load. */
+const REFERRING_FILE = /\.(?:html|js|css|json|webmanifest)$/;
+
+/**
+ * The chunks of a bundle that nothing can load: a hashed script whose name no
+ * other script, page, stylesheet or manifest of the bundle mentions, also
+ * counting a chunk only an unloadable chunk names. The bundler still writes a
+ * dynamically imported module whose import it dropped, such as a page a build
+ * leaves unregistered; publishing it would ship code nothing runs.
+ */
+export function unreferencedChunks(
+	files: string[],
+	read: (file: string) => string,
+): string[] {
+	const texts = new Map(
+		files
+			.filter((file) => REFERRING_FILE.test(file))
+			.map((file) => [file, read(file)] as const),
+	);
+	const unloadable = new Set<string>();
+	let changed = true;
+	while (changed) {
+		changed = false;
+		for (const chunk of files) {
+			if (!CHUNK_FILE.test(chunk) || unloadable.has(chunk)) continue;
+			const name = basename(chunk);
+			const named = [...texts].some(
+				([file, text]) =>
+					file !== chunk && !unloadable.has(file) && text.includes(name),
+			);
+			if (!named) {
+				unloadable.add(chunk);
+				changed = true;
+			}
+		}
+	}
+	return files.filter((file) => unloadable.has(file));
+}
+
 function folderSize(directory: string, files: string[]): FolderSize {
 	let bytes = 0;
 	for (const file of files) bytes += statSync(join(directory, file)).size;
@@ -365,6 +407,7 @@ export function packageWeb(options: PackageOptions): {
 	bundle: FolderSize;
 	published: FolderSize;
 	manifest: string;
+	unloadable: string[];
 } {
 	const basePath = parseBasePath(options.basePath);
 	const backendOrigin = parseBackendOrigin(options.backendOrigin);
@@ -374,7 +417,12 @@ export function packageWeb(options: PackageOptions): {
 	}
 
 	const bundle = listFiles(options.dist);
+	const unloadable = unreferencedChunks(bundle, (file) =>
+		readFileSync(join(options.dist, file), "utf8"),
+	);
+	const left = new Set(unloadable.flatMap((file) => [file, `${file}.map`]));
 	const kept = bundle.filter((file) => {
+		if (left.has(file)) return false;
 		if (!options.keepSourceMaps && file.endsWith(".map")) return false;
 		if (options.omitVideos && file.startsWith("web-hosted/")) return false;
 		return true;
@@ -415,6 +463,7 @@ export function packageWeb(options: PackageOptions): {
 		bundle: folderSize(options.dist, bundle),
 		published: folderSize(options.out, published),
 		manifest,
+		unloadable,
 	};
 }
 
@@ -457,6 +506,9 @@ function main(): void {
 		);
 		console.log(
 			`Folder to publish: ${result.published.files} files, ${megabytes(result.published)} MB in ${values.out}`,
+		);
+		console.log(
+			`Left out ${result.unloadable.length} chunks nothing loads`,
 		);
 		console.log(`Upload order: ${result.manifest}`);
 	} catch (error) {
