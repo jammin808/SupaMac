@@ -36,6 +36,8 @@ async fn configured_service_host_can_initialize_but_other_hosts_are_rejected() {
     for (host, expected) in [
         ("agent-harness-service:8080", StatusCode::OK),
         ("unconfigured.test", StatusCode::FORBIDDEN),
+        // No host is admitted that the deployment did not configure.
+        ("gateway.macro.com", StatusCode::FORBIDDEN),
     ] {
         let response = app.clone().oneshot(Request::post("/mcp")
             .header("host", host)

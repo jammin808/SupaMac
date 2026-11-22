@@ -9,6 +9,7 @@ use macro_authorization::{
     InternalIdentityClaims, MacroAuthorizationError, MacroAuthorizationService,
     MacroAuthorizationState,
 };
+use macro_user_id::user_id::MacroUserIdStr;
 use model_user::UserContext;
 use rootcause::Report;
 use serde_json::{Value, json};
@@ -22,7 +23,7 @@ use crate::inbound::axum_router::{SystemStatusRouterState, system_status_router}
 
 const STAFF_JWT: &str = "staff";
 const OUTSIDER_JWT: &str = "outsider";
-const STAFF_USER_ID: &str = "macro|oncall@macro.com";
+const STAFF_USER_ID: &str = "macro|oncall@example.com";
 const OUTSIDER_USER_ID: &str = "macro|ada@example.com";
 
 #[derive(Clone)]
@@ -63,10 +64,10 @@ impl MacroAuthorizationService for FakeAuthorizationService {
 
 fn router() -> axum::Router {
     system_status_router(SystemStatusRouterState {
-        service: Arc::new(SystemStatusServiceImpl::new(
-            FakeRepo::default(),
-            FakeBroadcaster::default(),
-        )),
+        service: Arc::new(
+            SystemStatusServiceImpl::new(FakeRepo::default(), FakeBroadcaster::default())
+                .with_staff([MacroUserIdStr::parse_from_str(STAFF_USER_ID).unwrap()]),
+        ),
         authorization_state: MacroAuthorizationState::new(Arc::new(FakeAuthorizationService)),
     })
 }

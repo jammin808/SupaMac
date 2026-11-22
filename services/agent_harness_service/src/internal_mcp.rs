@@ -42,7 +42,8 @@ fn toolset() -> AsyncToolCollection<SessionToolContext> {
         .add_tool::<TaskPullRequestsTool, SessionToolContext>()
 }
 
-/// Admit only the explicitly configured egress origins and standard gateway hosts.
+/// The hosts of the explicitly configured egress origins; [`router`] adds
+/// loopback and admits nothing else.
 pub(super) fn configured_hosts(urls: &[&str]) -> anyhow::Result<Vec<String>> {
     use anyhow::Context as _;
     urls.iter()
@@ -63,12 +64,7 @@ pub(super) fn router<A: AgentSessionRepo + 'static>(
     tools: InternalTools,
 ) -> Router {
     let mut hosts = hosts;
-    hosts.extend([
-        "localhost".into(),
-        "127.0.0.1".into(),
-        "gateway.macro.com".into(),
-        "dev-gateway.macro.com".into(),
-    ]);
+    hosts.extend(["localhost".into(), "127.0.0.1".into()]);
     let mut config = StreamableHttpServerConfig::default().with_allowed_hosts(hosts);
     config.legacy_session_mode = false;
     config.json_response = true;

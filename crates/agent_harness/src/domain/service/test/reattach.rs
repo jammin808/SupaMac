@@ -320,7 +320,8 @@ fn listing_harness() -> (
         crate::domain::pending::PendingCommands::new(),
         PromptMentionsMock::new(),
         NotifierMock::new(),
-    );
+    )
+    .with_sandbox_operators([staff_sender()]);
     turn_observer.bind(NoOpTurnObserver);
     (service, repo, runtimes, reports)
 }

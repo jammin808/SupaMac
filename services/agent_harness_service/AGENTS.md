@@ -413,7 +413,9 @@ Doppler validation binary validates each config. Stable public origins resolve
 once at startup through `macro_service_urls`: `McpPublicUrl` preserves the
 `mcp-server[-dev].macro.com` OAuth identity, `CognitionPublicUrl` preserves
 `document-cognition[-dev].macro.com` integration callbacks, and `AppServiceUrl`
-supplies browser links and preview form origin. Preview control accepts the
+supplies browser links and preview form origin. A SupaMac stack sets both public
+origins through `OVERRIDE_MCP_PUBLIC_URL` and `OVERRIDE_COGNITION_PUBLIC_URL`
+(`infra/self-hosted/compose.yaml`). Preview control accepts the
 `PreviewGatewayUrl` host (plus app/loopback hosts locally). Use process-level
 `OVERRIDE_*` values for local instances; each computer enrollment carries a
 typed `Deployment` resolved from this process's `macro_service_urls` values
@@ -520,7 +522,8 @@ listener failure shuts down the process so ECS can replace the task.
 Local MCP uses both configured egress addresses in the in-process catalog;
 the public MCP transport permits its typed service hostname as well as its
 public hostname. Internal MCP also permits the configured local computer egress
-bridge hostname, preserving Host validation for other origins.
+bridge hostname, preserving Host validation for other origins. Besides those
+configured hosts both admit only loopback: no gateway host is built in.
 
 ## Related
 

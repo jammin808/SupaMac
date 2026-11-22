@@ -356,6 +356,28 @@ mod tests {
         assert!(in_app.contains("non-Markdown documents"));
         assert!(in_app.contains("apply to your own conversational replies only"));
     }
+
+    #[test]
+    fn static_prompts_send_the_model_to_no_documentation_site() {
+        // Item links come from the deployment's base url; nothing static names
+        // a host the model could fetch or hand to a user.
+        for (name, prompt) in [
+            ("tool use", TOOL_USE_PROMPT.to_string()),
+            ("direct tool use", DIRECT_TOOL_USE_PROMPT.to_string()),
+            ("session", SESSION_TOOL_USE_PROMPT.to_string()),
+            ("code mode", CODE_MODE_SESSION_TOOL_USE_PROMPT.to_string()),
+            ("mcp", MCP_STATIC_INSTRUCTIONS.to_string()),
+            (
+                "database read-only",
+                DATABASE_READ_ONLY_TOOL_USE_PROMPT.to_string(),
+            ),
+        ] {
+            assert!(
+                !prompt.contains("macro.com"),
+                "{name} prompt names macro.com"
+            );
+        }
+    }
 }
 
 /// Compose runtime sections in their supplied order without retaining their data.

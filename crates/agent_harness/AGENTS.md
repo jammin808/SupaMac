@@ -227,6 +227,9 @@ agent or routine attribution, or the execution header).
 
 ## Gotchas
 
+- Only the accounts named with `AgentHarnessService::with_sandbox_operators`
+  may open, prompt or edit the queue of a sandboxed coder (Daytona) session;
+  with none named, nobody may. No email domain makes an account an operator.
 - A session's first prompt carries static files from the mentioning message
   and the rest of its thread (mention first, then root and replies), capped
   at 8 and deduped by file id; follow-ups carry only their own files.

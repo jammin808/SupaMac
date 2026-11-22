@@ -95,10 +95,10 @@ fn disconnected_harness_errors_keep_the_session_error_classification() {
     ));
 }
 
-/// A sender whose email domain is `is_macro_staff` - the identity the
-/// Daytona staff gate admits.
+/// The sandbox operator every test bench names (`with_sandbox_operators`) -
+/// the identity the Daytona gate admits.
 fn staff_sender() -> MacroUserIdStr<'static> {
-    MacroUserIdStr::try_from_email("staff@macro.com").expect("a valid user id")
+    MacroUserIdStr::try_from_email("operator@example.com").expect("a valid user id")
 }
 
 fn open_command() -> OpenSession {
@@ -165,7 +165,7 @@ fn mention_origin_mut(command: &mut OpenSession) -> &mut MentionOrigin {
 /// the announcing case.
 fn forward_message(content: &str) -> DeliverAction {
     // Staff: `disconnected_session` is a Daytona coder bot, and the
-    // execute() gate admits only macro.com actors onto those.
+    // execute() gate admits only the bench's sandbox operator onto those.
     DeliverAction {
         context: Some(trigger()),
         ..DeliverAction::prompt(
@@ -644,7 +644,8 @@ fn harness_with_journal_and_policy(
         crate::domain::pending::PendingCommands::new(),
         mentions,
         notifier.clone(),
-    );
+    )
+    .with_sandbox_operators([staff_sender()]);
     let service = match journal {
         Some(journal) => service.with_conversation_turns(journal),
         None => service,
@@ -729,7 +730,8 @@ fn harness_sharing_repo_with_bindings(
         crate::domain::pending::PendingCommands::new(),
         PromptMentionsMock::new(),
         NotifierMock::new(),
-    );
+    )
+    .with_sandbox_operators([staff_sender()]);
     turn_observer.bind(NoOpTurnObserver);
     service
 }
@@ -2078,6 +2080,28 @@ async fn a_prompt_through_control_reaches_the_agent_without_announcing() {
     );
 }
 
+/// A harness that names no sandbox operators runs no sandboxed coder for
+/// anyone: no email domain makes its holder an operator.
+#[tokio::test]
+async fn without_sandbox_operators_nobody_opens_a_sandboxed_coder() {
+    let service = harness_sharing_repo(InMemoryAgentSessionRepo::new())
+        .with_sandbox_operators(std::iter::empty());
+    for sender in [
+        staff_sender(),
+        MacroUserIdStr::try_from_email("staff@macro.com").unwrap(),
+    ] {
+        let mut command = open_command();
+        command.bot_id = bot_id::MACRO_CODER_BOT_ID;
+        mention_origin_mut(&mut command).sender = sender;
+        assert!(matches!(
+            service
+                .execute(AgentSessionId::new(), HarnessCommand::Open(command))
+                .await,
+            Err(HarnessError::Session(AgentSessionError::Forbidden))
+        ));
+    }
+}
+
 #[tokio::test]
 async fn a_non_staff_control_event_cannot_drive_a_sandboxed_coder_session() {
     let (service, _repo, containers, _announcer, _runtimes) = harness();
@@ -3408,7 +3432,8 @@ async fn a_managed_session_opens_as_the_managed_default_bot() {
         crate::domain::pending::PendingCommands::new(),
         crate::domain::ports::NoPromptMentions,
         crate::domain::ports::NoopAgentSessionNotifier,
-    );
+    )
+    .with_sandbox_operators([staff_sender()]);
 
     let session = service
         .open_managed_session(agent_session::domain::ports::OpenManagedSession {
@@ -3989,7 +4014,8 @@ async fn commands_for_a_peer_managed_session_forward_through_redis() {
         crate::domain::pending::PendingCommands::new(),
         crate::domain::ports::NoPromptMentions,
         crate::domain::ports::NoopAgentSessionNotifier,
-    );
+    )
+    .with_sandbox_operators([staff_sender()]);
 
     service
         .execute(id, HarnessCommand::Delete)
@@ -4043,7 +4069,8 @@ async fn unmanaged_external_session_forwards_to_its_remote_harness() {
         crate::domain::pending::PendingCommands::new(),
         crate::domain::ports::NoPromptMentions,
         crate::domain::ports::NoopAgentSessionNotifier,
-    );
+    )
+    .with_sandbox_operators([staff_sender()]);
     let session = service
         .open_external_session(open_external_request("/srv/agent"))
         .await

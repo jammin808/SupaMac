@@ -64,7 +64,7 @@ use crate::domain::error::{HarnessError, Result};
 use crate::domain::model::{
     AgentKind, AnnounceOrigin, AnnouncePrompt, CommandOutcome, DeclinedMention, DeliverAction,
     HarnessCommand, HarnessDefaults, OpenSession, PromptPeople, ReplyOutcome, ResolvedReply,
-    SessionAnnouncement, SpawnContainer, ToolApprovalChange, is_macro_staff,
+    SessionAnnouncement, SpawnContainer, ToolApprovalChange,
 };
 use crate::domain::pending::PendingCommands;
 use crate::domain::ports::{
@@ -217,6 +217,10 @@ struct AgentHarnessInner<
     /// Whether an idle release that kept its session is tried again; `None`
     /// always retries.
     idle_release_retry: Option<Arc<dyn idle::IdleReleaseRetry>>,
+    /// The only people who may open, prompt or edit the queue of a sandboxed
+    /// coder session, which spends the deployment's sandbox provider. Empty
+    /// unless the deployment names them, so nobody may by default.
+    sandbox_operators: Vec<MacroUserIdStr<'static>>,
 }
 
 /// One handle on the orchestrator's state, shared by the service's clones
@@ -416,6 +420,7 @@ where
                 presented_shapes: DashMap::new(),
                 worker_idle_timeout: queue::WORKER_IDLE_TIMEOUT,
                 idle_release_retry: None,
+                sandbox_operators: Vec::new(),
             }),
             workers: Arc::new(DashMap::new()),
             repositories: None,
@@ -679,6 +684,18 @@ where
             }
         }
         Ok(())
+    }
+
+    /// Let `operators` open and prompt sandboxed coder sessions; nobody may
+    /// until this is set. Configure before sharing the harness.
+    pub fn with_sandbox_operators(
+        mut self,
+        operators: impl IntoIterator<Item = MacroUserIdStr<'static>>,
+    ) -> Self {
+        Arc::get_mut(&mut self.inner)
+            .expect("configure sandbox operators before sharing the harness")
+            .sandbox_operators = operators.into_iter().collect();
+        self
     }
 
     /// Configure shared admission before cloning the harness or starting workers.

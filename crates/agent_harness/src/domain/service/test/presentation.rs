@@ -82,7 +82,8 @@ async fn presentation_forward_ack_waits_for_the_remote_durable_pair() {
         crate::domain::pending::PendingCommands::new(),
         crate::domain::ports::NoPromptMentions,
         crate::domain::ports::NoopAgentSessionNotifier,
-    );
+    )
+    .with_sandbox_operators([staff_sender()]);
     let presentation = SessionToolPresentation {
         tool_call_id: "review_remote".into(),
         title: "mcp__macro_internal__PresentReview".into(),

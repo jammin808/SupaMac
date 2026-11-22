@@ -1259,6 +1259,9 @@ fn tool_schemas_are_valid() {
     ] {
         let validated = result.unwrap_or_else(|error| panic!("{name}: {error:?}"));
         assert_eq!(validated.name, name);
+        // The schemas describe item links by path: the host is the deployment's.
+        let text = validated.schema.to_value().to_string();
+        assert!(!text.contains("macro.com"), "{name} names a host: {text}");
     }
 
     let schema = schemars::schema_for!(Comment).to_value();

@@ -520,6 +520,7 @@ async fn creation_retries_repair_reservation_for_both_primary_key_and_thread_con
         PromptMentionsMock::new(),
         NotifierMock::new(),
     )
+    .with_sandbox_operators([staff_sender()])
     .with_external_replies(store.clone());
     let id = AgentSessionId::new();
     let source = macro_uuid::generate_uuid_v7();

@@ -58,6 +58,14 @@ where
         Ok(())
     }
 
+    /// Whether `user` is one of the sandbox operators the deployment named,
+    /// the only people a sandboxed coder session admits.
+    pub(super) fn is_sandbox_operator(&self, user: &MacroUserIdStr<'_>) -> bool {
+        self.sandbox_operators
+            .iter()
+            .any(|operator| operator.as_ref() == user.as_ref())
+    }
+
     /// A prompt reaches a registered runtime only while it may run there.
     /// Checked when it is accepted, and again when it dispatches: access
     /// removed while it waited must stop it too.

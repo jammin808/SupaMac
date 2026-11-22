@@ -316,15 +316,14 @@ fn build_redirect_uri_policy(config: &Config) -> RedirectUriPolicy {
     }
 }
 
-/// Public and typed service origins share this authenticated MCP transport.
+/// Public and typed service origins share this authenticated MCP transport;
+/// besides them it admits only loopback.
 fn server_config(public_host: String, service_host: String) -> StreamableHttpServerConfig {
     let mut config = StreamableHttpServerConfig::default().with_allowed_hosts([
         public_host,
         service_host,
         "localhost".into(),
         "127.0.0.1".into(),
-        "gateway.macro.com".into(),
-        "dev-gateway.macro.com".into(),
     ]);
     config.legacy_session_mode = false;
     config.json_response = true;

@@ -172,6 +172,8 @@ fn parses_task_ids_links_and_macro_references() {
         format!("https://macro.com/app/task/{TASK}"),
         format!("https://dev.macro.com/app/task/{TASK}/?tab=activity#top"),
         format!("http://localhost:3000/app/task/{TASK}"),
+        // An app served under a base path.
+        format!("https://work.example.com/supamac/app/task/{TASK}"),
         format!("MACRO-{short}"),
         format!("macro-{short}"),
     ] {
@@ -184,6 +186,7 @@ fn parses_task_ids_links_and_macro_references() {
         "not-a-task",
         &format!("https://macro.com/app/md/{TASK}"),
         &format!("https://macro.com/app/task/{TASK}/comments"),
+        &format!("https://work.example.com/supamac/app/md/{TASK}"),
         &format!("{TASK}x"),
     ] {
         assert!(
@@ -194,6 +197,12 @@ fn parses_task_ids_links_and_macro_references() {
             "{invalid}"
         );
     }
+    // The refusal describes a link by its path; the host is the deployment's.
+    assert!(
+        !SessionTaskError::InvalidTaskReference
+            .to_string()
+            .contains("://")
+    );
 }
 
 #[tokio::test]

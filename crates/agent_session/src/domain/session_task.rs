@@ -22,7 +22,7 @@ mod test;
 pub enum SessionTaskError {
     /// The input names no task in a form this accepts.
     #[error(
-        "expected a Macro task id, a MACRO-<id> reference, or a task link like https://macro.com/app/task/<id>"
+        "expected a Macro task id, a MACRO-<id> reference, or a task link whose path ends in /app/task/<id>"
     )]
     InvalidTaskReference,
     /// The task does not exist, or the session owner cannot view it.
@@ -46,12 +46,12 @@ type Result<T, E = SessionTaskError> = std::result::Result<T, E>;
 pub struct TaskDocumentId(String);
 
 impl TaskDocumentId {
-    /// Accept a task document id, a `MACRO-{short id}` reference, or a link whose path is
-    /// `/app/task/{id}`.
+    /// Accept a task document id, a `MACRO-{short id}` reference, or a link whose path ends in
+    /// `/app/task/{id}`, under whatever base path the app is served from.
     pub fn parse(input: &str) -> Result<Self> {
         let input = input.trim();
         if let Some((_, id)) = lazy_regex::regex_captures!(
-            r"\A(?i:https?)://[^/\s?#]+/app/task/([^/\s?#]+)/*(?:[?#]\S*)?\z",
+            r"\A(?i:https?)://[^/\s?#]+(?:/[^\s?#]*)?/app/task/([^/\s?#]+)/*(?:[?#]\S*)?\z",
             input
         ) {
             return Self::from_uuid(id);

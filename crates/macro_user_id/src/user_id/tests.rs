@@ -104,21 +104,34 @@ fn debug_output_is_simple_string() {
 }
 
 #[test]
-fn macro_com_users_are_staff() {
-    let id = MacroUserIdStr::parse_from_str("macro|teo@macro.com").unwrap();
-    assert!(id.is_macro_staff());
+fn no_account_is_staff_whatever_its_domain() {
+    for id in [
+        "macro|teo@macro.com",
+        "macro|teo+notify@macro.com",
+        "macro|teo@MACRO.COM",
+        "macro|teo@example.com",
+    ] {
+        let id = MacroUserIdStr::parse_from_str(id).unwrap();
+        assert!(!id.is_macro_staff(), "{id:?} is staff");
+    }
 }
 
+/// Lookalikes of a real address are not addresses: a second `@`, a trailing
+/// dot, a space or a non-ASCII label never parse.
 #[test]
-fn macro_com_plus_aliases_are_staff() {
-    let id = MacroUserIdStr::parse_from_str("macro|teo+notify@macro.com").unwrap();
-    assert!(id.is_macro_staff());
-}
-
-#[test]
-fn non_macro_domains_are_not_staff() {
-    let id = MacroUserIdStr::parse_from_str("macro|teo@example.com").unwrap();
-    assert!(!id.is_macro_staff());
+fn lookalike_addresses_do_not_parse() {
+    for not_an_email in [
+        "someone@example.com@evil.test",
+        "someone@example.com.",
+        "someone@example com",
+        "someone@exаmple.com", // Cyrillic 'а'
+        "not-an-email",
+    ] {
+        assert!(
+            MacroUserIdStr::try_from_email(not_an_email).is_err(),
+            "parsed {not_an_email}"
+        );
+    }
 }
 
 #[test]
