@@ -31,7 +31,7 @@ impl ColleagueJoinedMacro {
     }
 
     fn signup_url(&self) -> Url {
-        signup_url(Environment::new_or_prod())
+        signup_url(web_app_url())
     }
 
     /// The notification service signs this into a link that stops these notices.

@@ -523,10 +523,10 @@ impl<R: MailboxProjectionRepository, E: MailboxProjectionEffects> MailboxProject
                     {
                         self.effects.publish(event.with_event_id(lease.id)).await?;
                     }
-                    if should_notify(import, *is_new, current) {
-                        for notification in notifications(lease, &context) {
-                            self.effects.notify(notification).await?;
-                        }
+                    if should_notify(import, *is_new, current)
+                        && let Some(notification) = notification(&context)
+                    {
+                        self.effects.notify(notification).await?;
                     }
                 }
                 self.reindex(&context.link, *thread_id, effects).await?;
@@ -751,43 +751,32 @@ fn correspondence(context: &ProjectionContext) -> CorrespondenceProjection {
     result
 }
 
-fn notifications(lease: &ProjectionLease, context: &ProjectionContext) -> Vec<MailboxNotification> {
-    let Some(current) = &context.message else {
-        return Vec::new();
-    };
+/// One new-mail notification for every viewer of the inbox, for Signal mail
+/// only. Its id is the message's, so a retried projection repeats it.
+fn notification(context: &ProjectionContext) -> Option<MailboxNotification> {
+    let current = context.message.as_ref()?;
     let message = &current.message;
-    let mut notifications = Vec::new();
-    for staff in [true, false] {
-        let recipients: HashSet<_> = context
-            .viewers
-            .iter()
-            .filter(|id| id.is_macro_staff() == staff)
-            .filter(|_| current.is_signal || context.link.macro_id.is_macro_staff())
-            .cloned()
-            .collect();
-        if recipients.is_empty() {
-            continue;
-        }
-        notifications.push(MailboxNotification {
-            id: if staff { lease.id } else { message.db_id },
-            recipients,
-            sender: message
-                .from
-                .as_ref()
-                .map(|c| c.name.clone().unwrap_or_else(|| c.email.clone())),
-            sender_id: message
-                .from
-                .as_ref()
-                .and_then(|c| MacroUserIdStr::try_from_email(&c.email).ok()),
-            to_email: context.link.email_address.0.as_ref().to_owned(),
-            subject: message.subject.clone().unwrap_or_default(),
-            snippet: message.snippet.clone().unwrap_or_default(),
-            thread_id: message.thread_db_id,
-            signal: current.is_signal,
-            push: staff && current.is_signal,
-        });
+    if !current.is_signal || context.viewers.is_empty() {
+        return None;
     }
-    notifications
+    Some(MailboxNotification {
+        id: message.db_id,
+        recipients: context.viewers.clone(),
+        sender: message
+            .from
+            .as_ref()
+            .map(|c| c.name.clone().unwrap_or_else(|| c.email.clone())),
+        sender_id: message
+            .from
+            .as_ref()
+            .and_then(|c| MacroUserIdStr::try_from_email(&c.email).ok()),
+        to_email: context.link.email_address.0.as_ref().to_owned(),
+        subject: message.subject.clone().unwrap_or_default(),
+        snippet: message.snippet.clone().unwrap_or_default(),
+        thread_id: message.thread_db_id,
+        signal: current.is_signal,
+        push: false,
+    })
 }
 
 fn organization_event(

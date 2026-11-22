@@ -28,6 +28,9 @@ use properties::{PropertiesService as _, domain::model::TagScope};
 use reqwest::StatusCode;
 use system_properties::{PriorityOption, StatusOption, SystemPropertyKey};
 
+#[cfg(test)]
+mod test;
+
 /// Also the name `get_starter_docs` resolves the guide by, so the two stay in
 /// sync from one definition.
 pub(in crate::api) const HOW_TO_GUIDE_NAME: &str = "Macro how to guide";
@@ -80,6 +83,16 @@ const STARTER_TASKS: [StarterTask; 3] = [
 /// web client invalidates those lists and provisioned properties on this
 /// message.
 const STARTER_DOCS_INITIALIZED_MESSAGE_TYPE: &str = "starter_docs_initialized";
+
+/// Stands for the web app's address, without a trailing slash, in the
+/// templates' links (`WEB_APP_URL/settings/shortcuts`).
+const WEB_APP_URL_PLACEHOLDER: &str = "WEB_APP_URL";
+
+/// The web app the starter documents link to: the root the invitation emails
+/// link to, without its trailing slash.
+fn web_app_url() -> &'static str {
+    invite_email::web_app_url().as_str().trim_end_matches('/')
+}
 
 /// Label of the personal tag applied to every starter doc.
 const DOCS_TAG_LABEL: &str = "docs";
@@ -191,7 +204,7 @@ pub async fn handler(
     let docs_tag = resolve_docs_tag(&state, user_id).await;
     let mut incomplete = docs_tag.is_none();
     let fill = |template: &str| {
-        let mut filled = template.to_string();
+        let mut filled = template.replace(WEB_APP_URL_PLACEHOLDER, web_app_url());
         if let Some((tag_definition_id, tag_option_id)) = docs_tag {
             filled = filled
                 .replace("DOCS_TAG_OPTION_ID", &tag_option_id.to_string())

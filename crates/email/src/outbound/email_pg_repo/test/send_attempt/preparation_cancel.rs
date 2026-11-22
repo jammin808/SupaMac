@@ -17,7 +17,7 @@ async fn admit_and_claim(pool: &Pool<Postgres>) -> anyhow::Result<(SendAttemptId
     EmailPgRepo::new(pool.clone())
         .admit_send(&actor(), link(), attempt, input)
         .await?;
-    let claim = claim_delivery(pool, link(), message(), 300)
+    let claim = claim_delivery(pool, link(), message(), 300, "example.com")
         .await?
         .expect("due send must be claimable");
     Ok((attempt, claim))
@@ -71,7 +71,7 @@ async fn active_backed_off_and_expired_preparation_can_be_cancelled(
         assert!(restored.is_draft);
         assert_eq!(restored.body_text.as_deref(), Some("Editable body"));
         assert!(
-            claim_delivery(&pool, link(), message(), 300)
+            claim_delivery(&pool, link(), message(), 300, "example.com")
                 .await?
                 .is_none()
         );
@@ -150,7 +150,7 @@ async fn submitted_delivery_remains_locked_after_lease_expiry(
             .await,
         Err(EmailErr::MessageDeliveryConflict(_))
     ));
-    let recovered = claim_delivery(&pool, link(), message(), 300)
+    let recovered = claim_delivery(&pool, link(), message(), 300, "example.com")
         .await?
         .unwrap();
     assert!(recovered.requires_reconciliation);

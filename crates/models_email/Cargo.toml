@@ -10,6 +10,7 @@ base64 = { workspace = true }
 chrono = { workspace = true }
 email_utils = { path = "../email_utils" }
 mailparse = { workspace = true }
+macro_env_var = { path = "../macro_env_var" }
 macro_user_id = { path = "../macro_user_id" }
 models_pagination = { path = "../models_pagination" }
 schemars = { workspace = true }

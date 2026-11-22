@@ -19,7 +19,7 @@ async fn deletion_retains_delivery_and_reconciliation_after_submission(
     repo.admit_send(&actor(), link(), attempt, approved).await?;
     sqlx::query!("UPDATE email_scheduled_messages SET send_time=NOW()-INTERVAL '1 minute' WHERE message_id=$1", message()).execute(&pool).await?;
     assert!(!delete_db_message(&pool, message()).await?);
-    let claim = delivery::claim_delivery(&pool, link(), message(), 300)
+    let claim = delivery::claim_delivery(&pool, link(), message(), 300, "example.com")
         .await?
         .unwrap();
     assert!(!claim.requires_reconciliation);
@@ -32,7 +32,7 @@ async fn deletion_retains_delivery_and_reconciliation_after_submission(
             .await?
             .is_none()
     );
-    let recovery = delivery::claim_delivery(&pool, link(), message(), 300)
+    let recovery = delivery::claim_delivery(&pool, link(), message(), 300, "example.com")
         .await?
         .unwrap();
     assert!(recovery.requires_reconciliation);

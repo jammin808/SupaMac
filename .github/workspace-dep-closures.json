@@ -6677,6 +6677,7 @@
       "crates/cowlike",
       "crates/email_db_client",
       "crates/email_utils",
+      "crates/macro_env_var",
       "crates/macro_user_id",
       "crates/macro_uuid",
       "crates/model-error-response",
@@ -12257,6 +12258,7 @@
     "models_email": [
       "crates/cowlike",
       "crates/email_utils",
+      "crates/macro_env_var",
       "crates/macro_user_id",
       "crates/model-error-response",
       "crates/models_email",

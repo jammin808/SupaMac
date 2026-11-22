@@ -288,11 +288,11 @@ pub struct InboxSyncNotification {
     pub snippet: String,
     /// Parsed sender identity, when available.
     pub sender_id: Option<MacroUserIdStr<'static>>,
-    /// Owner and valid delegated recipients in this partition.
+    /// Owner and valid delegated recipients.
     pub recipients: std::collections::HashSet<MacroUserIdStr<'static>>,
     /// Send the realtime notification for a Signal message.
     pub realtime: bool,
-    /// Enable APNS for the staff Signal partition.
+    /// Also send an APNS push. Inbox sync never does.
     pub apns: bool,
 }
 

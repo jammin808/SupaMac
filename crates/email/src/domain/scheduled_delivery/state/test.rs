@@ -156,7 +156,7 @@ impl DeliveryTransitions for Fake {
 }
 async fn claim(fake: Fake) -> (Arc<Fake>, Option<DeliveryClaim>) {
     let fake = Arc::new(fake);
-    let result = claim_delivery(&Store(fake.clone()), LINK, MESSAGE, 300)
+    let result = claim_delivery(&Store(fake.clone()), LINK, MESSAGE, 300, "example.com")
         .await
         .unwrap();
     (fake, result)
@@ -226,7 +226,7 @@ async fn every_legacy_and_reconciliation_condition_keeps_the_existing_header_rul
             } else {
                 let header = result.message_id_header.unwrap();
                 assert!(header.starts_with(&format!("{MESSAGE}.")));
-                assert!(header.ends_with("@send.macro.com"));
+                assert!(header.ends_with("@example.com"));
             }
             assert_eq!(
                 fake.trace(),
@@ -256,7 +256,7 @@ async fn claim_failures_keep_the_original_error_and_never_commit_after_a_failure
         let mut fake = Fake::ready();
         fake.fail = Some(fail);
         let fake = Arc::new(fake);
-        let error = claim_delivery(&Store(fake.clone()), LINK, MESSAGE, 300)
+        let error = claim_delivery(&Store(fake.clone()), LINK, MESSAGE, 300, "example.com")
             .await
             .err()
             .unwrap();

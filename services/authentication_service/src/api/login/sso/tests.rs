@@ -8,6 +8,7 @@ use super::*;
 
 #[test]
 fn allowed_original_urls_are_accepted() {
+    let frontend_origin = Url::parse("https://example.com/supamac/").unwrap();
     for original_url in [
         "macro://login",
         "macro:///welcome",
@@ -18,13 +19,12 @@ fn allowed_original_urls_are_accepted() {
         "https://tauri.localhost/app/login",
         "http://localhost:3000/app/login",
         "https://localhost/app/login",
-        "https://dev.macro.com/app/login",
-        "https://macro.com/app/login",
-        "https://www.macro.com/app/login",
+        "https://example.com/supamac/login",
+        "https://example.com/supamac/inbox-link-callback",
     ] {
         let original_url = Url::parse(original_url).expect("test URL should parse");
         assert!(
-            is_allowed_original_url(&original_url),
+            is_allowed_original_url_with_frontend_origin(&original_url, Some(&frontend_origin)),
             "{original_url} should be allowed"
         );
     }
@@ -32,21 +32,22 @@ fn allowed_original_urls_are_accepted() {
 
 #[test]
 fn untrusted_original_urls_are_rejected() {
+    let frontend_origin = Url::parse("https://example.com/supamac/").unwrap();
     for original_url in [
-        "https://example.com/app/login",
-        "https://macro.com.example.com/app/login",
-        "https://www.macro.com.example.com/app/login",
-        "https://staging.macro.com/app/login",
+        "https://www.example.com/supamac/login",
+        "https://example.com.example.org/supamac/login",
+        "http://example.com/supamac/login",
+        "https://macro.com/app/login",
+        "https://www.macro.com/app/login",
+        "https://dev.macro.com/app/login",
         "http://macro.com/app/login",
-        "http://www.macro.com/app/login",
-        "http://dev.macro.com/app/login",
         "tauri://example.com/app/login",
         "http://127.0.0.1:3000/app/login",
         "javascript:alert('redirected')",
     ] {
         let original_url = Url::parse(original_url).expect("test URL should parse");
         assert!(
-            !is_allowed_original_url(&original_url),
+            !is_allowed_original_url_with_frontend_origin(&original_url, Some(&frontend_origin)),
             "{original_url} should be rejected"
         );
     }
@@ -237,11 +238,11 @@ fn local_frontend_origin_is_accepted_only_when_configured() {
     let origin = Url::parse("https://peter-dev:29809").unwrap();
     for path in ["/app/login", "/app/inbox-link-callback"] {
         let url = origin.join(path).unwrap();
-        assert!(is_allowed_original_url_with_local_origin(
+        assert!(is_allowed_original_url_with_frontend_origin(
             &url,
             Some(&origin)
         ));
-        assert!(!is_allowed_original_url_with_local_origin(&url, None));
+        assert!(!is_allowed_original_url_with_frontend_origin(&url, None));
     }
 }
 
@@ -259,12 +260,12 @@ fn local_frontend_origin_requires_exact_https_origin_without_credentials() {
     ] {
         let url = Url::parse(candidate).unwrap();
         assert!(
-            !is_allowed_original_url_with_local_origin(&url, Some(&origin)),
+            !is_allowed_original_url_with_frontend_origin(&url, Some(&origin)),
             "{url}"
         );
     }
     let http_origin = Url::parse("http://peter-dev:29809").unwrap();
-    assert!(!is_allowed_original_url_with_local_origin(
+    assert!(!is_allowed_original_url_with_frontend_origin(
         &http_origin,
         Some(&http_origin)
     ));

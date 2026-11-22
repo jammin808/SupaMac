@@ -44,6 +44,7 @@ local_auth = ["macro_authorization/local_auth"]
 location_check = []
 
 [dependencies]
+invite_email = { path = "../../crates/invite_email" }
 passwords = { path = "../../crates/passwords" }
 password_events = { path = "../../crates/password_events" }
 agent_correlation = { path = "../../crates/agent_correlation", features = ["http", "postgres"] }

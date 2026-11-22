@@ -98,6 +98,20 @@ fn every_rendered_sign_in_template_is_hidden() {
 }
 
 #[test]
+fn the_configured_auth_sender_is_a_sign_in_sender() {
+    let configured = Some("no-reply@example.com");
+    assert!(is_sign_in_sender("no-reply@example.com", configured));
+    assert!(is_sign_in_sender(
+        "Example <No-Reply@Example.com>",
+        configured
+    ));
+    // The configured sender adds to the built-in ones.
+    assert!(is_sign_in_sender("auth@macro.com", configured));
+    assert!(!is_sign_in_sender("no-reply@example.com", None));
+    assert!(!is_sign_in_sender("someone@example.com", configured));
+}
+
+#[test]
 fn mail_from_anyone_else_is_not_a_sign_in() {
     assert!(!is_macro_sign_in_sender("someone@example.com"));
     assert!(!is_macro_sign_in_sender(

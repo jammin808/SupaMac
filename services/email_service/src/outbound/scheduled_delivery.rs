@@ -20,6 +20,7 @@ use email::domain::send_attempt::{PreparedSendContentUnavailable, SendSnapshot};
 use email_api_client::domain::models::{EmailApiError, PreparedSendMessage, SendRequest, SentIds};
 use macro_event_broker::{KafkaEventPublisher, MacroEventBroker, MacroEventBrokerService};
 use macro_user_id::cowlike::CowLike as _;
+use macro_user_id::email::ReadEmailParts as _;
 use macro_user_id::user_id::MacroUserIdStr;
 use models_email::service::{attachment::AttachmentDraft, link::Link, message::MessageToSend};
 use std::time::Instant;
@@ -103,25 +104,29 @@ impl ScheduledDeliveryRepo for ScheduledDeliveryAdapter {
         ) {
             return Ok(None);
         }
-        Ok(
-            delivery::claim_delivery(&self.db, link_id, message_id, DELIVERY_LEASE_SECONDS)
-                .await?
-                .map(|delivery| {
-                    tracing::info!(event = "email_send.claim_acquired", %link_id, %message_id,
-                        claim_id = %delivery.token.0,
-                        reconcile = delivery.requires_reconciliation,
-                        send_lateness_ms = (Utc::now() - delivery.schedule.send_time).num_milliseconds().max(0),
-                        "email delivery claim acquired");
-                    ClaimedDelivery {
-                        mode: if delivery.requires_reconciliation {
-                            DeliveryMode::Reconcile
-                        } else {
-                            DeliveryMode::Send
-                        },
-                        claim: ScheduledClaim { link, delivery },
-                    }
-                }),
+        Ok(delivery::claim_delivery(
+            &self.db,
+            link_id,
+            message_id,
+            DELIVERY_LEASE_SECONDS,
+            link.email_address.0.domain_part(),
         )
+        .await?
+        .map(|delivery| {
+            tracing::info!(event = "email_send.claim_acquired", %link_id, %message_id,
+                claim_id = %delivery.token.0,
+                reconcile = delivery.requires_reconciliation,
+                send_lateness_ms = (Utc::now() - delivery.schedule.send_time).num_milliseconds().max(0),
+                "email delivery claim acquired");
+            ClaimedDelivery {
+                mode: if delivery.requires_reconciliation {
+                    DeliveryMode::Reconcile
+                } else {
+                    DeliveryMode::Send
+                },
+                claim: ScheduledClaim { link, delivery },
+            }
+        }))
     }
 
     async fn begin_send(&self, claim: &ScheduledClaim) -> anyhow::Result<bool> {

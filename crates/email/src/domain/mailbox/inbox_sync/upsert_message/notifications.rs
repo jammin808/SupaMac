@@ -79,9 +79,9 @@ where
         return Ok(());
     }
 
-    let Some(tier) = new_email_tier(ctx, link, message.thread_db_id).await? else {
+    if !thread_in_inbox(ctx, link, signal_filter(message.thread_db_id)).await? {
         return Ok(());
-    };
+    }
 
     let sender = sender_contact.map(|contact| {
         contact
@@ -101,7 +101,7 @@ where
         snippet: message.snippet.unwrap_or_default(),
         sender_id,
         recipients: HashSet::new(),
-        realtime: matches!(tier, NewEmailTier::Signal),
+        realtime: true,
         apns: false,
     };
 
@@ -118,42 +118,14 @@ where
             })
         })?;
 
-    let recipient_ids = build_notification_recipients(&link.macro_id, primaries);
-    let (staff_recipients, customer_recipients) = partition_email_push_recipients(recipient_ids);
-
-    if !staff_recipients.is_empty() {
-        let mut request = notification.clone();
-        request.recipients = staff_recipients;
-        request.apns = matches!(tier, NewEmailTier::Signal);
-        ctx.effects.notify(request).await;
-    }
-    if !customer_recipients.is_empty() {
+    let recipients = build_notification_recipients(&link.macro_id, primaries);
+    if !recipients.is_empty() {
         let mut request = notification;
-        request.recipients = customer_recipients;
+        request.recipients = recipients;
         ctx.effects.notify(request).await;
     }
 
     Ok(())
-}
-
-/// Split recipients so only `@macro.com` users are on the APNS path.
-fn partition_email_push_recipients(
-    recipient_ids: HashSet<MacroUserIdStr<'static>>,
-) -> (
-    HashSet<MacroUserIdStr<'static>>,
-    HashSet<MacroUserIdStr<'static>>,
-) {
-    recipient_ids
-        .into_iter()
-        .partition(|id| id.is_macro_staff())
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum NewEmailTier {
-    /// Everyone gets the in-app row; staff also get APNS.
-    Signal,
-    /// Staff dogfood: in-app row only.
-    StaffInbox,
 }
 
 fn signal_filter(thread_id: Uuid) -> Expr<EmailLiteral> {
@@ -203,26 +175,6 @@ where
         })?;
 
     Ok(!previews.is_empty())
-}
-
-async fn new_email_tier<L, R, G, Q, E>(
-    ctx: &InboxSyncService<L, R, G, Q, E>,
-    link: &link::Link,
-    thread_id: Uuid,
-) -> result::Result<Option<NewEmailTier>, ProcessingError>
-where
-    L: GmailOpsLinks,
-    R: InboxSyncImportRepository,
-    G: InboxSyncImportGmail,
-    Q: InboxSyncQueue,
-    E: MacroEventBroker + InboxSyncRefresher + InboxSyncImportEffects,
-{
-    if thread_in_inbox(ctx, link, signal_filter(thread_id)).await? {
-        return Ok(Some(NewEmailTier::Signal));
-    }
-    let staff_inbox = link.macro_id.is_macro_staff()
-        && thread_in_inbox(ctx, link, Expr::Literal(EmailLiteral::ThreadId(thread_id))).await?;
-    Ok(staff_inbox.then_some(NewEmailTier::StaffInbox))
 }
 
 /// Loads the newly upserted message, returning `None` for messages that never

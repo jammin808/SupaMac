@@ -32,8 +32,10 @@ invites, and the colleague-joined email.
 ## Boundaries
 
 - Depends on: `notification` (for `Notification`, `NotificationExtEmail`
-  types), `macro_env`, `macro_user_id`, `model-entity`.
-- Used by: `model_notifications`, `call`, `referral`.
+  types), `macro_env`, `macro_env_var`, `macro_service_urls`, `macro_user_id`,
+  `model-entity`.
+- Used by: `model_notifications`, `call`, `referral`, and `email_formatting`
+  for `web_app_url` and `email_logo_url`.
 
 ## Recipes
 
@@ -51,6 +53,14 @@ invites, and the colleague-joined email.
 
 ## Gotchas
 
+- Every link, and the header logo, starts from `web_app_url()`: the
+  `FRONTEND_ORIGIN` a stack names (a self-hosted stack's bundle folder, or a
+  developer stack's bare origin), or without one the typed `AppServiceUrl`; a
+  bare origin serves the app at `/app`. The document storage service seeds its
+  starter documents from the same root. Build a link
+  with `web_app_link`, never a literal `/app/...` path or host. The logo is
+  the bundle's `macro-email-logo.png` (192 × 192, shown at 36 × 36). The
+  emails name no support address.
 - The team invite email promises what joining gives (`InviteePlan`). The
   sender, `teams`' `invite_users_to_team`, derives it the way `join_team`
   grants entitlements: Pro only from an enterprise team or one with a

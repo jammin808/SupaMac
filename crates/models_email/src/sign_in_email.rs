@@ -1,13 +1,15 @@
 //! Macro's own sign-in emails, which an agent's program must not read: one
 //! that reads the code from the user's inbox can sign in as the user.
 
+use macro_env_var::maybe_env_vars;
 use serde_json::Value;
+use std::sync::LazyLock;
 
 #[cfg(test)]
 mod test;
 
-/// The addresses Macro sends sign-in mail from in each environment:
-/// FusionAuth's `default-from-email` (passwordless codes and email
+/// The addresses the FusionAuth stacks send sign-in mail from in each
+/// environment: their `default-from-email` (passwordless codes and email
 /// verification) and the local kickstart's `MAIL_FROM`. The auth service
 /// sends its account-merge codes and verification links from the same
 /// addresses, and nothing but auth mail comes from them.
@@ -18,6 +20,22 @@ const SIGN_IN_SENDERS: [&str; 4] = [
     "noreply@macro.local",
 ];
 
+maybe_env_vars! {
+    /// The address the deployment's auth mail comes from, which a
+    /// self-hosted deployment's identity server also sends sign-in codes
+    /// from. It is recognised beside [`SIGN_IN_SENDERS`], never instead of
+    /// them, so a deployment can only hide more mail from programs.
+    struct AuthSenderAddress;
+}
+
+/// The configured [`AuthSenderAddress`], read once per process. A value
+/// that is not an address recognises nothing.
+static CONFIGURED_SIGN_IN_SENDER: LazyLock<Option<String>> = LazyLock::new(|| {
+    let configured = AuthSenderAddress::new()?;
+    let address = configured.value()?.trim();
+    address.contains('@').then(|| address.to_owned())
+});
+
 /// What a program reads instead of a sign-in email's subject and text.
 pub const HIDDEN_SIGN_IN_EMAIL: &str =
     "Macro sign-in email (hidden from programs; the user can read it in Macro)";
@@ -26,6 +44,10 @@ pub const HIDDEN_SIGN_IN_EMAIL: &str =
 /// address or a `Name <address>` mailbox.
 #[must_use]
 pub fn is_macro_sign_in_sender(sender: &str) -> bool {
+    is_sign_in_sender(sender, CONFIGURED_SIGN_IN_SENDER.as_deref())
+}
+
+fn is_sign_in_sender(sender: &str, configured: Option<&str>) -> bool {
     let address = sender
         .rsplit_once('<')
         .and_then(|(_, rest)| rest.split_once('>'))
@@ -33,6 +55,8 @@ pub fn is_macro_sign_in_sender(sender: &str) -> bool {
         .trim();
     SIGN_IN_SENDERS
         .iter()
+        .copied()
+        .chain(configured)
         .any(|known| known.eq_ignore_ascii_case(address))
 }
 

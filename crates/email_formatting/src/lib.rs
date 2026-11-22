@@ -2,7 +2,7 @@ use askama::Template;
 use chrono::{DateTime, Utc};
 use hmac::Hmac;
 use macro_env::Environment;
-use macro_service_urls::NotificationServiceUrl;
+use macro_service_urls::{NotificationServiceUrl, Url};
 use macro_user_id::cowlike::CowLike;
 use model_notifications::NotifEvent;
 use notification::domain::models::{
@@ -28,6 +28,10 @@ struct DigestTemplate {
     total_count: usize,
     /// the signed url which allows a client to unsubscribe from the email in an unauthenticated context
     unsubscribe_url: SignedUrl,
+    /// the web app, which the header, each notification and the button open
+    app_url: Url,
+    /// the logo in the email's header
+    logo_url: Url,
 }
 
 struct NotifPreview {
@@ -123,6 +127,8 @@ impl EmailDigestNotification {
             num_truncated,
             total_count: input_len,
             unsubscribe_url,
+            app_url: invite_email::web_app_url().clone(),
+            logo_url: invite_email::email_logo_url(),
         }
         .render()?;
 

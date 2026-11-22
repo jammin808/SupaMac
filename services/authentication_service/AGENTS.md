@@ -336,6 +336,11 @@ inputs cannot select an agent, and ordinary user credentials remain unattributed
   works (`needs_reauth` false); the refusal stands either way. Mirrors
   Outlook's required-scope check in `src/domain/microsoft.rs`; Macro has no
   mailbox-less link for either provider.
+- A sign-in's or link's `original_url` is trusted only on the deployment's
+  own frontend origin (`api::utils::default_redirect_url`, exact scheme, host
+  and port, https only), `localhost`, or the apps' `macro:` and
+  `tauri://localhost` (`login::sso::is_allowed_original_url`); no other host
+  is listed.
 - `/oauth/redirect` without a code logs `auth_handoff_failure=missing_code`
   with FusionAuth's error. When the state names an allowed `original_url`, it
   sends the browser back there with `sso_error` (`admin_consent_required`,

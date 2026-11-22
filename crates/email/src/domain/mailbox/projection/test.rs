@@ -77,34 +77,25 @@ fn sent_drafts_trash_and_macro_notifications_do_not_notify() {
 }
 
 #[test]
-fn notification_retry_preserves_ids_and_staff_push_policy() {
+fn every_viewer_gets_one_notification_that_a_retry_repeats() {
     let context = context();
-    let lease = ProjectionLease {
-        id: Uuid::now_v7(),
-        lease_id: Uuid::now_v7(),
-        mailbox: MailboxKey {
-            link_id: context.link.id,
-            sync_generation: 1,
-            grant_generation: 1,
-        },
-        event: ProjectionEvent::LinkConnected {
-            actor_id: context.link.macro_id.to_string(),
-            is_new: true,
-        },
-        from_current_generation: true,
-        attempts: 1,
-        unfinished_claims: 0,
-    };
-    let first = notifications(&lease, &context);
-    let retry = notifications(&lease, &context);
-    assert_eq!(first.len(), 2);
-    assert_eq!(
-        first.iter().map(|n| n.id).collect::<Vec<_>>(),
-        retry.iter().map(|n| n.id).collect::<Vec<_>>()
-    );
-    assert!(first[0].push);
-    assert!(!first[1].push);
-    assert_ne!(first[0].id, first[1].id);
+    let first = notification(&context).unwrap();
+    let retry = notification(&context).unwrap();
+    let message = &context.message.as_ref().unwrap().message;
+    assert_eq!(first.id, message.db_id);
+    assert_eq!(retry.id, first.id);
+    assert_eq!(first.recipients, context.viewers);
+    assert!(!first.push);
+}
+
+#[test]
+fn mail_outside_signal_notifies_nobody() {
+    let mut context = context();
+    context.message.as_mut().unwrap().is_signal = false;
+    assert!(notification(&context).is_none());
+    // An upstream staff address as the inbox owner gets no exception.
+    context.link.macro_id = MacroUserIdStr::try_from("macro|staff@macro.com".to_owned()).unwrap();
+    assert!(notification(&context).is_none());
 }
 
 #[test]

@@ -17,7 +17,7 @@ fn unsubscribe_url_keeps_gateway_prefix() {
 }
 
 #[test]
-fn digest_logo_keeps_the_png_aspect_ratio() {
+fn digest_links_and_logo_come_from_the_web_app() {
     let unsubscribe_url = SignedUrl::new(
         NotificationServiceUrl::default_for_environment(Environment::Production)
             .parse_url()
@@ -25,17 +25,31 @@ fn digest_logo_keeps_the_png_aspect_ratio() {
         Hmac::<Sha256>::new_from_slice(b"test-secret").unwrap(),
     );
     let html = DigestTemplate {
-        notifs: Vec::new(),
+        notifs: vec![NotifPreview {
+            created_at: Utc::now(),
+            title: "Alice commented".to_string(),
+            body: "Looks good".to_string(),
+        }],
         num_truncated: 0,
-        total_count: 0,
+        total_count: 1,
         unsubscribe_url,
+        app_url: Url::parse("https://example.com/supamac/").unwrap(),
+        logo_url: Url::parse("https://example.com/supamac/macro-email-logo.png").unwrap(),
     }
     .render()
     .unwrap();
     let html = html.split_whitespace().collect::<Vec<_>>().join(" ");
     assert!(html.contains(
-        r#"src="https://static-file-service.macro.com/file/b911aba9-94a6-435c-aa16-8404739f13b0" width="54" height="36""#
+        r#"<a href="https://example.com/supamac/" style="text-decoration: none" ><img src="https://example.com/supamac/macro-email-logo.png" width="36" height="36""#
     ));
+    // The header, the notification's title and the button.
+    assert_eq!(
+        html.matches(r#"href="https://example.com/supamac/""#)
+            .count(),
+        3
+    );
+    assert!(!html.contains("https://macro.com"));
+    assert!(!html.contains("static-file-service"));
 }
 
 #[test]
@@ -73,6 +87,8 @@ fn digest_escapes_nameless_mention_placeholders() {
                 .unwrap(),
             Hmac::<Sha256>::new_from_slice(b"test-secret").unwrap(),
         ),
+        app_url: Url::parse("https://example.com/supamac/").unwrap(),
+        logo_url: Url::parse("https://example.com/supamac/macro-email-logo.png").unwrap(),
     }
     .render()
     .unwrap();

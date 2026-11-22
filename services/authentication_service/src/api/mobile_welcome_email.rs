@@ -162,14 +162,15 @@ pub async fn handler(
     // The "continue on desktop" link the phone confirmation screen promises.
     // The capture page's ad parameters ride along so the laptop session,
     // which is a different browser, still has them for PostHog.
-    let url = desktop_signup_url(&default_redirect_url(), &req.attribution);
+    let app = default_redirect_url();
+    let url = desktop_signup_url(&app, &req.attribution);
     if let Err(e) = ctx
         .ses_client
         .send_email(
             &ctx.auth_sender_address,
             req.email.trim(),
             DESKTOP_EMAIL_SUBJECT,
-            &desktop_email_html(&url),
+            &desktop_email_html(&app, &url),
         )
         .await
     {
@@ -289,8 +290,23 @@ fn escape_html_attr(value: &str) -> String {
         .replace('>', "&gt;")
 }
 
-fn desktop_email_html(url: &str) -> String {
+/// A file of the web app's bundle, which is served below `base` the way
+/// `desktop_signup_url` finds its pages.
+fn web_app_file(base: &url::Url, file: &str) -> url::Url {
+    let mut url = base.clone();
+    let path = url.path().trim_end_matches('/').to_string();
+    url.set_path(&format!("{path}/{file}"));
+    url.set_query(None);
+    url.set_fragment(None);
+    url
+}
+
+/// The email's header links to the web app at `app` and shows the icon its
+/// bundle serves.
+fn desktop_email_html(app: &url::Url, url: &str) -> String {
     let url = escape_html_attr(url);
+    let app_url = escape_html_attr(app.as_str());
+    let icon_url = escape_html_attr(web_app_file(app, "macro-email-icon.png").as_str());
     format!(
         r##"<!doctype html>
 <html lang="en">
@@ -312,8 +328,8 @@ fn desktop_email_html(url: &str) -> String {
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;">
             <tr>
               <td bgcolor="#ffffff" style="padding:36px 40px 40px;border:1px solid #e7e7e5;border-radius:12px;">
-                <a href="https://macro.com" style="text-decoration:none;">
-                  <img src="https://macro.com/app/macro-email-icon.png" width="48" height="48" alt="Macro" style="display:block;border:0;" />
+                <a href="{app_url}" style="text-decoration:none;">
+                  <img src="{icon_url}" width="48" height="48" alt="Macro" style="display:block;border:0;" />
                 </a>
                 <h1 style="margin:36px 0 16px;font-size:28px;line-height:36px;font-weight:600;letter-spacing:-0.5px;color:#222222;">{DESKTOP_EMAIL_SUBJECT}</h1>
                 <p style="margin:0 0 20px;font-size:16px;line-height:26px;color:#525252;">Macro is a better experience on desktop. Open this link to finish signing up — it only takes a minute.</p>
@@ -325,11 +341,6 @@ fn desktop_email_html(url: &str) -> String {
                   </tr>
                 </table>
                 <p style="margin:28px 0 0;font-size:14px;line-height:22px;color:#737373;">If you didn't request this, you can safely ignore this email.</p>
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:24px 16px 0;text-align:center;font-size:12px;line-height:20px;color:#737373;">
-                Need a hand? <a href="mailto:support@macro.com" style="color:#525252;text-decoration:underline;">Contact support</a>
               </td>
             </tr>
           </table>
@@ -418,7 +429,7 @@ mod tests {
                 ("signup_flow".into(), "mobile_email".into()),
             ]
         );
-        let html = desktop_email_html(&url);
+        let html = desktop_email_html(&prod, &url);
         assert!(html.contains("&amp;"));
         assert!(!html.contains("<script"));
         assert!(html.contains(DESKTOP_EMAIL_SUBJECT));
@@ -448,9 +459,24 @@ mod tests {
 
     #[test]
     fn desktop_email_links_to_signup() {
-        let html = desktop_email_html("https://macro.com/app/signup");
-        assert!(html.contains(r#"href="https://macro.com/app/signup""#));
+        let app = url::Url::parse("https://example.com/supamac/").unwrap();
+        let html = desktop_email_html(&app, "https://example.com/supamac/signup");
+        assert!(html.contains(r#"href="https://example.com/supamac/signup""#));
         assert!(html.contains(DESKTOP_EMAIL_SUBJECT));
+    }
+
+    #[test]
+    fn desktop_email_header_comes_from_the_web_app() {
+        let app = url::Url::parse("https://example.com/supamac/").unwrap();
+        let html = desktop_email_html(&app, "https://example.com/supamac/signup");
+        assert!(
+            html.contains(
+                r#"<a href="https://example.com/supamac/" style="text-decoration:none;">"#
+            )
+        );
+        assert!(html.contains(r#"<img src="https://example.com/supamac/macro-email-icon.png""#));
+        assert!(!html.contains("mailto:"));
+        assert!(!html.contains("macro.com"));
     }
 
     #[test]

@@ -104,6 +104,8 @@ def main() -> None:
         total_count=len(DUMMY_NOTIFS),
         num_truncated=0,
         unsubscribe_url="https://example.com/unsubscribe",
+        app_url="http://localhost:3000/app/",
+        logo_url="http://localhost:3000/app/macro-email-logo.png",
     )
     # Write to a temp file that persists until the script exits
     with tempfile.NamedTemporaryFile(
