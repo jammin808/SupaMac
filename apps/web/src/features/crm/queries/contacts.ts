@@ -1,3 +1,4 @@
+import { t } from '@app/lib/i18n';
 import { throwOnErr } from '@core/util/result';
 import { Telemetry } from '@macro-inc/observability';
 import { refreshActiveGraphqlSoupQueries } from '@queries/soup/graphql/active-queries';
@@ -8,7 +9,10 @@ import type { CrmContactDetailResponse } from '@service-storage/generated/schema
 import type { CrmContactResponse } from '@service-storage/generated/schemas/crmContactResponse';
 import { queryOptions, useMutation, useQuery } from '@tanstack/solid-query';
 import type { Accessor } from 'solid-js';
-import type { CrmRecordDependencies } from './dependencies';
+import type {
+  CrmQueryDependencies,
+  CrmRecordDependencies,
+} from './dependencies';
 import { crmKeys } from './keys';
 import { listCanIncludeCrmContacts } from './list-refresh';
 import {
@@ -103,9 +107,9 @@ export function useContactQuery(
  * team-scoped, so the write is a plain overwrite. Optimistically updates the
  * contact detail cache (with rollback on error) so the title flips
  * immediately, then invalidates it plus the parent company's Team list and
- * soup so every listing picks up the new name.
+ * soup so every listing picks up the new name. A rejected rename says so.
  */
-export function useSetContactNameMutation(deps: CrmRecordDependencies) {
+export function useSetContactNameMutation(deps: CrmQueryDependencies) {
   return useMutation(
     () => ({
       mutationFn: ({
@@ -131,6 +135,7 @@ export function useSetContactNameMutation(deps: CrmRecordDependencies) {
       // Roll back only if the cache still holds this mutation's optimistic
       // name — a stale failure must not clobber a newer rename's update.
       onError: (_err, { contactId }, context) => {
+        deps.feedback.failure(t('crm.contactEditFailed'));
         if (context?.previous) {
           deps.client.setQueryData<CrmContactResponse>(
             crmKeys.contact(contactId).queryKey,

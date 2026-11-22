@@ -1,5 +1,6 @@
 import { NIL_UUID } from '@app/features/next-soup/filters/filter-store';
 import { analytics } from '@app/lib/analytics';
+import { t } from '@app/lib/i18n';
 import { ThrownResultError, throwOnErr } from '@core/util/result';
 import type { CrmCompanyEntity } from '@entity';
 import { Telemetry } from '@macro-inc/observability';
@@ -20,7 +21,10 @@ import {
 import { type Accessor, createMemo } from 'solid-js';
 import type { CompanyImporter } from '../context/crm-sources';
 import { contactCompanySummary } from '../core/contact';
-import type { CrmRecordDependencies } from './dependencies';
+import type {
+  CrmQueryDependencies,
+  CrmRecordDependencies,
+} from './dependencies';
 import { crmKeys } from './keys';
 import { listCanIncludeCrm } from './list-refresh';
 import {
@@ -257,9 +261,9 @@ export function useCreateContactMutation(deps: CrmRecordDependencies) {
  * Optimistically updates the company detail and the summaries of loaded
  * contact details (with rollback on error) so the name flips immediately,
  * then invalidates them plus soup so the Customers listings pick up the new
- * name.
+ * name. A rejected rename says so.
  */
-export function useSetCompanyNameMutation(deps: CrmRecordDependencies) {
+export function useSetCompanyNameMutation(deps: CrmQueryDependencies) {
   return useMutation(
     () => ({
       mutationFn: ({ companyId, name }: { companyId: string; name: string }) =>
@@ -292,6 +296,7 @@ export function useSetCompanyNameMutation(deps: CrmRecordDependencies) {
       // Roll back only if the cache still holds this mutation's optimistic
       // name — a stale failure must not clobber a newer rename's update.
       onError: (_err, { companyId }, context) => {
+        deps.feedback.failure(t('crm.contactEditFailed'));
         if (!context) return;
         if (context.previous) {
           deps.client.setQueryData<CrmCompanyResponse>(

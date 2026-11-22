@@ -12,6 +12,7 @@ import BuildingsIcon from '@icon/system/regular/buildings.svg';
 import { cn } from '@ui/utils/classname';
 import { Show } from 'solid-js';
 import { contactGridTemplate } from '../components/contact-grid-template';
+import { ContactRowEmail } from '../components/contact-row-email';
 import { ArchivedRecordBadge } from '../components/record-archived-status';
 import { CrmListRow } from './record-row';
 
@@ -57,11 +58,7 @@ function ContactGridLayout(props: LayoutProps) {
           <ArchivedRecordBadge />
         </Show>
         <Show when={contact()?.email !== contact()?.name && contact()?.email}>
-          {(email) => (
-            <span class="truncate shrink-[2] min-w-0 text-xs font-normal text-ink-extra-muted">
-              {email()}
-            </span>
-          )}
+          {(email) => <ContactRowEmail email={email()} />}
         </Show>
       </Entity.Slot>
 

@@ -695,7 +695,9 @@ body.tauri-ios {
   --button-accent-state-mix: black;
   --button-accent-hover: color-mix(in srgb, var(--button-accent-bg) 82%, var(--button-accent-state-mix));
   --button-accent-pressed: color-mix(in srgb, var(--button-accent-bg) 72%, var(--button-accent-state-mix));
-  --button-focus: var(--color-edge-focus, var(--color-accent));
+  /* The keyboard focus outline lies on the surface around a control. 70% ink
+     holds 3:1 against every surface of every built-in theme. */
+  --button-focus: color-mix(in oklch, var(--color-content-0) 70%, transparent);
   --button-elevated-outline: var(--glass-desktop-outline);
   --button-elevated-top-edge: var(--glass-desktop-top-edge);
   --button-elevated-inner-edge: var(--glass-desktop-inner-edge);

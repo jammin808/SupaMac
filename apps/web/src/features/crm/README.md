@@ -96,10 +96,28 @@ A person under an archived company routes to that company before restoration.
 Both information panels start with Record details and References; company-only
 Properties, Lists and Email sharing follow, with no duplicate visibility toggle.
 
+Text is not selectable by default (`index.css`), so read-only record values opt
+in with `select-text` on the element that holds the text: Record details name
+and website, header domains, read-only address and company values, and the
+address in an open address menu. A People row drags on a press and opens on a
+click, so its address (`ContactRowEmail`) keeps a press to itself and holds the
+click that ends a selection of it, wherever in the row the pointer is let go;
+it is selectable with a pointer only.
+
+Company and contact titles go through `RecordTitle`. A rejected rename shows the
+edit failure message from the mutation and puts the typed name back in the
+field: Enter or leaving the field tries it again, Escape drops it, and the
+editor is keyed by record so the name never follows the view to another record.
+
+The New contact, New company and New pipeline dialogs name each field with a
+visible label tied to its input; the field shows a focus ring while its input
+has focus.
+
 Contact headers and Record details share `ContactEmailField` and
 `ContactCompanyField`. The email field lists every address as a Tasks-style
-pill, primary first; each pill opens Make primary and Remove, and a trailing
-control adds another. The company pill links or switches only for a
+pill, primary first; each pill opens Copy, Make primary and Remove, and a
+trailing control adds another. Copy stays in the menu and confirms through the
+feedback capability. The company pill links or switches only for a
 personal-provider primary with no address on the company's domain, and offers
 Remove company whenever no address is on the company's domain
 (`companyDomain === false`), behind the shared confirmation dialog, which

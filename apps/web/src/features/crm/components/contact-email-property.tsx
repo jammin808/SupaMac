@@ -1,17 +1,28 @@
 import { t } from '@app/lib/i18n';
 import { isTouchDevice } from '@core/mobile/isTouchDevice';
 import { fireAndForget } from '@core/util/fireAndForget';
+import CopyIcon from '@icon/system/regular/copy.svg';
 import EnvelopeIcon from '@icon/system/regular/envelope.svg';
 import PlusIcon from '@icon/system/regular/plus.svg';
 import { EditorPopover } from '@property/editors/popover/EditorPopover';
 import { propertyPillClasses } from '@property/extractors/property-pill-classes';
 import { useSearchInputFocus } from '@property/utils';
-import { Badge, Button, Dialog, Dropdown, Input, Tooltip } from '@ui';
+import {
+  Badge,
+  Button,
+  CopyButton,
+  Dialog,
+  Dropdown,
+  Input,
+  Tooltip,
+} from '@ui';
 import { createSignal, For, type JSX, onCleanup, Show } from 'solid-js';
 import type { ContactEmailChange } from '../core/contact';
 import { contactPropertyTouchTarget } from './contact-property-styles';
 
 type ChangeEmail = (email: string, change: ContactEmailChange) => Promise<void>;
+/** Resolves to whether the address reached the clipboard. */
+type CopyEmail = (email: string) => Promise<boolean>;
 
 /** One pending change at a time, with the rejection kept beside its control. */
 function createEmailChange(
@@ -108,13 +119,14 @@ function EmailError(props: { message: string | undefined }) {
   );
 }
 
-/** One address: its pill opens Make primary and Remove. */
+/** One address: its pill opens Copy, Make primary and Remove. */
 function ContactEmailAddress(props: {
   email: string;
   primary: boolean;
   /** The address that ties the contact to its company cannot be removed. */
   linksCompany: boolean;
   change: ChangeEmail;
+  copy: CopyEmail;
   errorMessage(error: unknown, change: ContactEmailChange): string;
   /** Where focus goes once this address is gone. */
   focusAfterRemoval(): void;
@@ -184,7 +196,7 @@ function ContactEmailAddress(props: {
         }}
       >
         <div class="flex min-w-0 items-center gap-2">
-          <span class="ph-no-capture min-w-0 flex-1 truncate text-sm">
+          <span class="ph-no-capture min-w-0 flex-1 truncate text-sm select-text">
             {props.email}
           </span>
           <Show when={props.primary}>
@@ -200,8 +212,21 @@ function ContactEmailAddress(props: {
         </Show>
         <EmailError message={request.error()} />
         <div class="flex flex-wrap items-center justify-end gap-2">
+          <CopyButton
+            // Copy is the only action of a primary address that links its company.
+            ref={
+              props.primary && props.linksCompany ? setFirstAction : undefined
+            }
+            variant="ghost"
+            size="sm"
+            class="mr-auto"
+            icon={<CopyIcon class="size-3.5 shrink-0" />}
+            onClick={() => props.copy(props.email)}
+          >
+            {t('crm.copyContactEmail')}
+          </CopyButton>
           <Show when={request.saving()}>
-            <span role="status" class="mr-auto text-sm text-ink-muted">
+            <span role="status" class="text-sm text-ink-muted">
               {t('crm.savingContact')}
             </span>
           </Show>
@@ -318,7 +343,7 @@ function AddContactEmail(props: {
           autocomplete="off"
           spellcheck={false}
           data-1p-ignore
-          class="ph-no-capture"
+          class="ph-no-capture focus-visible:ring-button-focus"
           onInput={(event) => {
             setDraft(event.currentTarget.value);
             request.clearError();
@@ -361,6 +386,7 @@ export function ContactEmailProperty(props: {
   /** The one address on the company's domain, while the contact is linked. */
   companyEmail: string | undefined;
   change: ChangeEmail;
+  copy: CopyEmail;
   errorMessage(error: unknown, change: ContactEmailChange): string;
 }) {
   let addElement: HTMLButtonElement | undefined;
@@ -374,7 +400,7 @@ export function ContactEmailProperty(props: {
             fallback={
               <Badge variant="ghost" size="sm" class="min-w-0 max-w-full">
                 <EnvelopeIcon class="size-3 shrink-0" />
-                <span class="ph-no-capture truncate">{email}</span>
+                <span class="ph-no-capture truncate select-text">{email}</span>
               </Badge>
             }
           >
@@ -383,6 +409,7 @@ export function ContactEmailProperty(props: {
               primary={email === props.primary}
               linksCompany={email === props.companyEmail}
               change={props.change}
+              copy={props.copy}
               errorMessage={props.errorMessage}
               focusAfterRemoval={() => addElement?.focus()}
             />

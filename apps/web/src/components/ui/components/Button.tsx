@@ -46,9 +46,20 @@ const buttonMutedTextStyles =
 const buttonPressedStyles =
   'not-data-disabled:active:bg-none aria-pressed:bg-none popup-open:bg-none not-data-disabled:active:shadow-none aria-pressed:shadow-none popup-open:shadow-none';
 
+// Keyboard focus draws an outline outside the control, on the surrounding
+// surface, so it reads the same on every variant's face. A group frame clips
+// what lies outside its controls, so there the outline moves inside the control
+// and takes the control's own text color, which its face already contrasts with.
+// The explicit solid style outranks a caller's resting `outline-none`.
+const buttonFocusStyles =
+  'focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-button-focus forced-colors:focus-visible:outline-current in-data-[slot=button-group]:focus-visible:-outline-offset-2 in-data-[slot=button-group]:focus-visible:outline-current in-data-[slot=input-group]:focus-visible:-outline-offset-2 in-data-[slot=input-group]:focus-visible:outline-current';
+
 /** Shared recipe for Button and headless controls that own their rendering. */
 const buttonStyles = createVariants(
-  'relative inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-full border font-medium select-none transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-45 data-disabled:cursor-not-allowed data-disabled:opacity-45 focus-visible:outline-hidden focus-visible:-outline-offset-2 motion-reduce:transition-none forced-colors:focus-visible:outline-current touch:min-h-9 touch:min-w-9',
+  cn(
+    'relative inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-full border font-medium select-none transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-45 data-disabled:cursor-not-allowed data-disabled:opacity-45 motion-reduce:transition-none touch:min-h-9 touch:min-w-9',
+    buttonFocusStyles
+  ),
   {
     variant: {
       primary: cn(

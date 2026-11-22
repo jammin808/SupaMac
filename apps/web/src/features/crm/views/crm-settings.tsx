@@ -1,5 +1,6 @@
 import type { ItemDragOverlayData } from '@app/components/app/ItemDragAndDrop';
 import { ListSkeleton } from '@app/components/view-shell/ListSkeleton';
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { t } from '@app/lib/i18n';
 import { isTouchDevice } from '@core/mobile/isTouchDevice';
 import CaretDownIcon from '@icon/system/regular/caret-down.svg';
@@ -471,9 +472,9 @@ function StagesSection() {
         onConfirm={handleReset}
         body={
           <>
-            Your team returns to Macro's default stages. Companies keep their
-            stored stage values, and stages whose names match a default display
-            as before.
+            Your team returns to {PRODUCT_NAME}'s default stages. Companies keep
+            their stored stage values, and stages whose names match a default
+            display as before.
           </>
         }
       />
