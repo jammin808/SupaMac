@@ -9,8 +9,8 @@ infrastructure, rather than a frontend connected to Macro's hosted accounts.
 The imported source is pinned to
 [`5eda62e0428f8815ba50f17bb2d86ac208256c76`](https://github.com/macro-inc/macro/commit/5eda62e0428f8815ba50f17bb2d86ac208256c76).
 Original notices and the [AGPL-3.0 license](LICENSE.txt) are preserved. SupaMac is
-an independent fork; upstream branding and service integrations remain in the
-application. See the [original README](https://github.com/macro-inc/macro/blob/5eda62e0428f8815ba50f17bb2d86ac208256c76/README.md)
+an independent fork: its web builds carry the SupaMac name and mark, while the
+source keeps upstream's internal names. See the [original README](https://github.com/macro-inc/macro/blob/5eda62e0428f8815ba50f17bb2d86ac208256c76/README.md)
 for the feature tour; it is also preserved in the import commit's history.
 
 ## Start locally
