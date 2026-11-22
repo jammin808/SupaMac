@@ -1,7 +1,7 @@
 {
   "repository": "https://github.com/macro-inc/macro",
-  "revision": "e0ece1d1bed67a298c3ab375cc2e222944b239b9",
-  "imported_at": "2026-11-21",
+  "revision": "5eda62e0428f8815ba50f17bb2d86ac208256c76",
+  "imported_at": "2026-11-22",
   "import_strategy": "complete source snapshot; upstream history not copied",
   "license": "AGPL-3.0-only"
 }
