@@ -95,6 +95,12 @@ confirmed. CodeQL now has a 4 GiB memory budget and two analysis threads, with
 Cargo limited to two build jobs in static analysis, to leave runner headroom.
 A successful Rust analysis remains a release requirement.
 
+The two languages are analysed by the jobs `codeql-javascript-typescript` and
+`codeql-rust`, which replaced one `codeql` job over a matrix. After their first
+run on `main`, delete any configuration of the former `codeql` job still listed
+under Security, Code scanning, Tool status: a configuration that no longer runs
+keeps its alerts open.
+
 Feature branches run through pull-request CI only. Push CI runs on `main`,
 avoiding duplicate full scans for the same pull-request update. Scheduled and
 manually requested analysis remain available. Source and advisory scans continue

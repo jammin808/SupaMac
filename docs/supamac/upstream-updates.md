@@ -70,11 +70,17 @@ their dates. If another hash is printed, one of two things happened, and
    `git merge --no-ff "$snapshot"`. Resolve what is written by hand. Do not
    resolve a generated file: take either side and regenerate it in the next
    step. Every workflow under `.github/workflows` is generated.
+   `tooling/xtask/crates/xtask_workflows/actions.lock` is written and merged
+   by hand: upstream's lines, the fork's own block, and the newer commit
+   where both sides moved the same action.
 
 4. **Regenerate what is generated** and commit the results with the merge:
    - `cargo x workflows`: every workflow and composite action, `checks.lock`
      and the action bindings. This is also what puts the fork's repository
-     guard on the workflows upstream added or changed.
+     guard on the workflows upstream added or changed. Run it until
+     `cargo x workflows --check` passes. If the generator itself does not
+     build after the merge, follow the recipe under "This fork" in
+     `tooling/xtask/crates/xtask_workflows/AGENTS.md`.
    - `cargo x deps` (`just hakari` runs the same): `crates/workspace-hack`
      and `.github/workspace-dep-closures.json`.
    - `cargo x kafka-topics`: `.github/kafka-cluster-topics.json`.

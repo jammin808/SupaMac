@@ -62,7 +62,7 @@ fn tooling() -> Job {
         .add_step(setup_bun())
         .add_step(Step::new("Install locked analysis dependencies").run("bun install --frozen-lockfile --ignore-scripts"))
         .add_step(fork_steps::install_rust(&["--component rustfmt", "--component clippy"]))
-        .add_step(Step::new("Check and test fork tooling").run("cargo fmt --all -- --check\ncargo clippy --locked -p xtask_workflows -p gh_workflow -- -D warnings\ncargo test --locked -p xtask_workflows -p gh_workflow\ncargo x workflows --check\nbun test tooling/supamac\nbun node_modules/typescript-native/bin/tsc --noEmit --strict --skipLibCheck --types bun --target es2022 --module esnext --moduleResolution bundler tooling/supamac/*.ts\n"))
+        .add_step(Step::new("Check and test fork tooling").run("cargo fmt --all -- --check\ncargo clippy --locked -p xtask_workflows -p gh_workflow -- -D warnings\ncargo test --locked -p xtask_workflows -p gh_workflow\ncargo x workflows --check\nbun test tooling/supamac\nbun test infra/self-hosted/ops/src\nbun node_modules/typescript-native/bin/tsc --noEmit --strict --skipLibCheck --types bun --target es2022 --module esnext --moduleResolution bundler tooling/supamac/*.ts\n"))
 }
 
 fn dependencies() -> Job {

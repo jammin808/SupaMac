@@ -44,6 +44,7 @@ jobs:
           cargo test --locked -p xtask_workflows -p gh_workflow
           cargo x workflows --check
           bun test tooling/supamac
+          bun test infra/self-hosted/ops/src
           bun node_modules/typescript-native/bin/tsc --noEmit --strict --skipLibCheck --types bun --target es2022 --module esnext --moduleResolution bundler tooling/supamac/*.ts
   dependencies:
     name: Live dependency advisories

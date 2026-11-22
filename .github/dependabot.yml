@@ -1,10 +1,8 @@
 version: 2
+# GitHub Actions are pinned in tooling/xtask/crates/xtask_workflows/actions.lock
+# and written into generated workflows, so they are moved there by hand
+# (docs/supamac/delivery.md); a bump to a generated file fails the drift check.
 updates:
-  - package-ecosystem: github-actions
-    directory: /
-    schedule:
-      interval: weekly
-    open-pull-requests-limit: 5
   - package-ecosystem: cargo
     directory: /
     schedule:

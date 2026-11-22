@@ -243,7 +243,7 @@ What is pinned, and where to move it:
 
 | Pin | Where |
 | --- | --- |
-| Actions, by commit SHA with the release in a comment | `fork_steps.rs`, `supamac_images.rs` |
+| Actions, one commit each with its release | `tooling/xtask/crates/xtask_workflows/actions.lock`; then `cargo x workflows actions fetch` and `cargo x workflows` twice (the first run rewrites the bindings, the second the workflows) |
 | `just`, `wasm-pack`, `wasm-bindgen`, binaryen: URL and sha256 | `supamac_web/install_wasm_tools.sh` |
 | The PDF library's sha256 | `PDFIUM_SHA256` in `supamac_images.rs` |
 | Rust, which must be the release `rust-toolchain.toml` names | `RUST_TOOLCHAIN` in `fork_steps.rs` |
@@ -260,9 +260,9 @@ Checks, from the repository root:
 
 ```sh
 cargo x workflows --check
-cargo test -p xtask_workflows
-cargo clippy --locked -p xtask_workflows -- -D warnings
-cargo fmt -p xtask_workflows -- --check
+cargo test --locked -p xtask_workflows -p gh_workflow
+cargo clippy --locked -p xtask_workflows -p gh_workflow -- -D warnings
+cargo fmt -p xtask_workflows -p gh_workflow -- --check
 ```
 
 The tests run the embedded scripts, so they need `bash`, `git`, `jq` and
