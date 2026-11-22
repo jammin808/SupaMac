@@ -161,7 +161,7 @@ secrets: both required values are readable in the published bundle.
 | Variable | Value | Required |
 | --- | --- | --- |
 | `SUPAMAC_WEB_BASE_PATH` | The folder the bundle is served from, such as `/workspace`. The stack's `SUPAMAC_UI_PATH`. | yes |
-| `SUPAMAC_BACKEND_ORIGIN` | The backend's https origin, such as `https://api.example.com`: in lower case, with no path and without `:443`. `https://api.` followed by the stack's `SUPAMAC_DOMAIN`. | yes |
+| `SUPAMAC_BACKEND_ORIGIN` | The backend's https origin, such as `https://api.example.com`: in lower case, with no path and without `:443`. `https://` followed by the stack's `SUPAMAC_API_HOST`. | yes |
 | `SUPAMAC_WEB_ENFORCE_CSP` | `true` sends the Content Security Policy enforced. Anything else: report-only. | no |
 | `SUPAMAC_WEB_OMIT_VIDEOS` | `true` leaves out the tutorial videos, about 105 MB. | no |
 

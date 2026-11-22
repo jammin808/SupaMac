@@ -70,20 +70,20 @@ x-rust-env: &rust-env
   APP_BASE_URL: ${SUPAMAC_UI_ORIGIN}
   OVERRIDE_APP_SERVICE_URL: ${SUPAMAC_UI_ORIGIN}
   PIPEDREAM_ALLOWED_ORIGINS: ${SUPAMAC_UI_ORIGIN}
-  BASE_URL: https://api.${SUPAMAC_DOMAIN:?set SUPAMAC_DOMAIN}/auth
-  FUSIONAUTH_OAUTH_REDIRECT_URI: https://api.${SUPAMAC_DOMAIN}/auth/oauth/redirect
-  OVERRIDE_API_GATEWAY_URL: https://api.${SUPAMAC_DOMAIN}
-  OVERRIDE_COGNITION_PUBLIC_URL: https://api.${SUPAMAC_DOMAIN}/cognition
-  OVERRIDE_MCP_PUBLIC_URL: https://api.${SUPAMAC_DOMAIN}/mcp
-  OVERRIDE_STATIC_FILE_PUBLIC_URL: https://api.${SUPAMAC_DOMAIN}/static-file
-  LOCAL_AWS_PUBLIC_URL: https://api.${SUPAMAC_DOMAIN}/local-storage
-  DOCUMENT_STORAGE_SERVICE_CLOUDFRONT_DISTRIBUTION_URL: https://api.${SUPAMAC_DOMAIN}/local-storage/doc-storage
-  EMAIL_SERVICE_CLOUDFRONT_DISTRIBUTION_URL: https://api.${SUPAMAC_DOMAIN}/local-storage/macro-email-attachments
+  BASE_URL: https://${SUPAMAC_API_HOST:?set SUPAMAC_API_HOST}/auth
+  FUSIONAUTH_OAUTH_REDIRECT_URI: https://${SUPAMAC_API_HOST}/auth/oauth/redirect
+  OVERRIDE_API_GATEWAY_URL: https://${SUPAMAC_API_HOST}
+  OVERRIDE_COGNITION_PUBLIC_URL: https://${SUPAMAC_API_HOST}/cognition
+  OVERRIDE_MCP_PUBLIC_URL: https://${SUPAMAC_API_HOST}/mcp
+  OVERRIDE_STATIC_FILE_PUBLIC_URL: https://${SUPAMAC_API_HOST}/static-file
+  LOCAL_AWS_PUBLIC_URL: https://${SUPAMAC_API_HOST}/local-storage
+  DOCUMENT_STORAGE_SERVICE_CLOUDFRONT_DISTRIBUTION_URL: https://${SUPAMAC_API_HOST}/local-storage/doc-storage
+  EMAIL_SERVICE_CLOUDFRONT_DISTRIBUTION_URL: https://${SUPAMAC_API_HOST}/local-storage/macro-email-attachments
   # Without DEV_DANGEROUS_PRIVATE_MCP_ADDRESSES the agent harness dials these
   # two over https at public addresses only, so they go out and come back in
   # through Traefik.
-  OVERRIDE_MCP_SERVICE_URL: https://api.${SUPAMAC_DOMAIN}
-  OVERRIDE_PREVIEW_GATEWAY_URL: https://api.${SUPAMAC_DOMAIN}/preview
+  OVERRIDE_MCP_SERVICE_URL: https://${SUPAMAC_API_HOST}
+  OVERRIDE_PREVIEW_GATEWAY_URL: https://${SUPAMAC_API_HOST}/preview
 
   # Where the services find each other. Without an override a service looks
   # for its peer on its own localhost.
@@ -207,8 +207,8 @@ x-rust-env: &rust-env
   # the names tokens are issued under.
   FUSIONAUTH_CLIENT_ID: 22222222-2222-4222-8222-222222222222
   AUDIENCE: 22222222-2222-4222-8222-222222222222
-  ISSUER: api.${SUPAMAC_DOMAIN}
-  MACRO_API_TOKEN_ISSUER: api.${SUPAMAC_DOMAIN}
+  ISSUER: ${SUPAMAC_API_HOST}
+  MACRO_API_TOKEN_ISSUER: ${SUPAMAC_API_HOST}
   MACRO_API_TOKEN_EXPIRY_SECONDS: "3600"
 
   # Feature switches the local stack turns on.
@@ -712,7 +712,7 @@ services:
     env_file: *secrets-env
     environment:
       ALLOWED_SENDER_DOMAINS: ${SUPAMAC_MAIL_DOMAIN:-${SUPAMAC_DOMAIN}}
-      POSTFIX_myhostname: api.${SUPAMAC_DOMAIN}
+      POSTFIX_myhostname: ${SUPAMAC_API_HOST}
       POSTFIX_smtp_tls_security_level: encrypt
     networks: [internal, egress]
     mem_limit: 192m
@@ -735,14 +735,14 @@ services:
       SEARCH_TYPE: database
       FUSIONAUTH_APP_KICKSTART_FILE: /supamac/config/fusionauth/kickstart.json
       # Read by the kickstart, once, on an empty database.
-      ISSUER: api.${SUPAMAC_DOMAIN}
-      SUPAMAC_API_ORIGIN: https://api.${SUPAMAC_DOMAIN}
+      ISSUER: ${SUPAMAC_API_HOST}
+      SUPAMAC_API_ORIGIN: https://${SUPAMAC_API_HOST}
       SUPAMAC_UI_ORIGIN: ${SUPAMAC_UI_ORIGIN}
       SUPAMAC_UI_URL: ${SUPAMAC_UI_ORIGIN}${SUPAMAC_UI_PATH:-}
       SUPAMAC_MAIL_FROM: no-reply@${SUPAMAC_MAIL_DOMAIN:-${SUPAMAC_DOMAIN}}
       # Not an address anyone signs in to the app with: an account that
       # exists in FusionAuth before its first sign-in gets no app profile.
-      FUSIONAUTH_ADMIN_EMAIL: fusionauth-admin@${SUPAMAC_DOMAIN}
+      FUSIONAUTH_ADMIN_EMAIL: fusionauth-admin@${SUPAMAC_DOMAIN:?set SUPAMAC_DOMAIN}
     labels: *config-label
     volumes:
       - config:/supamac:ro
@@ -774,7 +774,7 @@ services:
       <<: *config-label
       traefik.enable: "true"
       traefik.docker.network: n8n_default
-      traefik.http.routers.supamac-api.rule: Host(`api.${SUPAMAC_DOMAIN}`)
+      traefik.http.routers.supamac-api.rule: Host(`${SUPAMAC_API_HOST}`)
       traefik.http.routers.supamac-api.entrypoints: websecure
       traefik.http.routers.supamac-api.tls: "true"
       traefik.http.routers.supamac-api.tls.certresolver: mytlschallenge
@@ -896,7 +896,7 @@ services:
     environment:
       <<: *rust-env
       # This service puts its own address into unsubscribe links.
-      OVERRIDE_NOTIFICATION_SERVICE_URL: https://api.${SUPAMAC_DOMAIN}/notification
+      OVERRIDE_NOTIFICATION_SERVICE_URL: https://${SUPAMAC_API_HOST}/notification
     depends_on:
       <<: *backing
       connection-gateway:
@@ -1080,7 +1080,7 @@ services:
     environment: &email-env
       <<: *rust-env
       # This service puts its own address into read-receipt links.
-      OVERRIDE_EMAIL_SERVICE_URL: https://api.${SUPAMAC_DOMAIN}/email
+      OVERRIDE_EMAIL_SERVICE_URL: https://${SUPAMAC_API_HOST}/email
       # Blank counts as unset here. With a key the server and the workers
       # would each ask PostHog once a minute for an Outlook sync switch;
       # without one both switches are off and nothing is asked.

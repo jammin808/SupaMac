@@ -9,8 +9,9 @@ working instructions are in
 - **The web UI** is a static bundle on ordinary web hosting, in a folder of
   the operator's site. See [static publishing](static-publishing.md).
 - **The backend** is one Docker Compose project on one server, published at
-  `https://api.<domain>` through the Traefik that server already runs. One
-  gateway container is the only thing reachable from outside.
+  `https://<api host>` (`SUPAMAC_API_HOST`) through the Traefik that server
+  already runs. One gateway container is the only thing reachable from
+  outside.
 - **Nothing runs in the upstream company's cloud.** Postgres, Redis, Kafka,
   an object store and stand-ins for the AWS queue, table and key services run
   on the server, with their data on Docker volumes.
@@ -24,9 +25,9 @@ returns sign-in codes in its responses.
 1. Run the one-shot bootstrap project. It generates every internal secret on
    the server, into `/etc/supamac`; no secret passes through the deploy tool
    or this repository.
-2. Point `api.<domain>` at the server.
-3. Deploy the stack with the domain, the UI's address, the list of addresses
-   allowed to sign up, and the image references.
+2. Point `<api host>` at the server.
+3. Deploy the stack with the API host, the mail domain, the UI's address, the
+   list of addresses allowed to sign up, and the image references.
 4. Add the SMTP provider's login and any AI keys on the server, and deploy
    again.
 5. Publish the web bundle and sign in.

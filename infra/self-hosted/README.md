@@ -1,9 +1,9 @@
 # Self-hosted backend
 
 The SupaMac backend as one Docker Compose project on one VPS, for one owner
-and a few teammates, reached from the internet at `https://api.<domain>`. The
-web UI is a static bundle served somewhere else and is not part of this
-directory.
+and a few teammates, reached from the internet at `https://<api host>`, the
+host name `SUPAMAC_API_HOST` names. The web UI is a static bundle served
+somewhere else and is not part of this directory.
 
 **Status: rehearsed once on a development machine, never deployed.** The
 default profile was started from empty volumes behind a stand-in for Traefik,
@@ -32,7 +32,7 @@ Read that list before relying on any part of this.
 ```
  browser ── https://<ui origin>/<folder>/        static bundle, hosted elsewhere
     │
-    │ https://api.<domain>/<service>/...
+    │ https://<api host>/<service>/...
     ▼
  Traefik (already on the VPS: TLS, security headers)
     │ network n8n_default
@@ -119,7 +119,7 @@ a deployment runs.
    variables. Its log ends with the names of the variables it wrote to
    `/etc/supamac/generated.env`. Remove the project again. Deploying it a
    second time changes nothing.
-3. **DNS.** Point `api.<domain>` at the VPS.
+3. **DNS.** Point `<api host>` at the VPS.
 4. **The stack.** Deploy `compose.yaml` with the variables of
    [`example.env`](example.env). The jobs run first; the services start when
    the jobs are done. `mail-relay` keeps restarting until step 5: it refuses
@@ -129,7 +129,7 @@ a deployment runs.
    stack again. Nobody can sign in before the mail relay runs, because the
    sign-in code arrives by mail.
 6. **The web bundle.** Build and publish it for
-   `https://api.<domain>`; see
+   `https://<api host>`; see
    [`docs/supamac/static-publishing.md`](../../docs/supamac/static-publishing.md).
 7. **First sign-in.** Sign in with an address from the allow-list. Then
    deploy the stack once more: `grant-owner-roles` gives the accounts in
@@ -138,11 +138,11 @@ a deployment runs.
 
 Checks worth doing from outside the VPS afterwards:
 
-- `POST https://api.<domain>/auth/login/passwordless` answers without a
+- `POST https://<api host>/auth/login/passwordless` answers without a
   `code` field, and a second request for the same address within 30 seconds
   answers 429. Either failing means the services image was built with the
   developer features.
-- `https://api.<domain>/auth/docs`, `/auth/internal/health`,
+- `https://<api host>/auth/docs`, `/auth/internal/health`,
   `/auth/webhooks/user` and `/dss/items/soup/graphql` (GET) answer 404.
 - No port other than Traefik's answers.
 
@@ -152,7 +152,8 @@ In the deploy tool, with the Compose file. None of these is a secret.
 
 | Variable | Meaning |
 | --- | --- |
-| `SUPAMAC_DOMAIN` | The API is `https://api.<this>`. |
+| `SUPAMAC_API_HOST` | The host name the API is served at, such as `api.example.com`: the API is `https://<this>`. |
+| `SUPAMAC_DOMAIN` | Domain mail is sent from, unless `SUPAMAC_MAIL_DOMAIN` names another, and the domain of the identity server's admin account. |
 | `SUPAMAC_UI_ORIGIN` | The origin browsers send, `https://example.com`, without path or trailing slash. Every service allows exactly this origin. |
 | `SUPAMAC_UI_PATH` | The folder of the bundle below that origin, `/supamac`; empty at the root. |
 | `SUPAMAC_SIGNUP_ALLOWLIST_JSON` | JSON array of the only addresses that can create an account. An invited teammate must be on it too. |
@@ -363,7 +364,7 @@ Once, on a development machine with 4 CPUs and 16 GB: the five images built
 from this repository, the bootstrap project run into a scratch directory, and
 the default profile started from empty volumes. In front of the gateway a
 Caddy container stood where Traefik stands, terminating TLS for
-`api.<domain>` with the three response headers the labels ask for; the web
+`<api host>` with the three response headers the labels ask for; the web
 bundle, built for a folder and packaged with the enforced policy, was served
 by Apache on a sibling hostname; the mail relay submitted to a mail catcher
 over STARTTLS with a login. Observed:
