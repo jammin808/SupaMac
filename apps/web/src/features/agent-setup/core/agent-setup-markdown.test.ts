@@ -125,7 +125,7 @@ describe('agentSetupMarkdown on a self-hosted instance', () => {
   });
 
   it('links no documentation when it is given none', () => {
-    expect(markdown).not.toMatch(/macro\.com/);
+    expect(markdown).not.toContain('macro.com');
     expect(markdown).not.toContain('docsHeading');
     expect(
       markdownParts(markdown).flatMap((part) =>

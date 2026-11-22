@@ -184,14 +184,14 @@ it('derives every backend-facing address from a self-hosted backend origin', asy
   for (const url of servers.NATIVE_SESSION_SERVICE_URLS) {
     expect(new URL(url).hostname).toBe('api.example.com');
   }
-  expect(
-    JSON.stringify([
-      servers.SERVER_HOSTS,
-      servers.SYNC_SERVICE_HOSTS,
-      servers.NATIVE_SESSION_SERVICE_URLS,
-      servers.EMAIL_SERVICE_EMBEDDED_HOSTS,
-    ])
-  ).not.toMatch(/macro\.com|macroverse/);
+  const hosts = JSON.stringify([
+    servers.SERVER_HOSTS,
+    servers.SYNC_SERVICE_HOSTS,
+    servers.NATIVE_SESSION_SERVICE_URLS,
+    servers.EMAIL_SERVICE_EMBEDDED_HOSTS,
+  ]);
+  expect(hosts).not.toContain('macro.com');
+  expect(hosts).not.toContain('macroverse');
 });
 
 it('keeps the hosted services when no self-hosted origin is set', async () => {

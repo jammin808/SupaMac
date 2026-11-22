@@ -79,7 +79,7 @@ it('builds a self-hosted bundle that names no host of the hosted service', async
   const code = await buildGatedModules();
 
   expect(code).toContain('https://api.example.org');
-  expect(code).not.toMatch(/macro\.com/);
+  expect(code).not.toContain('macro.com');
   expect(code).not.toContain('macroverse.workers.dev');
   // The hosted service's analytics accounts.
   expect(code).not.toContain('G-52HPEL3FTV');

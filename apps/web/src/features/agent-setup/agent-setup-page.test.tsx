@@ -87,6 +87,6 @@ describe('AgentSetupPage', () => {
       "connection: 'https://api.example.org/connection-gateway',"
     );
     expect(text).toContain(`webAppUrl: '${window.location.origin}/app',`);
-    expect(text).not.toMatch(/macro\.com/);
+    expect(text).not.toContain('macro.com');
   });
 });
