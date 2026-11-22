@@ -1,6 +1,6 @@
 # The one public door of the backend. Traefik terminates TLS for
-# <api host> (SUPAMAC_API_HOST) and forwards every request here; this file decides which
-# service, if any, a path reaches.
+# <api host> (SUPAMAC_API_HOST) and forwards every request here; this file
+# decides which service, if any, a path reaches.
 #
 # The route table follows the local stack's proxy
 # (tooling/xtask/crates/xtask_local/src/local/proxy.rs and inventory.rs), so

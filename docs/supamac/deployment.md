@@ -11,7 +11,8 @@ working instructions are in
 - **The backend** is one Docker Compose project on one server, published at
   `https://<api host>` (`SUPAMAC_API_HOST`) through the Traefik that server
   already runs. One gateway container is the only thing reachable from
-  outside.
+  outside. The API host shares a registrable domain with the UI, because
+  session cookies are strict, and is chosen before the first start.
 - **Nothing runs in the upstream company's cloud.** Postgres, Redis, Kafka,
   an object store and stand-ins for the AWS queue, table and key services run
   on the server, with their data on Docker volumes.
