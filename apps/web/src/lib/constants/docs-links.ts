@@ -4,9 +4,6 @@ import { SELF_HOSTED } from '@core/constant/servers';
 /** Base URL for the public documentation site. */
 export const DOCS_BASE = 'https://docs.macro.com';
 
-/** Task projects have their own collection rather than a legacy ListView. */
-export const PROJECTS_DOCS_URL = `${DOCS_BASE}/product/projects`;
-
 /**
  * The public documentation page at `path` (`/product/email`). The site is the
  * hosted service's own, so a self-hosted instance has no page to link:
@@ -15,6 +12,9 @@ export const PROJECTS_DOCS_URL = `${DOCS_BASE}/product/projects`;
 export function docsUrl(path: string): string | undefined {
   return SELF_HOSTED ? undefined : `${DOCS_BASE}${path}`;
 }
+
+/** Task projects have their own collection rather than a legacy ListView. */
+export const PROJECTS_DOCS_URL = docsUrl('/product/projects');
 
 /** Public documentation page for each list view on the hosted service. */
 const HOSTED_LIST_VIEW_DOCS_URL: Partial<Record<ListView, string>> = {

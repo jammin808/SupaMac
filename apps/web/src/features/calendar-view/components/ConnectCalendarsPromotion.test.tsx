@@ -157,7 +157,7 @@ describe('ConnectCalendarsPromotion', () => {
     ).toBeTruthy();
     expect(
       screen.getByText(
-        'Reconnect work@example.com to show its events in Macro again.'
+        'Reconnect work@example.com to show its events in SupaMac again.'
       )
     ).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Reconnect calendar' }));

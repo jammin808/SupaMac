@@ -98,7 +98,7 @@ describe('unhealthy', () => {
     const computer: ComputerStatus = { ...waiting, status: 'unhealthy' };
     expect(computerStatusLabel(computer)).toEqual({
       label: 'Not responding',
-      detail: "It's back once it reconnects; Macro restarts it if it doesn't",
+      detail: "It's back once it reconnects; SupaMac restarts it if it doesn't",
       tone: 'failure',
     });
     expect(canTogglePower(computer)).toBe(true);

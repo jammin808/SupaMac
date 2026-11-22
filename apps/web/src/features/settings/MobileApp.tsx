@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { t } from '@app/lib/i18n';
 import { isMobile } from '@core/mobile/isMobile';
 import { isNativeMobilePlatform } from '@core/mobile/isNativeMobilePlatform';
@@ -54,7 +55,7 @@ export function MobileApp() {
     return (
       <NativeAppInfo
         title="Mobile app"
-        description="Your installed version of Macro."
+        description={`Your installed version of ${PRODUCT_NAME}.`}
       />
     );
   }

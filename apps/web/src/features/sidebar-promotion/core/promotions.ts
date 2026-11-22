@@ -82,7 +82,7 @@ export const CALENDAR_ACCOUNTS_PROMOTION = {
       id: `${CALENDAR_ACCOUNTS_ID}:stopped`,
       headline: 'Calendar stopped syncing',
       pitch: (emailAddress: string) =>
-        `Reconnect ${emailAddress} to show its events in Macro again.`,
+        `Reconnect ${emailAddress} to show its events in ${PRODUCT_NAME} again.`,
       action: 'Reconnect calendar',
     },
     /** A calendar grant that has expired. */
