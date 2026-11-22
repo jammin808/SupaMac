@@ -120,9 +120,6 @@
 		handle_path /calendar/* {
 			import service calendar-service:8080
 		}
-		handle_path /lexical/* {
-			import service lexical-service:8096
-		}
 
 		# The web client opens these sockets without a trailing slash.
 		@connection_gateway path /connection-gateway /connection-gateway/*
