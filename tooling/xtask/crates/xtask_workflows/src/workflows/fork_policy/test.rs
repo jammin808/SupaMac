@@ -95,6 +95,21 @@ fn a_fork_owned_workflow_is_refused_for_each_thing_only_upstream_has() -> Result
             "it reads the secret `DOPPLER_TOKEN`; only `GITHUB_TOKEN` exists here",
         ),
         (
+            "secrets.GITHUB_TOKEN",
+            "SECRETS.DOPPLER_TOKEN",
+            "it reads the secret `DOPPLER_TOKEN`; only `GITHUB_TOKEN` exists here",
+        ),
+        (
+            "secrets.GITHUB_TOKEN",
+            "secrets['DOPPLER_TOKEN']",
+            "it reads the `secrets` context other than as `secrets.GITHUB_TOKEN`",
+        ),
+        (
+            "secrets.GITHUB_TOKEN",
+            "toJSON(secrets)",
+            "it reads the `secrets` context other than as `secrets.GITHUB_TOKEN`",
+        ),
+        (
             "run: gh api user",
             "run: docker push ghcr.io/macro-inc/macro-agent-harness",
             "it names `macro-inc/`, which exists only upstream",
@@ -146,6 +161,23 @@ fn a_fork_owned_workflow_is_refused_for_each_thing_only_upstream_has() -> Result
         fork_owned_problems("fixture.yml", FORK_OWNED)?,
         ["its file name does not start with `supamac-`"]
     );
+    Ok(())
+}
+
+#[test]
+fn the_word_secrets_outside_the_context_is_not_a_read() -> Result<()> {
+    let prose = FORK_OWNED
+        .replace(
+            "run: gh api user",
+            "run: echo \"Settings, Secrets and variables (no secrets), then ${{ needs.secrets.result }}\"",
+        )
+        .replace("  build:\n", "  secrets:\n");
+
+    assert_eq!(
+        fork_owned_problems("supamac-fixture.yml", &prose)?,
+        Vec::<String>::new()
+    );
+    assert_eq!(secret_reads(&prose), [SecretRead::Named("GITHUB_TOKEN")]);
     Ok(())
 }
 

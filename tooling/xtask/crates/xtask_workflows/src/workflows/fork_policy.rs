@@ -105,11 +105,15 @@ fn fork_owned_problems(file_name: &str, yaml: &str) -> Result<Vec<String>> {
         }
     }
 
-    for secret in secret_names(yaml) {
-        if secret != RUN_TOKEN {
-            problems.push(format!(
+    for read in secret_reads(yaml) {
+        match read {
+            SecretRead::Named(secret) if secret.eq_ignore_ascii_case(RUN_TOKEN) => {}
+            SecretRead::Named(secret) => problems.push(format!(
                 "it reads the secret `{secret}`; only `{RUN_TOKEN}` exists here"
-            ));
+            )),
+            SecretRead::Unnamed => problems.push(format!(
+                "it reads the `secrets` context other than as `secrets.{RUN_TOKEN}`"
+            )),
         }
     }
 
@@ -159,22 +163,49 @@ fn fork_owned_problems(file_name: &str, yaml: &str) -> Result<Vec<String>> {
     Ok(problems)
 }
 
-/// Every `secrets.<NAME>` the workflow text reads, in order of appearance.
-fn secret_names(yaml: &str) -> Vec<&str> {
-    const CONTEXT: &str = "secrets.";
-    let is_name_character = |character: char| character.is_ascii_alphanumeric() || character == '_';
+/// How a workflow reads the `secrets` context.
+#[derive(Debug, PartialEq, Eq)]
+enum SecretRead<'a> {
+    /// `secrets.<NAME>`.
+    Named(&'a str),
+    /// An index (`secrets['NAME']`) or the whole context (`toJSON(secrets)`)
+    /// inside an expression, either of which can reach any secret.
+    Unnamed,
+}
 
-    yaml.match_indices(CONTEXT)
-        .filter(|(start, _)| {
-            // `secrets.` at the end of a longer identifier is not the context.
-            !yaml[..*start].ends_with(is_name_character)
-        })
-        .map(|(start, _)| {
-            let name = &yaml[start + CONTEXT.len()..];
-            let end = name
-                .find(|character| !is_name_character(character))
-                .unwrap_or(name.len());
-            &name[..end]
+/// Every read of the `secrets` context in the workflow text, in order of
+/// appearance. The context is matched in any letter case, as the expression
+/// language reads it. `secrets` as a property of another context
+/// (`needs.secrets.result`) or in prose is not a read.
+fn secret_reads(yaml: &str) -> Vec<SecretRead<'_>> {
+    const CONTEXT: &str = "secrets";
+    const EXPRESSION_OPEN: &str = "${{";
+    const EXPRESSION_CLOSE: &str = "}}";
+    let is_name_character =
+        |character: char| character.is_ascii_alphanumeric() || character == '_' || character == '-';
+
+    // Lowering ASCII keeps every byte offset, so matches index into `yaml`.
+    yaml.to_ascii_lowercase()
+        .match_indices(CONTEXT)
+        .filter_map(|(start, _)| {
+            let before = &yaml[..start];
+            if before.ends_with(|character| is_name_character(character) || character == '.') {
+                return None;
+            }
+
+            let after = &yaml[start + CONTEXT.len()..];
+            if let Some(name) = after.strip_prefix('.') {
+                let end = name
+                    .find(|character| !is_name_character(character))
+                    .unwrap_or(name.len());
+                return Some(SecretRead::Named(&name[..end]));
+            }
+
+            let in_expression = before.rfind(EXPRESSION_OPEN) > before.rfind(EXPRESSION_CLOSE);
+            let after = after.trim_start_matches(' ');
+            let ends_the_operand =
+                after.starts_with(['[', ')', ',']) || after.starts_with(EXPRESSION_CLOSE);
+            (in_expression && ends_the_operand).then_some(SecretRead::Unnamed)
         })
         .collect()
 }
