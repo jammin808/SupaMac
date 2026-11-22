@@ -5,15 +5,16 @@ on:
   workflow_dispatch:
     inputs:
       environment:
-        type: choice
-        required: true
-        default: dev
-        options:
-        - dev
-        - prod
         description: The environment to deploy to.
+        required: true
+        type: choice
+        options:
+          - dev
+          - prod
+        default: dev
 jobs:
   deploy:
+    if: github.repository == 'macro-inc/macro'
     name: Deploy fusionauth-instance
     uses: ./.github/workflows/reusable_deploy_service.yml
     with:
@@ -22,7 +23,6 @@ jobs:
       pulumi-stack-name: fusionauth-instance
       use-docker: false
     secrets: inherit
-    if: github.repository == 'macro-inc/macro'
 concurrency:
   group: deploy-fusionauth-instance-${{ inputs.environment }}
   cancel-in-progress: false

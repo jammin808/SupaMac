@@ -154,6 +154,7 @@ x-rust-env: &rust-env
   BACKFILL_QUEUE: email-service-backfill-queue
   EMAIL_BACKFILL_QUEUE: http://localstack:4566/000000000000/email-service-backfill-queue
   OVERRIDE_EMAIL_CRM_CLEANUP_QUEUE: http://localstack:4566/000000000000/email-service-crm-cleanup-queue
+  OVERRIDE_EMAIL_CRM_POPULATION_QUEUE: http://localstack:4566/000000000000/email-service-crm-population-queue.fifo
   CHAT_DELETE_QUEUE: delete-chat-handler-queue
   CONTACTS_QUEUE: contacts-queue
   CONVERT_QUEUE: convert-service-queue
@@ -166,6 +167,7 @@ x-rust-env: &rust-env
   GMAIL_OPS_QUEUE: email-service-gmail-ops-queue
   GMAIL_OPS_RETRY_QUEUE: email-service-gmail-ops-retry-queue
   LINK_MANAGER_QUEUE: email-service-refresh-queue
+  OVERRIDE_LINK_MAINTENANCE_QUEUE: http://localstack:4566/000000000000/email-service-link-maintenance-queue
   SEARCH_EVENT_QUEUE: search-event-queue
   SFS_DELETE_QUEUE: email-sfs-delete-queue
   SFS_UPLOADER_QUEUE: email-service-sfs-mapper-queue
@@ -206,10 +208,19 @@ x-rust-env: &rust-env
   AI_USAGE_MAX_INCLUDED_ALLOWANCE_CENTS: "15000"
   AI_USAGE_OVERAGE_MARKUP_PERCENT: "25"
 
-  # Feature flags are read from PostHog, and some services refuse to start
-  # without a project key. The host is a port nothing listens on, so no
-  # identifier leaves the box and a flag check fails at once: flag-gated
-  # features stay off.
+  # PostHog is where the services read feature flags and send product events.
+  # Most reads are per person and carry the person's id, which is an e-mail
+  # address. A service that has a key and no POSTHOG_HOST talks to PostHog's
+  # hosted endpoint, so the two are set together, here and nowhere else: the
+  # host is a port nothing listens on, so nothing leaves the box and a flag
+  # read fails at once, which its reader takes as the flag being off.
+  #
+  # The key is a stand-in because two services need one to start: the
+  # document storage service requires it, and the agent harness refuses a
+  # blank one. A service whose own config counts a blank key as none gets a
+  # blank key below (authentication, contacts, email) and then builds no
+  # PostHog client at all. Not every switch asks PostHog: README.md,
+  # "Features", lists what ENVIRONMENT=local turns on by itself.
   POSTHOG_API_KEY: unused
   POSTHOG_HOST: http://127.0.0.1:9
 
@@ -760,7 +771,8 @@ services:
       # No support channel with the upstream company's staff in new accounts.
       SUPPORT_CHANNEL_PARTICIPANTS_JSON: "[]"
       AUTH_SENDER_ADDRESS: no-reply@${SUPAMAC_MAIL_DOMAIN:-${SUPAMAC_DOMAIN}}
-      # Blank counts as unset here: no sign-up event is sent anywhere.
+      # Blank counts as unset here: no sign-up event is sent anywhere, and
+      # the flags this service reads are off.
       POSTHOG_API_KEY: ""
     depends_on:
       <<: *backing
@@ -779,6 +791,12 @@ services:
   contacts-service:
     <<: *rust-service
     command: ["/app/bin/contacts_service"]
+    environment:
+      <<: *rust-env
+      # Blank counts as unset here. With a key this service would ask PostHog
+      # about each person who opens their contacts; without one everybody
+      # reads the contacts the stack has always served.
+      POSTHOG_API_KEY: ""
     depends_on: *backing
     healthcheck: *rust-healthcheck
     mem_limit: 256m
@@ -836,7 +854,10 @@ services:
       connection-gateway:
         condition: service_healthy
     healthcheck: *rust-healthcheck
-    mem_limit: 256m
+    # Besides delivery it checks, for an agent's notification, what each
+    # recipient may see, with the document, mail, CRM and chat readers that
+    # takes.
+    mem_limit: 384m
 
   static-file-service:
     <<: *rust-service
@@ -876,7 +897,9 @@ services:
       lexical-service:
         condition: service_healthy
     healthcheck: *rust-healthcheck
-    mem_limit: 1536m
+    # Every program an agent writes is type-checked before it runs: about
+    # 250 MB a check, up to four at once, beside the programs themselves.
+    mem_limit: 2048m
 
   # Collaborative editing. Document content lives in its state volume and
   # nowhere else.
@@ -993,6 +1016,10 @@ services:
       <<: *rust-env
       # This service puts its own address into read-receipt links.
       OVERRIDE_EMAIL_SERVICE_URL: https://api.${SUPAMAC_DOMAIN}/email
+      # Blank counts as unset here. With a key the server and the workers
+      # would each ask PostHog once a minute for an Outlook sync switch;
+      # without one both switches are off and nothing is asked.
+      POSTHOG_API_KEY: ""
     depends_on:
       <<: *backing
       authentication-service:
@@ -1126,7 +1153,9 @@ services:
       lexical-service:
         condition: service_healthy
     healthcheck: *rust-healthcheck
-    mem_limit: 512m
+    # Two sets of event workers, one for mail and one for everything else,
+    # beside the queue workers.
+    mem_limit: 768m
 
 # Named outright, not after the project: the deploy tool may name the project
 # as it likes, a renamed project must find its data again, and

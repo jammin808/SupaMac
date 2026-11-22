@@ -3,6 +3,21 @@ use std::process::Command;
 
 use super::*;
 
+/// Every job that pushes, by id. No other job may reach the registry.
+const PUBLISHING_JOBS: [&str; 4] = [
+    "services-image",
+    "sync-service-image",
+    "workers-image",
+    "ops-image",
+];
+
+/// What a job that pushes holds, and nothing wider.
+const PUBLISH_PERMISSIONS: &str =
+    "contents: read\npackages: write\nid-token: write\nattestations: write\n";
+
+const ON_PULL_REQUEST: &str = "github.event_name == 'pull_request'";
+const NOT_ON_PULL_REQUEST: &str = "github.event_name != 'pull_request'";
+
 /// The build is the workflow's longest step, so a renamed binary must fail
 /// here and not an hour into a run. A feature flag must never appear: cargo
 /// would unify it into every service of the invocation.
@@ -85,7 +100,8 @@ fn the_pinned_pdfium_digest_is_the_tracked_library() {
 fn a_pull_request_holds_no_registry_permission_and_pushes_nothing() {
     let workflow: serde_yaml::Value =
         serde_yaml::from_str(&render().expect("render")).expect("valid YAML");
-    let publish_permissions = yaml_fragment(PUBLISH_PERMISSIONS).expect("permissions");
+    let publish_permissions: serde_yaml::Value =
+        serde_yaml::from_str(PUBLISH_PERMISSIONS).expect("permissions");
 
     let mut built_on_pull_requests = BTreeSet::new();
     let mut published = BTreeSet::new();
@@ -104,7 +120,7 @@ fn a_pull_request_holds_no_registry_permission_and_pushes_nothing() {
 
         if PUBLISHING_JOBS.contains(&id) {
             assert!(reaches_the_registry, "{id} publishes nothing");
-            assert_eq!(job["if"], fork_steps::NOT_ON_PULL_REQUEST, "{id}");
+            assert_eq!(job["if"], NOT_ON_PULL_REQUEST, "{id}");
             assert_eq!(job["permissions"], publish_permissions, "{id}");
             published.extend(dockerfiles);
         } else {
@@ -113,7 +129,7 @@ fn a_pull_request_holds_no_registry_permission_and_pushes_nothing() {
             // The services job runs on every event; the others only on a
             // pull request.
             if id != "services" {
-                assert_eq!(job["if"], fork_steps::ON_PULL_REQUEST, "{id}");
+                assert_eq!(job["if"], ON_PULL_REQUEST, "{id}");
             }
             built_on_pull_requests.extend(dockerfiles);
         }

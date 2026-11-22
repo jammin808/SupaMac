@@ -5,11 +5,12 @@
 //! from. docs/supamac/delivery.md describes the variables and the branch.
 
 use anyhow::Result;
+use gh_workflow::expr::typed::{Bool, Expr, StepHandle, StepOutput, Str, Var, github, runner};
 use gh_workflow::{
-    Event, Expression, Job, Level, Permissions, PullRequest, Push, Run, Step, Use, Workflow,
-    WorkflowDispatch,
+    Event, Job, Level, Permissions, PullRequest, Push, Run, Step, Use, Workflow, WorkflowDispatch,
 };
 
+use crate::workflows::actions::{ActionsDownloadArtifact, ActionsUploadArtifact};
 use crate::workflows::{fork_steps, steps};
 
 #[cfg(test)]
@@ -18,52 +19,71 @@ mod test;
 /// The branch that holds the built files and nothing else.
 const PUBLISH_BRANCH: &str = "supamac-web-dist";
 
-/// The folder to publish, as the packaging tool writes it. The tool writes
-/// the upload order beside it, in [`SITE_MANIFEST`].
-const SITE: &str = "${{ runner.temp }}/supamac-web";
-const SITE_MANIFEST: &str = "${{ runner.temp }}/supamac-web.publish.json";
+/// The job that builds and packages the bundle, which the job that publishes
+/// it waits for.
+const BUILD_JOB: &str = "build";
+
+/// The name the packaging tool gives the folder to publish. It writes the
+/// upload order beside it, under [`SITE_MANIFEST_NAME`].
+const SITE_NAME: &str = "supamac-web";
+const SITE_MANIFEST_NAME: &str = "supamac-web.publish.json";
 
 const ARTIFACT: &str = "supamac-web";
 
 /// Where the publishing job unpacks [`ARTIFACT`]: the folder and its manifest
 /// keep their names below it.
-const DOWNLOADED: &str = "${{ runner.temp }}/published";
+fn downloaded() -> String {
+    format!("{}/published", runner().temp())
+}
 
 /// The folder the bundle is served from, such as `/workspace`.
-const BASE_PATH_VARIABLE: &str = "${{ vars.SUPAMAC_WEB_BASE_PATH }}";
+const BASE_PATH_VARIABLE: Var = Var("SUPAMAC_WEB_BASE_PATH");
 
 /// The backend's https origin, with no path.
-const BACKEND_ORIGIN_VARIABLE: &str = "${{ vars.SUPAMAC_BACKEND_ORIGIN }}";
+const BACKEND_ORIGIN_VARIABLE: Var = Var("SUPAMAC_BACKEND_ORIGIN");
 
-/// What the build's first step, `inputs`, resolved the two variables to. Only
-/// the steps that build and package the bundle are given these, as
-/// `MACRO_APP_BASE_PATH` and `VITE_BACKEND_ORIGIN`: in the environment of the
-/// whole job they would reach the unit tests, which cover the hosted and the
-/// local service addresses too and fail with a backend origin set.
-const RESOLVED_BASE_PATH: &str = "${{ steps.inputs.outputs.base_path }}";
-const RESOLVED_BACKEND_ORIGIN: &str = "${{ steps.inputs.outputs.backend_origin }}";
+/// What the build's first step resolved the two variables to.
+struct BuildInputs {
+    base_path: StepOutput<Str>,
+    backend_origin: StepOutput<Str>,
+}
+
+/// The build's first step. Only the steps that build and package the bundle
+/// are given its outputs, as `MACRO_APP_BASE_PATH` and `VITE_BACKEND_ORIGIN`:
+/// in the environment of the whole job they would reach the unit tests, which
+/// cover the hosted and the local service addresses too and fail with a
+/// backend origin set.
+const INPUTS: StepHandle<BuildInputs> = StepHandle::new(
+    "inputs",
+    BuildInputs {
+        base_path: StepOutput::new("inputs", "base_path"),
+        backend_origin: StepOutput::new("inputs", "backend_origin"),
+    },
+);
 
 /// Only a run on `main` that is not a pull request publishes: a push, or a
 /// manual run, which publishes again after a variable changed.
-const PUBLISHES: &str = "github.ref == 'refs/heads/main' && github.event_name != 'pull_request'";
+fn publishes() -> Expr<Bool> {
+    github()
+        .git_ref()
+        .eq(fork_steps::MAIN_REF)
+        .and(fork_steps::not_on_pull_request())
+}
 
-/// Render the workflow, with the concurrency block gh-workflow cannot express.
+/// Render the workflow.
 pub fn render() -> Result<String> {
-    let workflow = Workflow::new("SupaMac web")
+    fork_steps::render_delivery(workflow())
+}
+
+fn workflow() -> Workflow {
+    Workflow::new("SupaMac web")
         .permissions(Permissions::default().contents(Level::Read))
         .on(Event::default()
             .push(Push::default().add_branch("main"))
             .pull_request(pull_request())
             .workflow_dispatch(WorkflowDispatch::default()))
-        .add_job("build", build())
-        .add_job("publish", publish());
-
-    let yaml = workflow
-        .to_string()
-        .map_err(|error| anyhow::anyhow!("{error:?}"))?;
-    let mut value: serde_yaml::Value = serde_yaml::from_str(&yaml)?;
-    value["concurrency"] = fork_steps::delivery_concurrency()?;
-    serde_yaml::to_string(&value).map_err(Into::into)
+        .add_job(BUILD_JOB, build())
+        .add_job("publish", publish())
 }
 
 /// A pull request builds the bundle only when it changes something the bundle
@@ -144,8 +164,11 @@ fn build() -> Job {
                 .working_directory(web)
                 .add_env(("MODE", "production"))
                 .add_env(("NODE_ENV", "production"))
-                .add_env(("MACRO_APP_BASE_PATH", RESOLVED_BASE_PATH))
-                .add_env(("VITE_BACKEND_ORIGIN", RESOLVED_BACKEND_ORIGIN))
+                .add_env(("MACRO_APP_BASE_PATH", INPUTS.outputs.base_path.read()))
+                .add_env((
+                    "VITE_BACKEND_ORIGIN",
+                    INPUTS.outputs.backend_origin.read(),
+                ))
                 // Vite's chunk rendering can pass 6 GB.
                 .add_env(("NODE_OPTIONS", "--max-old-space-size=8192")),
         )
@@ -156,7 +179,7 @@ fn build() -> Job {
 fn resolve_build_inputs() -> Step<Run> {
     Step::new("Resolve the folder and the backend to build for")
         .run(include_str!("supamac_web/resolve_build_inputs.sh"))
-        .id("inputs")
+        .id(INPUTS.id())
         .add_env(("CONFIGURED_BASE_PATH", BASE_PATH_VARIABLE))
         .add_env(("CONFIGURED_BACKEND_ORIGIN", BACKEND_ORIGIN_VARIABLE))
 }
@@ -166,61 +189,62 @@ fn resolve_build_inputs() -> Step<Run> {
 fn package() -> Step<Run> {
     Step::new("Package the folder to publish")
         .run(include_str!("supamac_web/package.sh"))
-        .add_env(("MACRO_APP_BASE_PATH", RESOLVED_BASE_PATH))
-        .add_env(("VITE_BACKEND_ORIGIN", RESOLVED_BACKEND_ORIGIN))
-        .add_env(("SITE", SITE))
-        .add_env(("ENFORCE_CSP", "${{ vars.SUPAMAC_WEB_ENFORCE_CSP }}"))
-        .add_env(("OMIT_VIDEOS", "${{ vars.SUPAMAC_WEB_OMIT_VIDEOS }}"))
+        .add_env(("MACRO_APP_BASE_PATH", INPUTS.outputs.base_path.read()))
+        .add_env(("VITE_BACKEND_ORIGIN", INPUTS.outputs.backend_origin.read()))
+        .add_env(("SITE", format!("{}/{SITE_NAME}", runner().temp())))
+        .add_env(("ENFORCE_CSP", Var("SUPAMAC_WEB_ENFORCE_CSP")))
+        .add_env(("OMIT_VIDEOS", Var("SUPAMAC_WEB_OMIT_VIDEOS")))
 }
 
 fn upload() -> Step<Use> {
-    Step::new("Upload the folder to publish")
-        .uses("actions", "upload-artifact", fork_steps::UPLOAD_ARTIFACT)
-        .add_with(("name", ARTIFACT))
-        .add_with(("path", format!("{SITE}\n{SITE_MANIFEST}\n")))
-        .add_with(("if-no-files-found", "error"))
-        // `.htaccess` is a hidden file and the folder does not work without it.
-        .add_with(("include-hidden-files", true))
-        .add_with(("retention-days", 3))
-        // A run that is started again uploads under the same name.
-        .add_with(("overwrite", true))
+    let temp = runner().temp();
+    ActionsUploadArtifact::new(
+        "Upload the folder to publish",
+        format!("{temp}/{SITE_NAME}\n{temp}/{SITE_MANIFEST_NAME}\n"),
+    )
+    .name(ARTIFACT)
+    .if_no_files_found("error")
+    // `.htaccess` is a hidden file and the folder does not work without it.
+    .include_hidden_files(true)
+    .retention_days(3)
+    // A run that is started again uploads under the same name.
+    .overwrite(true)
+    .step()
 }
 
 /// The one job that can write to the repository. It checks nothing out and
 /// runs no code of the build: it downloads the packaged folder and pushes it.
 fn publish() -> Job {
+    let downloaded = downloaded();
+
     Job::default()
         .name("Publish the web bundle")
         .runs_on(fork_steps::RUNNER)
         .timeout_minutes(15u32)
-        .add_needs("build")
-        .cond(Expression::new(PUBLISHES))
+        .add_needs(BUILD_JOB)
+        .cond(publishes())
         .permissions(Permissions::default().contents(Level::Write))
         .add_step(
-            Step::new("Fetch the folder to publish")
-                .uses(
-                    "actions",
-                    "download-artifact",
-                    fork_steps::DOWNLOAD_ARTIFACT,
-                )
-                .add_with(("name", ARTIFACT))
-                .add_with(("path", DOWNLOADED)),
+            ActionsDownloadArtifact::new("Fetch the folder to publish")
+                .name(ARTIFACT)
+                .path(&downloaded)
+                .step(),
         )
         .add_step(
             Step::new(format!(
                 "Make the folder the only commit of {PUBLISH_BRANCH}"
             ))
             .run(include_str!("supamac_web/publish_branch.sh"))
-            .add_env(("SITE", format!("{DOWNLOADED}/supamac-web")))
-            .add_env(("MANIFEST", format!("{DOWNLOADED}/supamac-web.publish.json")))
+            .add_env(("SITE", format!("{downloaded}/{SITE_NAME}")))
+            .add_env(("MANIFEST", format!("{downloaded}/{SITE_MANIFEST_NAME}")))
             .add_env(("EXPECTED_BASE_PATH", BASE_PATH_VARIABLE))
             .add_env(("EXPECTED_BACKEND_ORIGIN", BACKEND_ORIGIN_VARIABLE))
             .add_env((
                 "REMOTE",
-                "${{ github.server_url }}/${{ github.repository }}.git",
+                format!("{}/{}.git", github().server_url(), github().repository()),
             ))
             .add_env(("BRANCH", PUBLISH_BRANCH))
-            .add_env(("SOURCE_SHA", "${{ github.sha }}"))
-            .add_env(("GITHUB_TOKEN", "${{ secrets.GITHUB_TOKEN }}")),
+            .add_env(("SOURCE_SHA", github().sha()))
+            .add_env(("GITHUB_TOKEN", fork_steps::RUN_TOKEN)),
         )
 }

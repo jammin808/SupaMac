@@ -26,9 +26,12 @@ on the box. The Pulumi stacks next to it are upstream's AWS and are not used.
 - Add a service setting: `x-rust-env` in `compose.yaml`, with the name
   `xtask_local`'s `local_env.rs` uses. A secret goes into the bootstrap
   script instead, and into README's rotation table.
-- Add a queue: `resources.rs` → `ops/config/elasticmq/elasticmq.conf` →
-  `x-rust-env`. A bucket or table: `resources.rs` → `ops/scripts/init-aws.sh`
-  → `x-rust-env`.
+- Add a queue, or change one's attributes: `resources.rs` →
+  `ops/config/elasticmq/elasticmq.conf` → the `queue` lines of
+  `ops/scripts/init-aws.sh` → `x-rust-env`. `bun test` in `ops/src`, run
+  from the checkout, fails until the four agree; the ops image's build has
+  no `resources.rs` and skips that comparison. A bucket or table:
+  `resources.rs` → `ops/scripts/init-aws.sh` → `x-rust-env`.
 - Add a volume: give it a `name:` in `compose.yaml`. One that holds data
   nothing else can rebuild also goes into `ops/scripts/backup.sh`,
   `ops/scripts/restore.sh`, the `backup` container's mounts and
@@ -44,8 +47,9 @@ on the box. The Pulumi stacks next to it are upstream's AWS and are not used.
 - `docker compose --env-file example.env -f compose.yaml config`, also with
   `COMPOSE_PROFILES=email,search`; set `SUPAMAC_SECRETS_DIR` to a directory
   that holds a `generated.env`.
-- `bun test` in `ops/src`; `sh -n` on `ops/scripts/*.sh`; Biome through
-  `bun run --cwd infra lint`.
+- `bun test` in `ops/src`, from the checkout: only there do the tests reach
+  the local stack's queue catalogue and `compose.yaml`. `sh -n` on
+  `ops/scripts/*.sh`; Biome through `bun run --cwd infra lint`.
 - `docker build -f infra/self-hosted/ops/Dockerfile .` from the repository
   root: validates both Caddy files and runs the tests.
 
@@ -64,6 +68,11 @@ on the box. The Pulumi stacks next to it are upstream's AWS and are not used.
   keeps old config after an upgrade.
 - `restore.compose.yaml` repeats the Postgres and MinIO services, health
   checks included, and mounts the main project's volumes by their names.
+- The queue service's database wins over its config: the config creates a
+  queue that is missing and changes none that is there. A changed attribute
+  reaches a deployed stack through `init-aws.sh` only.
+- `init-aws.sh` runs in the AWS CLI image: that CLI and the shell's builtins,
+  no `jq`, and no `grep` or `sed` to count on.
 - A health check runs inside its container, with that image's tools. The
   MinIO image has bash, coreutils and `mc`: no grep, no HTTP client, no tar.
 - A health check of a store proves what its dependants use: Postgres over

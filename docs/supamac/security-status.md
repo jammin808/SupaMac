@@ -1,7 +1,10 @@
 # Security and verification status
 
 Initial assessment: 2026-11-19. Imported upstream revision:
-`f8a38d2b114fab2e35563684b3b4e2ef33a39b58`.
+`e0ece1d1bed67a298c3ab375cc2e222944b239b9`, imported 2026-11-21. Every count
+on this page was measured on the snapshot before it, revision
+`f8a38d2b114fab2e35563684b3b4e2ef33a39b58` of 2026-11-19, and none has been
+measured again on this one.
 
 **Release status: blocked.** These are full-source inherited findings, not a
 clean security assessment. Adding scanners does not certify the application.

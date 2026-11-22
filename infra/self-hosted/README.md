@@ -21,7 +21,8 @@ relying on any part of this.
   resolver named `mytlschallenge`, attached to the Docker network
   `n8n_default`. Those three names are written into `compose.yaml`.
 - 16 GB of memory shared with what already runs there. The limits of the
-  default profile add up to 10.8 GB.
+  default profile add up to 11.4 GB; [Profiles](#profiles) says what fits
+  beside it.
 
 ## How the pieces fit
 
@@ -73,13 +74,36 @@ SMTP provider, fetched links. The stores cannot.
 
 | Profile | Adds | Limits add |
 | --- | --- | --- |
-| default | Sign-in, documents, tasks, CRM and contacts, notifications, static files, upload finalizer, connection gateway, collaborative editing, the AI assistant, reminders, backups | 10.8 GB |
+| default | Sign-in, documents, tasks, CRM and contacts, notifications, static files, upload finalizer, connection gateway, collaborative editing, the AI assistant, reminders, backups | 11.4 GB |
 | `email` | Email service and workers, calendar service, the email schedules | 1.6 GB |
-| `search` | OpenSearch and the search indexer | 2.0 GB |
+| `search` | OpenSearch and the search indexer | 2.3 GB |
 
-The limits are estimates from the settings in the repository, not
-measurements. With both optional profiles the stack's limits alone come to
-14.4 GB.
+A limit is the most a container may use before the kernel stops it, not
+memory set aside for it. The limits are estimates from the settings and the
+code in the repository; none is a measurement. Three were raised with the
+upstream snapshot of 2026-11-21, again as estimates, and are the first to
+measure when the stack is next rehearsed:
+
+| Container | Was | Is | Why |
+| --- | --- | --- | --- |
+| `agent-harness-service` | 1536 MB | 2048 MB | It now type-checks every program an agent writes before running it: about 250 MB a check, up to four at once, beside the programs that are running. The limit is meant to hold the service, four checks and a handful of programs. The most the code allows, sixteen programs at their 128 MB heap target during four checks, is about 3 GB on top of the service itself; neither the old limit nor this one holds that. |
+| `notification-service` | 256 MB | 384 MB | For a notification an agent sends, it checks what each recipient may see, with the document, mail, CRM and chat readers that takes. Upstream runs it with 512 MB in its smallest environment. |
+| `search-processing-service` | 512 MB | 768 MB | It runs two sets of event workers, one for mail and one for everything else, where it ran one. Upstream runs it with 1024 MB in its smallest environment. |
+
+What fits on a 16 GB server: the kernel, Docker with up to 35 containers,
+Traefik and one other small application take, as a guess, 2 GB, which leaves
+14 GB. If every container reached its limit at once, the default profile
+with one optional profile would stay inside that (13.0 GB with `email`,
+13.7 GB with `search`) and with both it would not (15.3 GB; before this
+update, 14.4 GB). No limit was lowered to make both fit: nothing has been
+measured, and the limits with most to give are the stores', where a stop for
+want of memory costs most. Until there are measurements, running both
+optional profiles on such a server means that a spike in several containers
+at once can make the kernel stop one, of this stack or of the other
+application.
+
+The jobs have limits of their own, 1.5 GB together, which count only while
+a deployment runs.
 
 ## First deployment
 
@@ -130,7 +154,7 @@ In the deploy tool, with the Compose file. None of these is a secret.
 | `SUPAMAC_OWNER_EMAILS` | Comma-separated accounts that get the paid-plan roles. Optional. |
 | `SUPAMAC_MAIL_DOMAIN` | Domain mail is sent from, if not `SUPAMAC_DOMAIN`. The relay refuses any other sender domain. |
 | `SUPAMAC_SERVICES_IMAGE`, `SUPAMAC_OPS_IMAGE`, `SUPAMAC_SYNC_IMAGE`, `SUPAMAC_LEXICAL_IMAGE`, `SUPAMAC_AI_EDITING_IMAGE` | Image references. |
-| `COMPOSE_PROFILES` | `email`, `search` or both. Optional. |
+| `COMPOSE_PROFILES` | `email`, `search` or both. Optional. With both, the limits add up to more than a 16 GB server that also runs another application has left; until they are measured, [Profiles](#profiles) says what that risks. |
 | `SUPAMAC_SEARCH_IMAGE` | Needed with the `search` profile. |
 | `SUPAMAC_BACKUP_KEEP` | Daily backups kept, default 7. |
 
@@ -262,11 +286,23 @@ elsewhere.
 
 ## Upgrading
 
-Deploy the stack again with the new image references. The jobs run first:
-new migrations are applied before any service starts, and missing topics,
-buckets and tables are created. A container that reads the config volume or
+Deploy the stack again with the new image references, all built from one
+commit. The jobs run first: new migrations are applied before any service
+starts, missing topics, buckets, tables and queues are created, and every
+queue's attributes are set. A container that reads the config volume or
 the KMS seed is recreated when `SUPAMAC_OPS_IMAGE` changes, which is why that
-reference has to change with the image.
+reference has to change with the image. The order of an upgrade, and what
+the snapshot of 2026-11-21 needs beyond it, is in
+[`docs/supamac/deployment.md`](../../docs/supamac/deployment.md#upgrading).
+
+The queue service keeps its queues in its data volume and creates only the
+ones its config has and its database lacks; it does not change one that is
+there. `init-aws` therefore sets each queue's visibility timeout, delay and
+dead-letter queue on every deployment, and its log has one line per queue it
+created and one per dead-letter queue with the number of messages in it.
+Nothing else watches those three queues (`slack-import-dlq`, `contacts-dlq`,
+`search-event-queue-dlq`) and nothing empties them: a message there was
+received as often as its queue allows without being finished.
 
 A FusionAuth kickstart change does not reach a running instance; see
 [`ops/config/fusionauth/README.md`](ops/config/fusionauth/README.md).
@@ -300,7 +336,11 @@ docker build -f infra/self-hosted/ops/Dockerfile -t <ops image> .
 ## What was checked
 
 On a development machine, without starting the stack. Where a check needed
-a server, the server ran inside an image build step and went away with it:
+a server, the server ran inside an image build step and went away with it.
+The repository has held two upstream snapshots, of 2026-11-19 and of
+2026-11-21. Each check below was run on the first unless it says otherwise;
+[after the snapshot of 2026-11-21](#after-the-snapshot-of-2026-11-21) lists
+what was run again, and nothing else was.
 
 - `docker compose config` accepts `compose.yaml` (default profile, and with
   `email` and `search`), `bootstrap.compose.yaml` and `restore.compose.yaml`
@@ -317,8 +357,8 @@ a server, the server ran inside an image build step and went away with it:
   runs each program it copies in.
 - The database scripts were run against a temporary Postgres 18 inside a
   build step of a throwaway image on top of the ops image: `migrate.sh`
-  applied all 852 migrations with the image's sqlx CLI and applied none on a
-  second run; it refused a database with a table and no migration history;
+  applied all 852 migrations of that snapshot with the image's sqlx CLI and
+  applied none on a second run; it refused a database with a table and no migration history;
   `init-fusionauth-db.sh` ran twice; `grant-owner-roles.sh` granted once to
   an account that existed and nothing to one that did not; `pg_dump` and
   `pg_restore`, as `backup.sh` and `restore.sh` call them, round-tripped both
@@ -336,8 +376,8 @@ a server, the server ran inside an image build step and went away with it:
   running and a stopped server, and the database's against a server that
   listens on its socket only.
 - `init-kafka-topics.sh` was run in the pinned Kafka image against a broker
-  started in a build step: 28 topics created, none on a second run, and the
-  missing ones only from a list written on one line.
+  started in a build step: the 28 topics of that snapshot created, none on a
+  second run, and the missing ones only from a list written on one line.
 - The `add_secret` snippet writes values Compose reads back unchanged,
   including `$`, `#`, quotes and backslashes.
 - The names of the service environment were compared with the local stack's:
@@ -349,6 +389,46 @@ a database it does not own; ElasticMQ's config format and persistence; the
 KMS emulator's seed format; the mail relay image's variables, read from the
 scripts inside the image.
 
+Read from ElasticMQ's source at the pinned version 1.6.15, not tried: at
+start it restores the queues in its database, then creates those of its
+config whose names the database lacks, and takes nothing from the config for
+a queue that is there; a change of visibility timeout, delay or dead-letter
+queue made through its API is written to the database.
+
+### After the snapshot of 2026-11-21
+
+The snapshot carries 876 migrations and 29 event topics, and its local stack
+has two more queues and other attributes on a third. Run on the merged tree,
+on a development machine:
+
+- `docker compose config` accepts `compose.yaml` with the values of
+  `example.env`, by itself and with `email` and `search`. In the result every
+  service that is given the stand-in PostHog key is also given the host
+  nothing listens on, and the limits add up as [Profiles](#profiles) says.
+- The Bun tests pass, and `sh -n` accepts every script. The tests now hold
+  the queues of `elasticmq.conf` and of `init-aws.sh` to each other, and
+  from a checkout also to the local stack's catalogue and to `compose.yaml`;
+  run against the stack as it was before this update they fail on the two
+  missing queues and the changed attribute.
+- The tests run `init-aws.sh` against a stand-in for the AWS CLI that keeps
+  a list of queues and records each call: on an empty queue service it
+  creates the 31 queues and sets attributes on 6; where a queue exists with
+  the defaults it is not created again and gets its attributes; a second run
+  creates nothing; a refused call fails the job. The same was run by hand
+  under `dash` and `bash --posix` against the 27 queues of the earlier
+  config: 4 created.
+- The topic list of the snapshot, read the way `init-kafka-topics.sh` reads
+  it, gives 29 names, `macro.time_entries` among them.
+
+Not run again: the ops image was not rebuilt, so the 876 migrations have not
+been applied with its `migrate.sh` and no topic or queue has been created in
+a broker or a queue service. The fork's image workflow builds the ops image
+on every pull request that touches what it is built from, which runs the Bun
+tests and validates both Caddy files; it applies no migration. In that build
+the two tests that hold the stack's queues to the local stack's catalogue
+and to `compose.yaml` are skipped, because the image has neither: they run
+only where someone runs `bun test` from a checkout.
+
 ## Not covered, not verified
 
 Nothing below has been observed working.
@@ -358,8 +438,10 @@ Nothing below has been observed working.
 - It has never been started, here or on a VPS. Start order, memory limits
   and every interaction between containers are untested, and so are the
   health checks other than the object store's and the database's.
-- `init-aws.sh` and `init-search-indices.sh` have only been syntax-checked:
-  they need the services they talk to.
+- `init-aws.sh` has been run only against a stand-in for the AWS CLI, which
+  shows what it calls and not what the services behind the router answer;
+  `init-search-indices.sh` has only been syntax-checked. Both need the
+  services they talk to.
 - The ops image was built locally from the Dockerfile plus two lines that
   make the build trust the development machine's outbound proxy. The
   services, sync, lexical, AI editing and search images did not exist when
@@ -379,9 +461,22 @@ Nothing below has been observed working.
   parser was read, not run), that its webhook queue folder under `/data` is
   ignored as a bucket, and that the notification ARN has the form
   `init-aws.sh` uses.
-- That ElasticMQ accepts the unsigned JSON calls of the relay and the clock,
-  and how it treats a queue added to its config after its database exists.
-  The dead-letter queue's 14-day retention cannot be expressed in its config.
+- That ElasticMQ accepts the unsigned JSON calls of the relay and the clock.
+- The queues on a deployment that already has some. That ElasticMQ creates a
+  queue added to its config after its database exists is read from its
+  source, not seen. That it accepts `init-aws`'s calls through the router
+  (list, create, set attributes), and that an attribute set that way is the
+  one in effect afterwards, has not been seen either: `init-aws` fails the
+  deployment if a call is refused, and does not read an attribute back. After
+  the first deployment of this version, `aws sqs get-queue-attributes` for
+  `email-service-refresh-queue`, run as `init-aws` runs the CLI, should show
+  a visibility timeout of 300.
+- Dead-letter queues keep a message until someone removes it: ElasticMQ has
+  no retention period, so the 14 days of the deployed queues cannot be had.
+  Moving messages back to their queue is not provided for.
+- Only three queues have a dead-letter queue. On every other one, as on the
+  local stack, a message its worker neither finishes nor deletes is delivered
+  again without end.
 - That the KMS emulator enforces the encryption context the services bind
   ciphertexts with.
 - That a download link opens through `/local-storage`. The services sign
@@ -420,7 +515,24 @@ Nothing below has been observed working.
 - Without the `search` profile the document storage service is given a
   stand-in that answers its startup probe; search requests fail.
 - Feature flags are read from PostHog, which is deliberately unreachable, so
-  flag-gated features stay off; some CRM writes refuse without their flag.
+  a feature that waits for its flag stays off; some CRM writes refuse
+  without theirs. Two features do not wait for a flag here. Upstream turns
+  them on wherever `ENVIRONMENT=local`, which is how every service of this
+  stack runs, and nothing in this stack turns them off:
+  - **Agents can notify people.** Any account, an agent's or a person's,
+    can send a notification of up to 280 characters with a link to an item
+    (`POST /notification/user_notifications/send`, the SDK's
+    `notifications.send`). Upstream's limits apply: the sender must be able
+    to see the item, and so must each recipient, whose inbox must list items
+    of its kind; at most 100 recipients a call; 1,000 notified recipients an
+    hour for a sender; 60 an hour from others for a recipient. An agent
+    session whose scope excludes sending is refused.
+  - **Contact lists are written.** What tells the stack who a person's
+    contacts are (mailbox sync, team changes, channel activity) is recorded
+    in two new tables, `contact_list_members` and `contact_inbox_members`,
+    beside the contact graph that has always been written. Nothing reads the
+    new tables here: which of the two a person's contacts are read from is a
+    per-person PostHog flag, and a read that fails means the old graph.
 - The agent harness has no sandbox provider. Sessions that need one fail. It
   reaches its own MCP and preview routes through the public address, which
   requires the VPS to reach itself that way.
@@ -431,6 +543,12 @@ Nothing below has been observed working.
 - No Stripe: the sign-up sentinel skips it, and billing screens may show
   inconsistent state for accounts given roles by `grant-owner-roles`.
 - The Passwords vault (OpenBao) is not part of the stack.
+- No computer fleet for agent teammates. Two settings of the local stack
+  exist only for one and are deliberately not set: `COMPUTERS_AGENT_EFFECTS`
+  (absent means off; it starts the worker that takes agent teammates back
+  from released computers) and `OVERRIDE_TELEMETRY_INTAKE_URL` (where a
+  computer sends its traces; without it the address is the service's own
+  loopback, which the services never hand to a computer).
 - Links the services build to the web app may still assume the upstream
   folder `/app`.
 

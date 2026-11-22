@@ -4,27 +4,27 @@ name: SupaMac web
 on:
   pull_request:
     branches:
-    - main
+      - main
     paths:
-    - .cargo/**
-    - Cargo.lock
-    - Cargo.toml
-    - rust-toolchain.toml
-    - bun.lock
-    - bunfig.toml
-    - package.json
-    - apps/web/**
-    - crates/**
-    - packages/**
-    - vendor/**
-    - tooling/supamac/**
-    - tooling/xtask/crates/xtask_workflows/src/workflows/fork_steps.rs
-    - tooling/xtask/crates/xtask_workflows/src/workflows/supamac_web.rs
-    - tooling/xtask/crates/xtask_workflows/src/workflows/supamac_web/**
-    - .github/workflows/supamac-web.yml
+      - .cargo/**
+      - Cargo.lock
+      - Cargo.toml
+      - rust-toolchain.toml
+      - bun.lock
+      - bunfig.toml
+      - package.json
+      - apps/web/**
+      - crates/**
+      - packages/**
+      - vendor/**
+      - tooling/supamac/**
+      - tooling/xtask/crates/xtask_workflows/src/workflows/fork_steps.rs
+      - tooling/xtask/crates/xtask_workflows/src/workflows/supamac_web.rs
+      - tooling/xtask/crates/xtask_workflows/src/workflows/supamac_web/**
+      - .github/workflows/supamac-web.yml
   push:
     branches:
-    - main
+      - main
   workflow_dispatch: {}
 permissions:
   contents: read
@@ -33,170 +33,170 @@ jobs:
     name: Build and package the web bundle
     runs-on: ubuntu-24.04
     env:
-      RUSTUP_TOOLCHAIN: 1.94.0
+      RUSTUP_TOOLCHAIN: '1.94.0'
       CARGO_TERM_COLOR: always
     timeout-minutes: 60
     steps:
-    - id: inputs
-      name: Resolve the folder and the backend to build for
-      run: |
-        set -euo pipefail
+      - id: inputs
+        name: Resolve the folder and the backend to build for
+        run: |
+          set -euo pipefail
 
-        # The folder the bundle is served from and the backend it calls are this
-        # deployment's own, kept in repository variables. A pull request publishes
-        # nothing and may run without them (a fork's pull request never sees them), so
-        # it builds for placeholders. Any other run may publish, so without them it
-        # stops here rather than build for the placeholders.
-        base_path="$CONFIGURED_BASE_PATH"
-        backend_origin="$CONFIGURED_BACKEND_ORIGIN"
+          # The folder the bundle is served from and the backend it calls are this
+          # deployment's own, kept in repository variables. A pull request publishes
+          # nothing and may run without them (a fork's pull request never sees them), so
+          # it builds for placeholders. Any other run may publish, so without them it
+          # stops here rather than build for the placeholders.
+          base_path="$CONFIGURED_BASE_PATH"
+          backend_origin="$CONFIGURED_BACKEND_ORIGIN"
 
-        if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
-          base_path="${base_path:-/workspace}"
-          backend_origin="${backend_origin:-https://api.example.com}"
-        elif [ -z "$base_path" ] || [ -z "$backend_origin" ]; then
-          echo "::error title=Repository variables are not set::Set SUPAMAC_WEB_BASE_PATH (the folder, such as /workspace) and SUPAMAC_BACKEND_ORIGIN (the backend's https origin, with no path) under Settings, Secrets and variables, Actions, Variables. Nothing was built or published."
-          exit 1
-        fi
+          if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
+            base_path="${base_path:-/workspace}"
+            backend_origin="${backend_origin:-https://api.example.com}"
+          elif [ -z "$base_path" ] || [ -z "$backend_origin" ]; then
+            echo "::error title=Repository variables are not set::Set SUPAMAC_WEB_BASE_PATH (the folder, such as /workspace) and SUPAMAC_BACKEND_ORIGIN (the backend's https origin, with no path) under Settings, Secrets and variables, Actions, Variables. Nothing was built or published."
+            exit 1
+          fi
 
-        # The rules the build itself applies, so a value it would refuse stops the run
-        # here. Checked before anything is written to the step's outputs, which take
-        # one value per line. The build accepts an origin only in the form a browser
-        # reports it in: the host in lower case and no default port. A letter range
-        # means ASCII letters in the C locale alone.
-        LC_ALL=C
-        if [[ ! "$base_path" =~ ^(/[A-Za-z0-9_-]+)+$ ]]; then
-          echo "::error title=SUPAMAC_WEB_BASE_PATH is malformed::It must look like /workspace or /team/app."
-          exit 1
-        fi
-        if [[ ! "$backend_origin" =~ ^https://[a-z0-9.-]+(:[1-9][0-9]*)?$ ]] || [[ "$backend_origin" = *:443 ]]; then
-          echo "::error title=SUPAMAC_BACKEND_ORIGIN is malformed::It must be an https origin in lower case, with no path and without the port 443, such as https://api.example.com."
-          exit 1
-        fi
+          # The rules the build itself applies, so a value it would refuse stops the run
+          # here. Checked before anything is written to the step's outputs, which take
+          # one value per line. The build accepts an origin only in the form a browser
+          # reports it in: the host in lower case and no default port. A letter range
+          # means ASCII letters in the C locale alone.
+          LC_ALL=C
+          if [[ ! "$base_path" =~ ^(/[A-Za-z0-9_-]+)+$ ]]; then
+            echo "::error title=SUPAMAC_WEB_BASE_PATH is malformed::It must look like /workspace or /team/app."
+            exit 1
+          fi
+          if [[ ! "$backend_origin" =~ ^https://[a-z0-9.-]+(:[1-9][0-9]*)?$ ]] || [[ "$backend_origin" = *:443 ]]; then
+            echo "::error title=SUPAMAC_BACKEND_ORIGIN is malformed::It must be an https origin in lower case, with no path and without the port 443, such as https://api.example.com."
+            exit 1
+          fi
 
-        # Outputs of this step, not the environment of the job: only the steps that
-        # build and package the bundle are given the two values. The unit tests cover
-        # the hosted and the local service addresses as well, and fail with a backend
-        # origin in their environment.
-        {
-          echo "base_path=$base_path"
-          echo "backend_origin=$backend_origin"
-        } >> "$GITHUB_OUTPUT"
-      env:
-        CONFIGURED_BASE_PATH: ${{ vars.SUPAMAC_WEB_BASE_PATH }}
-        CONFIGURED_BACKEND_ORIGIN: ${{ vars.SUPAMAC_BACKEND_ORIGIN }}
-    - name: Checkout
-      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
-      with:
-        clean: 'false'
-        persist-credentials: 'false'
-      env:
-        GIT_HTTP_LOW_SPEED_LIMIT: '10000'
-        GIT_HTTP_LOW_SPEED_TIME: '60'
-    - name: Setup Bun for current lockfile formats
-      uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
-      with:
-        bun-version: 1.4.5
-    - name: Install locked dependencies
-      run: bun install --frozen-lockfile --ignore-scripts
-    - name: Install pinned Rust tooling
-      run: rustup toolchain install 1.94.0 --profile minimal --target wasm32-unknown-unknown
-    - name: Install pinned WebAssembly tooling
-      run: |
-        set -euo pipefail
+          # Outputs of this step, not the environment of the job: only the steps that
+          # build and package the bundle are given the two values. The unit tests cover
+          # the hosted and the local service addresses as well, and fail with a backend
+          # origin in their environment.
+          {
+            echo "base_path=$base_path"
+            echo "backend_origin=$backend_origin"
+          } >> "$GITHUB_OUTPUT"
+        env:
+          CONFIGURED_BASE_PATH: ${{ vars.SUPAMAC_WEB_BASE_PATH }}
+          CONFIGURED_BACKEND_ORIGIN: ${{ vars.SUPAMAC_BACKEND_ORIGIN }}
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          clean: 'false'
+          persist-credentials: 'false'
+        env:
+          GIT_HTTP_LOW_SPEED_LIMIT: '10000'
+          GIT_HTTP_LOW_SPEED_TIME: '60'
+      - name: Setup Bun for current lockfile formats
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: '1.4.5'
+      - name: Install locked dependencies
+        run: bun install --frozen-lockfile --ignore-scripts
+      - name: Install pinned Rust tooling
+        run: rustup toolchain install 1.94.0 --profile minimal --target wasm32-unknown-unknown
+      - name: Install pinned WebAssembly tooling
+        run: |
+          set -euo pipefail
 
-        # The tools `just build-wasm` runs, each at the release the build was measured
-        # with and each checked against its digest before it is unpacked. wasm-pack
-        # would download wasm-bindgen and wasm-opt itself, unchecked; it uses the ones
-        # on the path instead. It takes wasm-bindgen from the path only at the release
-        # Cargo.lock names, so that pin moves with the lockfile (a test holds the two
-        # equal).
-        tools="$RUNNER_TEMP/supamac-tools"
-        mkdir -p "$tools"
+          # The tools `just build-wasm` runs, each at the release the build was measured
+          # with and each checked against its digest before it is unpacked. wasm-pack
+          # would download wasm-bindgen and wasm-opt itself, unchecked; it uses the ones
+          # on the path instead. It takes wasm-bindgen from the path only at the release
+          # Cargo.lock names, so that pin moves with the lockfile (a test holds the two
+          # equal).
+          tools="$RUNNER_TEMP/supamac-tools"
+          mkdir -p "$tools"
 
-        curl -fsSL --retry 3 https://github.com/casey/just/releases/download/1.59.0/just-1.59.0-x86_64-unknown-linux-musl.tar.gz -o "$RUNNER_TEMP/just.tar.gz"
-        printf '409044617b6f06517c1035e55ca38c8c856ff8b650e41bc2aa1ef82d5903a23e  %s\n' "$RUNNER_TEMP/just.tar.gz" | sha256sum --check
-        tar -xzf "$RUNNER_TEMP/just.tar.gz" -C "$tools" just
+          curl -fsSL --retry 3 https://github.com/casey/just/releases/download/1.59.0/just-1.59.0-x86_64-unknown-linux-musl.tar.gz -o "$RUNNER_TEMP/just.tar.gz"
+          printf '409044617b6f06517c1035e55ca38c8c856ff8b650e41bc2aa1ef82d5903a23e  %s\n' "$RUNNER_TEMP/just.tar.gz" | sha256sum --check
+          tar -xzf "$RUNNER_TEMP/just.tar.gz" -C "$tools" just
 
-        curl -fsSL --retry 3 https://github.com/rustwasm/wasm-pack/releases/download/v0.15.1/wasm-pack-v0.15.1-x86_64-unknown-linux-musl.tar.gz -o "$RUNNER_TEMP/wasm-pack.tar.gz"
-        printf '410101009739b9d01c7d5affaaad6e9c9a24b4cba6791a4805db8e89b9bf7af2  %s\n' "$RUNNER_TEMP/wasm-pack.tar.gz" | sha256sum --check
-        tar -xzf "$RUNNER_TEMP/wasm-pack.tar.gz" -C "$tools" --strip-components=1 wasm-pack-v0.15.1-x86_64-unknown-linux-musl/wasm-pack
+          curl -fsSL --retry 3 https://github.com/rustwasm/wasm-pack/releases/download/v0.15.1/wasm-pack-v0.15.1-x86_64-unknown-linux-musl.tar.gz -o "$RUNNER_TEMP/wasm-pack.tar.gz"
+          printf '410101009739b9d01c7d5affaaad6e9c9a24b4cba6791a4805db8e89b9bf7af2  %s\n' "$RUNNER_TEMP/wasm-pack.tar.gz" | sha256sum --check
+          tar -xzf "$RUNNER_TEMP/wasm-pack.tar.gz" -C "$tools" --strip-components=1 wasm-pack-v0.15.1-x86_64-unknown-linux-musl/wasm-pack
 
-        curl -fsSL --retry 3 https://github.com/wasm-bindgen/wasm-bindgen/releases/download/0.2.126/wasm-bindgen-0.2.126-x86_64-unknown-linux-musl.tar.gz -o "$RUNNER_TEMP/wasm-bindgen.tar.gz"
-        printf '064948d58e2d6c0a745216477a639ba696216d6309aaa902939d1b865b1d869d  %s\n' "$RUNNER_TEMP/wasm-bindgen.tar.gz" | sha256sum --check
-        tar -xzf "$RUNNER_TEMP/wasm-bindgen.tar.gz" -C "$tools" --strip-components=1 wasm-bindgen-0.2.126-x86_64-unknown-linux-musl/wasm-bindgen
+          curl -fsSL --retry 3 https://github.com/wasm-bindgen/wasm-bindgen/releases/download/0.2.126/wasm-bindgen-0.2.126-x86_64-unknown-linux-musl.tar.gz -o "$RUNNER_TEMP/wasm-bindgen.tar.gz"
+          printf '064948d58e2d6c0a745216477a639ba696216d6309aaa902939d1b865b1d869d  %s\n' "$RUNNER_TEMP/wasm-bindgen.tar.gz" | sha256sum --check
+          tar -xzf "$RUNNER_TEMP/wasm-bindgen.tar.gz" -C "$tools" --strip-components=1 wasm-bindgen-0.2.126-x86_64-unknown-linux-musl/wasm-bindgen
 
-        curl -fsSL --retry 3 https://github.com/WebAssembly/binaryen/releases/download/version_130/binaryen-version_130-x86_64-linux.tar.gz -o "$RUNNER_TEMP/binaryen.tar.gz"
-        printf '0a18362361ad05465118cd8eeb72edaeec89de6894bc283576ef4e07aa3babcc  %s\n' "$RUNNER_TEMP/binaryen.tar.gz" | sha256sum --check
-        tar -xzf "$RUNNER_TEMP/binaryen.tar.gz" -C "$tools" --strip-components=2 binaryen-version_130/bin/wasm-opt
+          curl -fsSL --retry 3 https://github.com/WebAssembly/binaryen/releases/download/version_130/binaryen-version_130-x86_64-linux.tar.gz -o "$RUNNER_TEMP/binaryen.tar.gz"
+          printf '0a18362361ad05465118cd8eeb72edaeec89de6894bc283576ef4e07aa3babcc  %s\n' "$RUNNER_TEMP/binaryen.tar.gz" | sha256sum --check
+          tar -xzf "$RUNNER_TEMP/binaryen.tar.gz" -C "$tools" --strip-components=2 binaryen-version_130/bin/wasm-opt
 
-        echo "$tools" >> "$GITHUB_PATH"
-    - name: Build the WebAssembly packages
-      run: just build-wasm
-      working-directory: apps/web
-    - name: Test the self-hosted build inputs
-      run: bunx vitest run src/lib/core/constant/servers.test.ts src/lib/core/util/macroAppUrl.test.ts src/lib/core/util/url.test.ts
-      working-directory: apps/web
-    - name: Build the bundle
-      run: bun run --bun build
-      env:
-        MODE: production
-        NODE_ENV: production
-        MACRO_APP_BASE_PATH: ${{ steps.inputs.outputs.base_path }}
-        VITE_BACKEND_ORIGIN: ${{ steps.inputs.outputs.backend_origin }}
-        NODE_OPTIONS: --max-old-space-size=8192
-      working-directory: apps/web
-    - name: Package the folder to publish
-      run: |
-        set -euo pipefail
+          echo "$tools" >> "$GITHUB_PATH"
+      - name: Build the WebAssembly packages
+        run: just build-wasm
+        working-directory: apps/web
+      - name: Test the self-hosted build inputs
+        run: bunx vitest run src/lib/core/constant/servers.test.ts src/lib/core/util/macroAppUrl.test.ts src/lib/core/util/url.test.ts
+        working-directory: apps/web
+      - name: Build the bundle
+        run: bun run --bun build
+        env:
+          MODE: production
+          NODE_ENV: production
+          MACRO_APP_BASE_PATH: ${{ steps.inputs.outputs.base_path }}
+          VITE_BACKEND_ORIGIN: ${{ steps.inputs.outputs.backend_origin }}
+          NODE_OPTIONS: --max-old-space-size=8192
+        working-directory: apps/web
+      - name: Package the folder to publish
+        run: |
+          set -euo pipefail
 
-        # The packaging tool refuses a bundle built for another folder, and one in
-        # which no script addresses the backend: such a bundle calls the upstream
-        # hosts and loads their analytics. Its refusal fails this job. That is all it
-        # checks: it does not search the scripts for upstream hosts.
-        arguments=(
-          --dist apps/web/dist
-          --base-path "$MACRO_APP_BASE_PATH"
-          --backend-origin "$VITE_BACKEND_ORIGIN"
-          --out "$SITE"
-        )
-        if [ "$ENFORCE_CSP" = true ]; then
-          arguments+=(--enforce-csp)
-        fi
-        if [ "$OMIT_VIDEOS" = true ]; then
-          arguments+=(--omit-videos)
-        fi
+          # The packaging tool refuses a bundle built for another folder, and one in
+          # which no script addresses the backend: such a bundle calls the upstream
+          # hosts and loads their analytics. Its refusal fails this job. That is all it
+          # checks: it does not search the scripts for upstream hosts.
+          arguments=(
+            --dist apps/web/dist
+            --base-path "$MACRO_APP_BASE_PATH"
+            --backend-origin "$VITE_BACKEND_ORIGIN"
+            --out "$SITE"
+          )
+          if [ "$ENFORCE_CSP" = true ]; then
+            arguments+=(--enforce-csp)
+          fi
+          if [ "$OMIT_VIDEOS" = true ]; then
+            arguments+=(--omit-videos)
+          fi
 
-        bun run supamac:package-web "${arguments[@]}" | tee "$RUNNER_TEMP/package-web.txt"
+          bun run supamac:package-web "${arguments[@]}" | tee "$RUNNER_TEMP/package-web.txt"
 
-        {
-          echo "### Web bundle"
-          echo
-          echo "Built for the folder \`$MACRO_APP_BASE_PATH\` and the backend \`$VITE_BACKEND_ORIGIN\`."
-          echo
-          echo '```'
-          cat "$RUNNER_TEMP/package-web.txt"
-          echo '```'
-        } >> "$GITHUB_STEP_SUMMARY"
-      env:
-        MACRO_APP_BASE_PATH: ${{ steps.inputs.outputs.base_path }}
-        VITE_BACKEND_ORIGIN: ${{ steps.inputs.outputs.backend_origin }}
-        SITE: ${{ runner.temp }}/supamac-web
-        ENFORCE_CSP: ${{ vars.SUPAMAC_WEB_ENFORCE_CSP }}
-        OMIT_VIDEOS: ${{ vars.SUPAMAC_WEB_OMIT_VIDEOS }}
-    - name: Upload the folder to publish
-      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
-      with:
-        name: supamac-web
-        path: |
-          ${{ runner.temp }}/supamac-web
-          ${{ runner.temp }}/supamac-web.publish.json
-        if-no-files-found: error
-        include-hidden-files: 'true'
-        retention-days: '3'
-        overwrite: 'true'
+          {
+            echo "### Web bundle"
+            echo
+            echo "Built for the folder \`$MACRO_APP_BASE_PATH\` and the backend \`$VITE_BACKEND_ORIGIN\`."
+            echo
+            echo '```'
+            cat "$RUNNER_TEMP/package-web.txt"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+        env:
+          MACRO_APP_BASE_PATH: ${{ steps.inputs.outputs.base_path }}
+          VITE_BACKEND_ORIGIN: ${{ steps.inputs.outputs.backend_origin }}
+          SITE: ${{ runner.temp }}/supamac-web
+          ENFORCE_CSP: ${{ vars.SUPAMAC_WEB_ENFORCE_CSP }}
+          OMIT_VIDEOS: ${{ vars.SUPAMAC_WEB_OMIT_VIDEOS }}
+      - name: Upload the folder to publish
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          path: |
+            ${{ runner.temp }}/supamac-web
+            ${{ runner.temp }}/supamac-web.publish.json
+          name: supamac-web
+          if-no-files-found: error
+          include-hidden-files: 'true'
+          retention-days: '3'
+          overwrite: 'true'
   publish:
     needs:
-    - build
+      - build
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     name: Publish the web bundle
     runs-on: ubuntu-24.04
@@ -204,59 +204,59 @@ jobs:
       contents: write
     timeout-minutes: 15
     steps:
-    - name: Fetch the folder to publish
-      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
-      with:
-        name: supamac-web
-        path: ${{ runner.temp }}/published
-    - name: Make the folder the only commit of supamac-web-dist
-      run: |
-        set -euo pipefail
+      - name: Fetch the folder to publish
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          name: supamac-web
+          path: ${{ runner.temp }}/published
+      - name: Make the folder the only commit of supamac-web-dist
+        run: |
+          set -euo pipefail
 
-        # Makes the packaged folder the only commit of the branch the host deploys
-        # from. The commit is made in a repository of its own, which has no other
-        # branch or tag, and the push names that one branch, so no other ref of the
-        # remote can change.
+          # Makes the packaged folder the only commit of the branch the host deploys
+          # from. The commit is made in a repository of its own, which has no other
+          # branch or tag, and the push names that one branch, so no other ref of the
+          # remote can change.
 
-        test -f "$SITE/index.html"
-        test -f "$SITE/.htaccess"
+          test -f "$SITE/index.html"
+          test -f "$SITE/.htaccess"
 
-        # The folder was packaged by another job. It is published only if it was
-        # packaged for the folder and the backend this repository is configured for.
-        packaged_base_path="$(jq --raw-output .basePath "$MANIFEST")"
-        packaged_backend_origin="$(jq --raw-output .backendOrigin "$MANIFEST")"
-        if [ -z "$EXPECTED_BASE_PATH" ] || [ "$packaged_base_path" != "$EXPECTED_BASE_PATH" ] \
-          || [ -z "$EXPECTED_BACKEND_ORIGIN" ] || [ "$packaged_backend_origin" != "$EXPECTED_BACKEND_ORIGIN" ]; then
-          echo "::error title=Not published::The bundle was packaged for $packaged_base_path and $packaged_backend_origin, which are not the values of SUPAMAC_WEB_BASE_PATH and SUPAMAC_BACKEND_ORIGIN."
-          exit 1
-        fi
+          # The folder was packaged by another job. It is published only if it was
+          # packaged for the folder and the backend this repository is configured for.
+          packaged_base_path="$(jq --raw-output .basePath "$MANIFEST")"
+          packaged_backend_origin="$(jq --raw-output .backendOrigin "$MANIFEST")"
+          if [ -z "$EXPECTED_BASE_PATH" ] || [ "$packaged_base_path" != "$EXPECTED_BASE_PATH" ] \
+            || [ -z "$EXPECTED_BACKEND_ORIGIN" ] || [ "$packaged_backend_origin" != "$EXPECTED_BACKEND_ORIGIN" ]; then
+            echo "::error title=Not published::The bundle was packaged for $packaged_base_path and $packaged_backend_origin, which are not the values of SUPAMAC_WEB_BASE_PATH and SUPAMAC_BACKEND_ORIGIN."
+            exit 1
+          fi
 
-        cd "$SITE"
-        git init --quiet --initial-branch "$BRANCH"
-        git add --all --force
-        git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
-          commit --quiet --message "Web bundle built from $SOURCE_SHA"
+          cd "$SITE"
+          git init --quiet --initial-branch "$BRANCH"
+          git add --all --force
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit --quiet --message "Web bundle built from $SOURCE_SHA"
 
-        # The token reaches git through a credential helper that reads it from the
-        # environment, so it is in no command line and no file.
-        git -c credential.helper= \
-          -c credential.helper='!f() { test "$1" = get && printf "username=x-access-token\npassword=%s\n" "$GITHUB_TOKEN"; }; f' \
-          push --force "$REMOTE" "HEAD:refs/heads/$BRANCH"
+          # The token reaches git through a credential helper that reads it from the
+          # environment, so it is in no command line and no file.
+          git -c credential.helper= \
+            -c credential.helper='!f() { test "$1" = get && printf "username=x-access-token\npassword=%s\n" "$GITHUB_TOKEN"; }; f' \
+            push --force "$REMOTE" "HEAD:refs/heads/$BRANCH"
 
-        {
-          echo "### Published"
-          echo
-          echo "Branch \`$BRANCH\` now holds commit \`$(git rev-parse HEAD)\`, the bundle built from \`$SOURCE_SHA\`."
-        } >> "$GITHUB_STEP_SUMMARY"
-      env:
-        SITE: ${{ runner.temp }}/published/supamac-web
-        MANIFEST: ${{ runner.temp }}/published/supamac-web.publish.json
-        EXPECTED_BASE_PATH: ${{ vars.SUPAMAC_WEB_BASE_PATH }}
-        EXPECTED_BACKEND_ORIGIN: ${{ vars.SUPAMAC_BACKEND_ORIGIN }}
-        REMOTE: ${{ github.server_url }}/${{ github.repository }}.git
-        BRANCH: supamac-web-dist
-        SOURCE_SHA: ${{ github.sha }}
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          {
+            echo "### Published"
+            echo
+            echo "Branch \`$BRANCH\` now holds commit \`$(git rev-parse HEAD)\`, the bundle built from \`$SOURCE_SHA\`."
+          } >> "$GITHUB_STEP_SUMMARY"
+        env:
+          SITE: ${{ runner.temp }}/published/supamac-web
+          MANIFEST: ${{ runner.temp }}/published/supamac-web.publish.json
+          EXPECTED_BASE_PATH: ${{ vars.SUPAMAC_WEB_BASE_PATH }}
+          EXPECTED_BACKEND_ORIGIN: ${{ vars.SUPAMAC_BACKEND_ORIGIN }}
+          REMOTE: ${{ github.server_url }}/${{ github.repository }}.git
+          BRANCH: supamac-web-dist
+          SOURCE_SHA: ${{ github.sha }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 concurrency:
   group: supamac-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}

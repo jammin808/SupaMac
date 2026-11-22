@@ -2,6 +2,9 @@ use std::collections::BTreeSet;
 
 use super::*;
 
+/// The repository boundary, as `restrict_to_upstream` spells it.
+const UPSTREAM_ONLY: &str = "github.repository == 'macro-inc/macro'";
+
 /// A workflow that keeps every rule a fork-owned workflow is held to.
 const FORK_OWNED: &str = "\
 on:
@@ -24,7 +27,7 @@ jobs:
 ";
 
 /// Whether a job's condition starts with the repository boundary, as
-/// `restrict_to_upstream` writes it and as the hand-written workflows carry it.
+/// `restrict_to_upstream` writes it.
 fn restricted_to_upstream(job: &Value) -> bool {
     job["if"].as_str().is_some_and(|condition| {
         condition.starts_with(UPSTREAM_ONLY)
@@ -34,7 +37,7 @@ fn restricted_to_upstream(job: &Value) -> bool {
 
 #[test]
 fn repository_boundary_preserves_failure_and_input_conditions() {
-    let yaml = "jobs:\n  failure:\n    if: ${{ always() && failure() }}\n  input:\n    if: inputs.deploy\n  disabled:\n    if: false\n  default: {}\n";
+    let yaml = "jobs:\n  failure:\n    if: ${{ always() && failure() }}\n    runs-on: ubuntu-24.04\n  input:\n    if: inputs.deploy\n    runs-on: ubuntu-24.04\n  disabled:\n    if: 'false'\n    runs-on: ubuntu-24.04\n  default:\n    runs-on: ubuntu-24.04\n";
     let guarded: serde_yaml::Value =
         serde_yaml::from_str(&restrict_to_upstream(yaml).expect("workflow guards"))
             .expect("valid YAML");
@@ -59,7 +62,7 @@ fn repository_boundary_preserves_failure_and_input_conditions() {
 #[test]
 fn preserves_existing_job_conditions_including_status_functions() -> Result<()> {
     let yaml = restrict_to_upstream(
-        "jobs:\n  deploy:\n    if: ${{ always() && needs.build.result == 'success' }}\n    uses: ./workflow.yml\n  publish:\n    if: false\n    runs-on: ubuntu-24.04\n  build:\n    runs-on: ubuntu-24.04\n",
+        "jobs:\n  deploy:\n    needs:\n      - build\n    if: ${{ always() && needs.build.result == 'success' }}\n    uses: ./workflow.yml\n  publish:\n    if: 'false'\n    runs-on: ubuntu-24.04\n  build:\n    runs-on: ubuntu-24.04\n",
     )?;
     let value: Value = serde_yaml::from_str(&yaml)?;
     assert_eq!(
@@ -74,6 +77,99 @@ fn preserves_existing_job_conditions_including_status_functions() -> Result<()> 
     );
     assert_eq!(value["jobs"]["build"]["if"].as_str(), Some(UPSTREAM_ONLY));
     Ok(())
+}
+
+/// A workflow as upstream's emitter lays one out: a comment ahead of it and
+/// one on a line, a key after the jobs, and a script whose lines look like
+/// keys of the workflow.
+const UPSTREAM: &str = "\
+# A notice ahead of the workflow.
+name: Fixture
+on:
+  push:
+    branches:
+      - main
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Run # zizmor: ignore[fixture] kept on purpose
+        if: always()
+        run: |
+          if: true
+
+            jobs:
+          echo done
+  deploy:
+    needs:
+      - build
+    if: needs.build.result == 'success'
+    runs-on: ubuntu-24.04
+concurrency:
+  group: fixture
+  cancel-in-progress: false
+";
+
+/// A workflow here differs from upstream's by its job conditions alone, so
+/// an upstream change to any other line of it merges cleanly.
+#[test]
+fn only_the_condition_lines_of_an_upstream_workflow_change() -> Result<()> {
+    let expected = UPSTREAM
+        .replace(
+            "  build:\n",
+            "  build:\n    if: github.repository == 'macro-inc/macro'\n",
+        )
+        .replace(
+            "    if: needs.build.result == 'success'\n",
+            "    if: (github.repository == 'macro-inc/macro') && (needs.build.result == 'success')\n",
+        );
+    assert_ne!(expected, UPSTREAM);
+    assert_eq!(restrict_to_upstream(UPSTREAM)?, expected);
+    Ok(())
+}
+
+/// A condition YAML would read differently unquoted is quoted.
+#[test]
+fn a_condition_yaml_would_misread_is_quoted() -> Result<()> {
+    let yaml = restrict_to_upstream(
+        "jobs:\n  build:\n    if: 'inputs.note != '': '''\n    runs-on: ubuntu-24.04\n",
+    )?;
+    assert!(
+        yaml.contains("    if: '(github.repository == ''macro-inc/macro'') && "),
+        "{yaml}"
+    );
+    let value: Value = serde_yaml::from_str(&yaml)?;
+    assert_eq!(
+        value["jobs"]["build"]["if"].as_str(),
+        Some("(github.repository == 'macro-inc/macro') && (inputs.note != ': ')")
+    );
+    Ok(())
+}
+
+/// The boundary is written into the emitter's layout. Anything else is
+/// refused: a job left without the boundary would run in this repository.
+#[test]
+fn a_layout_the_boundary_does_not_understand_is_refused() {
+    for unsupported in [
+        // A condition over several lines.
+        "jobs:\n  build:\n    if: |-\n      always()\n      && failure()\n    runs-on: ubuntu-24.04\n",
+        // A job written inline.
+        "jobs:\n  build: {runs-on: ubuntu-24.04}\n",
+        // A condition that is text around expressions.
+        "jobs:\n  build:\n    if: ${{ inputs.a }}-${{ inputs.b }}\n    runs-on: ubuntu-24.04\n",
+        // A condition that reads what a job's `if:` does not offer.
+        "jobs:\n  build:\n    if: secrets.TOKEN != ''\n    runs-on: ubuntu-24.04\n",
+        // Keys indented otherwise than the emitter's.
+        "jobs:\n    build:\n        if: always()\n        runs-on: ubuntu-24.04\n",
+        // No jobs at all.
+        "name: Fixture\n",
+    ] {
+        assert!(
+            restrict_to_upstream(unsupported).is_err(),
+            "accepted:\n{unsupported}"
+        );
+    }
 }
 
 #[test]
@@ -183,7 +279,7 @@ fn every_generated_workflow_is_on_its_side_of_the_repository_boundary() -> Resul
         let value: Value = serde_yaml::from_str(&yaml)?;
         let jobs = value["jobs"].as_mapping().context("jobs")?;
 
-        if workflow.fork_owned() {
+        if is_fork_owned(workflow) {
             fork_owned += 1;
             assert_eq!(
                 fork_owned_problems(workflow.file_name, &yaml)?,
@@ -218,14 +314,15 @@ fn every_generated_workflow_is_on_its_side_of_the_repository_boundary() -> Resul
     Ok(())
 }
 
-/// The same boundary on what is checked in, which also covers the workflows
-/// that are still hand-written. A `supamac-` file is one the generator wrote
-/// for a fork-owned workflow; any other file is restricted to upstream.
+/// The same boundary on what is checked in, so a workflow file that was
+/// merged or edited without regenerating fails here. A `supamac-` file is one
+/// the generator wrote for a fork-owned workflow; any other file is
+/// restricted to upstream.
 #[test]
 fn every_checked_in_workflow_is_on_its_side_of_the_repository_boundary() -> Result<()> {
     let fork_owned: BTreeSet<&str> = crate::workflows::WORKFLOWS
         .iter()
-        .filter(|workflow| workflow.fork_owned())
+        .filter(|workflow| is_fork_owned(workflow))
         .map(|workflow| workflow.file_name)
         .collect();
 

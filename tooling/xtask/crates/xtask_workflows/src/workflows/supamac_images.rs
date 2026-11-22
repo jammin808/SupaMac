@@ -4,21 +4,22 @@
 //! docs/supamac/delivery.md describes what is published and how it is pinned.
 
 use anyhow::Result;
+use gh_workflow::expr::typed::{
+    Bool, Expr, StepOutput, Str, cancelled, env, format as format_expression, github, hash_files,
+    runner, steps as step,
+};
 use gh_workflow::{
-    Event, Expression, Job, Level, Permissions, PullRequest, Push, Run, Step, Use, Workflow,
-    WorkflowDispatch,
+    Event, Job, Level, Permissions, PullRequest, Push, Run, Step, Use, Workflow, WorkflowDispatch,
 };
 
-use crate::workflows::{fork_steps, steps, yaml_fragment};
+use crate::workflows::actions::{
+    ActionsAttestBuildProvenance, ActionsCacheRestore, ActionsCacheSave, ActionsDownloadArtifact,
+    ActionsUploadArtifact, DockerBuildPushAction, DockerLoginAction, DockerSetupBuildxAction,
+};
+use crate::workflows::{fork_steps, steps};
 
 #[cfg(test)]
 mod test;
-
-// Resolved from each action's release tags on 2026-11-21.
-const SETUP_BUILDX: &str = "f87e5991a6d7451dcb8d9637bfbc97413f497069"; // v4.4.1
-const LOGIN: &str = "8aa5831fb8d48d8f76594c7ddde61ae58019f550"; // v4.8.0
-const BUILD_PUSH: &str = "c3c9e263c25d99ce0380d002d59b67737d91b0dc"; // v7.4.0
-const ATTEST_BUILD_PROVENANCE: &str = "4d101475d8b20a2381f78447822ac1eab6504dd8"; // v4.2.2
 
 /// The Rust binaries of a self-hosted instance: each cargo package with the
 /// binaries it puts in the image. They are the ones
@@ -51,30 +52,65 @@ const SERVICE_BINARIES: [(&str, &[&str]); 15] = [
 /// as tracked. A test holds it to the file.
 const PDFIUM_SHA256: &str = "3f3af4e4ba46bec9d0d11c5635262663b7020345ff4bed7eee85e883e2ce8455";
 
+/// The job that compiles the services, which the job that publishes their
+/// image waits for.
+const SERVICES_JOB: &str = "services";
+
 /// Where the services job puts what the services image is built from.
-const SERVICES_CONTEXT: &str = "${{ runner.temp }}/services-context";
+fn services_context() -> String {
+    format!("{}/services-context", runner().temp())
+}
 
 /// The services image's context as one file, which keeps the binaries' modes
 /// between the job that compiles and the job that publishes.
-const SERVICES_ARCHIVE: &str = "${{ runner.temp }}/services-context.tar.zst";
+fn services_archive() -> String {
+    format!("{}/services-context.tar.zst", runner().temp())
+}
 
 const SERVICES_ARTIFACT: &str = "supamac-services-context";
 
 /// The image the services job builds to check it. Never pushed.
 const SERVICES_CHECK_IMAGE: &str = "supamac-services:check";
 
-/// The registry path of this repository's images, set by
-/// [`name_registry_namespace`].
-const IMAGE_NAMESPACE: &str = "${{ env.IMAGE_NAMESPACE }}";
+/// The variable [`name_registry_namespace`] sets to the registry path of this
+/// repository's images.
+const IMAGE_NAMESPACE: &str = "IMAGE_NAMESPACE";
+
+/// The registry path of this repository's images.
+fn image_namespace() -> Expr<Str> {
+    env(IMAGE_NAMESPACE)
+}
 
 /// What a job that pushes an image needs beyond reading the repository:
 /// `packages` to push, and `id-token` with `attestations` to sign and store
-/// the provenance of what it pushed. gh-workflow has no `attestations` field.
-const PUBLISH_PERMISSIONS: &str =
-    "contents: read\npackages: write\nid-token: write\nattestations: write\n";
+/// the provenance of what it pushed.
+fn publish_permissions() -> Permissions {
+    Permissions::default()
+        .contents(Level::Read)
+        .packages(Level::Write)
+        .id_token(Level::Write)
+        .attestations(Level::Write)
+}
 
 /// The licence of this repository, which the fork's own images carry.
 const REPOSITORY_LICENCE: &str = "AGPL-3.0-only";
+
+/// Where an image is built from.
+enum BuildContext {
+    /// A directory of the checkout.
+    Checkout(&'static str),
+    /// The directory the services job assembles ([`services_context`]).
+    Assembled,
+}
+
+impl BuildContext {
+    fn path(&self) -> String {
+        match self {
+            Self::Checkout(directory) => (*directory).to_owned(),
+            Self::Assembled => services_context(),
+        }
+    }
+}
 
 /// One image and what it is built from. The names follow the variables
 /// `infra/self-hosted/compose.yaml` reads them from (`SUPAMAC_SYNC_IMAGE` is
@@ -83,7 +119,7 @@ struct Image {
     /// The repository name in the registry.
     name: &'static str,
     dockerfile: &'static str,
-    context: &'static str,
+    context: BuildContext,
     /// The SPDX expression for what the image holds.
     licence: &'static str,
 }
@@ -91,14 +127,14 @@ struct Image {
 const SERVICES: Image = Image {
     name: "supamac-services",
     dockerfile: "infra/self-hosted/images/services.Dockerfile",
-    context: SERVICES_CONTEXT,
+    context: BuildContext::Assembled,
     licence: REPOSITORY_LICENCE,
 };
 
 const SYNC: Image = Image {
     name: "supamac-sync",
     dockerfile: "docker/sync-service.Dockerfile",
-    context: ".",
+    context: BuildContext::Checkout("."),
     licence: REPOSITORY_LICENCE,
 };
 
@@ -108,21 +144,21 @@ const SYNC: Image = Image {
 const LEXICAL: Image = Image {
     name: "supamac-lexical",
     dockerfile: "infra/self-hosted/images/lexical-service.Dockerfile",
-    context: ".",
+    context: BuildContext::Checkout("."),
     licence: REPOSITORY_LICENCE,
 };
 
 const AI_EDITING: Image = Image {
     name: "supamac-ai-editing",
     dockerfile: "infra/self-hosted/images/ai-editing-worker.Dockerfile",
-    context: ".",
+    context: BuildContext::Checkout("."),
     licence: REPOSITORY_LICENCE,
 };
 
 const OPS: Image = Image {
     name: "supamac-ops",
     dockerfile: "infra/self-hosted/ops/Dockerfile",
-    context: ".",
+    context: BuildContext::Checkout("."),
     licence: REPOSITORY_LICENCE,
 };
 
@@ -132,27 +168,23 @@ const OPS: Image = Image {
 const SEARCH: Image = Image {
     name: "supamac-search",
     dockerfile: "infra/local/opensearch/Dockerfile",
-    context: "infra/local/opensearch",
+    context: BuildContext::Checkout("infra/local/opensearch"),
     licence: "Apache-2.0",
 };
 
-/// Every job that pushes, by id. [`render`] gives each [`PUBLISH_PERMISSIONS`].
-const PUBLISHING_JOBS: [&str; 4] = [
-    "services-image",
-    "sync-service-image",
-    "workers-image",
-    "ops-image",
-];
-
-/// Render the workflow, with the constructs gh-workflow cannot express.
+/// Render the workflow.
 pub fn render() -> Result<String> {
-    let workflow = Workflow::new("SupaMac images")
+    fork_steps::render_delivery(workflow())
+}
+
+fn workflow() -> Workflow {
+    Workflow::new("SupaMac images")
         .permissions(Permissions::default().contents(Level::Read))
         .on(Event::default()
             .push(Push::default().add_branch("main"))
             .pull_request(pull_request())
             .workflow_dispatch(WorkflowDispatch::default()))
-        .add_job("services", services())
+        .add_job(SERVICES_JOB, services())
         .add_job("services-image", services_image())
         .add_job(
             "sync-service-check",
@@ -185,17 +217,7 @@ pub fn render() -> Result<String> {
         .add_job(
             "ops-image",
             docker_images("the ops and search images", &[OPS, SEARCH], true),
-        );
-
-    let yaml = workflow
-        .to_string()
-        .map_err(|error| anyhow::anyhow!("{error:?}"))?;
-    let mut value: serde_yaml::Value = serde_yaml::from_str(&yaml)?;
-    value["concurrency"] = fork_steps::delivery_concurrency()?;
-    for job in PUBLISHING_JOBS {
-        value["jobs"][job]["permissions"] = yaml_fragment(PUBLISH_PERMISSIONS)?;
-    }
-    serde_yaml::to_string(&value).map_err(Into::into)
+        )
 }
 
 /// A pull request builds the images only when it changes something they are
@@ -312,16 +334,24 @@ fn generate_code_mode_assets() -> Step<Run> {
 /// other lockfile.
 fn restore_cargo_cache() -> Step<Use> {
     let toolchain = fork_steps::RUST_TOOLCHAIN;
-    let prefix = format!("supamac-services-${{{{ runner.os }}}}-rust{toolchain}-");
-    let lockfile = format!("{prefix}${{{{ hashFiles('Cargo.lock') }}}}");
+    let prefix = format!("supamac-services-{}-rust{toolchain}-", runner().os());
+    let lockfile = format!("{prefix}{}", hash_files(["Cargo.lock"]));
 
-    Step::new("Restore the cargo cache")
-        .uses("actions/cache", "restore", fork_steps::ACTIONS_CACHE)
-        .id("cargo-cache")
-        .add_with(("path", CARGO_CACHE_PATHS))
-        .add_with(("key", lockfile.clone()))
-        .add_with(("restore-keys", format!("{lockfile}-\n{prefix}\n")))
+    ActionsCacheRestore::new("Restore the cargo cache", CARGO_CACHE_PATHS, &lockfile)
+        .restore_keys(format!("{lockfile}-\n{prefix}\n"))
+        .step()
+        .id(CARGO_CACHE)
 }
+
+/// The step that restores the cargo cache, and what later steps read of it:
+/// whether it found this lockfile's entry, and the name of that entry.
+const CARGO_CACHE: &str = "cargo-cache";
+const CARGO_CACHE_HIT: StepOutput<Str> = ActionsCacheRestore::cache_hit_output(CARGO_CACHE);
+const CARGO_CACHE_KEY: StepOutput<Str> = ActionsCacheRestore::cache_primary_key_output(CARGO_CACHE);
+
+/// The step that compiles the services. What it left behind is cached
+/// whether or not it succeeded.
+const BUILD: &str = "build";
 
 /// The registry's index and archives (cargo unpacks sources from them), git
 /// dependencies, and the release build.
@@ -346,7 +376,7 @@ fn build_services() -> Step<Run> {
 
     Step::new("Build every service in one cargo invocation")
         .run(command)
-        .id("build")
+        .id(BUILD)
         .timeout_minutes(300u32)
 }
 
@@ -363,7 +393,7 @@ fn assemble_services_context() -> Step<Run> {
     Step::new("Strip the binaries into the image context")
         .run(include_str!("supamac_images/assemble_services_context.sh"))
         .add_env(("BINARIES", service_binary_names()))
-        .add_env(("CONTEXT", SERVICES_CONTEXT))
+        .add_env(("CONTEXT", services_context()))
         .add_env(("PDFIUM_SHA256", PDFIUM_SHA256))
 }
 
@@ -371,39 +401,60 @@ fn assemble_services_context() -> Step<Run> {
 /// publishing run starts from; a run that found its lockfile's entry has
 /// nothing to add. A build that failed or ran out of time saves what it
 /// compiled under a name of its own, and the next run goes on from there.
-const SAVES_CARGO_CACHE: &str = "!cancelled() && github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && steps.cargo-cache.outputs.cache-hit != 'true' && steps.build.outcome != 'skipped'";
+fn saves_cargo_cache() -> Expr<Bool> {
+    (!cancelled())
+        .and(github().git_ref().eq(fork_steps::MAIN_REF))
+        .and(fork_steps::not_on_pull_request())
+        .and(CARGO_CACHE_HIT.read().ne("true"))
+        .and(step(BUILD).outcome().ne("skipped"))
+}
 
 fn trim_cargo_target() -> Step<Run> {
     Step::new("Drop the linked binaries from the cargo cache")
         .run(include_str!("supamac_images/trim_cargo_target.sh"))
-        .if_condition(Expression::new(SAVES_CARGO_CACHE))
+        .if_condition(saves_cargo_cache())
 }
 
 fn save_cargo_cache() -> Step<Use> {
-    Step::new("Save the cargo cache")
-        .uses("actions/cache", "save", fork_steps::ACTIONS_CACHE)
-        .if_condition(Expression::new(SAVES_CARGO_CACHE))
-        .add_with(("path", CARGO_CACHE_PATHS))
-        .add_with((
-            "key",
-            "${{ steps.cargo-cache.outputs.cache-primary-key }}${{ steps.build.outcome != 'success' && format('-partial-{0}-{1}', github.run_id, github.run_attempt) || '' }}",
-        ))
+    let unfinished = step(BUILD).outcome().ne("success").then_else(
+        format_expression(
+            "-partial-{0}-{1}",
+            [
+                github().run_id().into_ast(),
+                github().run_attempt().into_ast(),
+            ],
+        ),
+        "",
+    );
+
+    ActionsCacheSave::new(
+        "Save the cargo cache",
+        CARGO_CACHE_PATHS,
+        format!("{}{unfinished}", CARGO_CACHE_KEY.read()),
+    )
+    .step()
+    .if_condition(saves_cargo_cache())
 }
 
 fn setup_buildx() -> Step<Use> {
-    Step::new("Set up Docker Buildx").uses("docker", "setup-buildx-action", SETUP_BUILDX)
+    DockerSetupBuildxAction::new("Set up Docker Buildx").step()
 }
 
 /// Build the services image into the runner's Docker, so the next step can
 /// run it. The publishing job builds it again from the same context.
 fn build_services_check_image() -> Step<Use> {
-    Step::new("Build the services image")
-        .uses("docker", "build-push-action", BUILD_PUSH)
-        .add_with(("context", SERVICES.context))
-        .add_with(("file", SERVICES.dockerfile))
-        .add_with(("platforms", "linux/amd64"))
-        .add_with(("load", true))
-        .add_with(("tags", SERVICES_CHECK_IMAGE))
+    build_image("Build the services image", &SERVICES)
+        .load(true)
+        .tags(SERVICES_CHECK_IMAGE)
+        .step()
+}
+
+/// A build of `image` for the one platform the stack runs on.
+fn build_image(name: &str, image: &Image) -> DockerBuildPushAction {
+    DockerBuildPushAction::new(name)
+        .context(image.context.path())
+        .file(image.dockerfile)
+        .platforms("linux/amd64")
 }
 
 fn check_services_image() -> Step<Run> {
@@ -416,23 +467,25 @@ fn check_services_image() -> Step<Run> {
 fn pack_services_context() -> Step<Run> {
     Step::new("Pack the image context")
         .run("tar --create --zstd --file \"$ARCHIVE\" --directory \"$CONTEXT\" .")
-        .if_condition(Expression::new(fork_steps::NOT_ON_PULL_REQUEST))
-        .add_env(("ARCHIVE", SERVICES_ARCHIVE))
-        .add_env(("CONTEXT", SERVICES_CONTEXT))
+        .if_condition(fork_steps::not_on_pull_request())
+        .add_env(("ARCHIVE", services_archive()))
+        .add_env(("CONTEXT", services_context()))
 }
 
 fn upload_services_context() -> Step<Use> {
-    Step::new("Hand the image context to the publishing job")
-        .uses("actions", "upload-artifact", fork_steps::UPLOAD_ARTIFACT)
-        .if_condition(Expression::new(fork_steps::NOT_ON_PULL_REQUEST))
-        .add_with(("name", SERVICES_ARTIFACT))
-        .add_with(("path", SERVICES_ARCHIVE))
-        .add_with(("if-no-files-found", "error"))
-        // Already compressed, and read once by the next job.
-        .add_with(("compression-level", 0))
-        .add_with(("retention-days", 1))
-        // A run that is started again uploads under the same name.
-        .add_with(("overwrite", true))
+    ActionsUploadArtifact::new(
+        "Hand the image context to the publishing job",
+        services_archive(),
+    )
+    .name(SERVICES_ARTIFACT)
+    .if_no_files_found("error")
+    // Already compressed, and read once by the next job.
+    .compression_level(0)
+    .retention_days(1)
+    // A run that is started again uploads under the same name.
+    .overwrite(true)
+    .step()
+    .if_condition(fork_steps::not_on_pull_request())
 }
 
 /// Publish the image of the binaries [`services`] built. This job runs no
@@ -443,24 +496,21 @@ fn services_image() -> Job {
         .name("Publish the services image")
         .runs_on(fork_steps::RUNNER)
         .timeout_minutes(30u32)
-        .add_needs("services")
-        .cond(Expression::new(fork_steps::NOT_ON_PULL_REQUEST))
+        .add_needs(SERVICES_JOB)
+        .cond(fork_steps::not_on_pull_request())
+        .permissions(publish_permissions())
         .add_step(steps::checkout(false, false))
         .add_step(
-            Step::new("Fetch the image context")
-                .uses(
-                    "actions",
-                    "download-artifact",
-                    fork_steps::DOWNLOAD_ARTIFACT,
-                )
-                .add_with(("name", SERVICES_ARTIFACT))
-                .add_with(("path", "${{ runner.temp }}")),
+            ActionsDownloadArtifact::new("Fetch the image context")
+                .name(SERVICES_ARTIFACT)
+                .path(runner().temp())
+                .step(),
         )
         .add_step(
             Step::new("Unpack the image context")
                 .run("mkdir \"$CONTEXT\"\ntar --extract --zstd --file \"$ARCHIVE\" --directory \"$CONTEXT\"\n")
-                .add_env(("ARCHIVE", SERVICES_ARCHIVE))
-                .add_env(("CONTEXT", SERVICES_CONTEXT)),
+                .add_env(("ARCHIVE", services_archive()))
+                .add_env(("CONTEXT", services_context())),
         )
         .add_step(setup_buildx())
         .add_step(name_registry_namespace())
@@ -474,16 +524,16 @@ fn services_image() -> Job {
 /// one that runs otherwise and pushes.
 fn docker_images(what: &str, images: &[Image], publish_images: bool) -> Job {
     let (name, condition) = if publish_images {
-        (format!("Publish {what}"), fork_steps::NOT_ON_PULL_REQUEST)
+        (format!("Publish {what}"), fork_steps::not_on_pull_request())
     } else {
-        (format!("Build {what}"), fork_steps::ON_PULL_REQUEST)
+        (format!("Build {what}"), fork_steps::on_pull_request())
     };
 
     let mut job = Job::default()
         .name(name)
         .runs_on(fork_steps::RUNNER)
         .timeout_minutes(120u32)
-        .cond(Expression::new(condition))
+        .cond(condition)
         .add_step(steps::checkout(false, false))
         .add_step(fork_steps::free_disk_space())
         .add_step(setup_buildx());
@@ -496,6 +546,7 @@ fn docker_images(what: &str, images: &[Image], publish_images: bool) -> Job {
     }
 
     job = job
+        .permissions(publish_permissions())
         .add_step(name_registry_namespace())
         .add_step(log_in_to_registry());
     for image in images {
@@ -505,26 +556,24 @@ fn docker_images(what: &str, images: &[Image], publish_images: bool) -> Job {
 }
 
 fn build_without_pushing(image: &Image) -> Step<Use> {
-    Step::new(format!("Build {}", image.name))
-        .uses("docker", "build-push-action", BUILD_PUSH)
-        .add_with(("context", image.context))
-        .add_with(("file", image.dockerfile))
-        .add_with(("platforms", "linux/amd64"))
-        .add_with(("push", false))
+    build_image(&format!("Build {}", image.name), image)
+        .push(false)
+        .step()
 }
 
 /// A registry path is lower-case, and an account name need not be.
 fn name_registry_namespace() -> Step<Run> {
-    Step::new("Name the registry namespace")
-        .run("echo \"IMAGE_NAMESPACE=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}\" >> \"$GITHUB_ENV\"")
+    Step::new("Name the registry namespace").run(format!(
+        "echo \"{IMAGE_NAMESPACE}=ghcr.io/${{GITHUB_REPOSITORY_OWNER,,}}\" >> \"$GITHUB_ENV\""
+    ))
 }
 
 fn log_in_to_registry() -> Step<Use> {
-    Step::new("Log in to the container registry")
-        .uses("docker", "login-action", LOGIN)
-        .add_with(("registry", "ghcr.io"))
-        .add_with(("username", "${{ github.actor }}"))
-        .add_with(("password", "${{ secrets.GITHUB_TOKEN }}"))
+    DockerLoginAction::new("Log in to the container registry")
+        .registry("ghcr.io")
+        .username(github().actor())
+        .password(fork_steps::RUN_TOKEN)
+        .step()
 }
 
 /// Push one image and say what was pushed: the image under its commit, and
@@ -534,43 +583,44 @@ fn log_in_to_registry() -> Step<Use> {
 fn publish(job: Job, image: &Image) -> Job {
     let name = image.name;
     let build = format!("build-{name}");
-    let repository = format!("{IMAGE_NAMESPACE}/{name}");
-    let digest = format!("${{{{ steps.{build}.outputs.digest }}}}");
+    let repository = format!("{}/{name}", image_namespace());
+    let digest = step(&build).output("digest");
 
-    let tags = format!(
-        "{repository}:${{{{ github.sha }}}}\n${{{{ github.ref == 'refs/heads/main' && format('{{0}}/{name}:latest', env.IMAGE_NAMESPACE) || '' }}}}\n"
+    let latest = github().git_ref().eq(fork_steps::MAIN_REF).then_else(
+        format_expression(
+            &format!("{{0}}/{name}:latest"),
+            [image_namespace().into_ast()],
+        ),
+        "",
     );
+    let tags = format!("{repository}:{}\n{latest}\n", github().sha());
     let labels = format!(
-        "org.opencontainers.image.title={name}\norg.opencontainers.image.source=${{{{ github.server_url }}}}/${{{{ github.repository }}}}\norg.opencontainers.image.revision=${{{{ github.sha }}}}\norg.opencontainers.image.licenses={licence}\n",
+        "org.opencontainers.image.title={name}\norg.opencontainers.image.source={}/{}\norg.opencontainers.image.revision={}\norg.opencontainers.image.licenses={licence}\n",
+        github().server_url(),
+        github().repository(),
+        github().sha(),
         licence = image.licence
     );
 
     job.add_step(
-        Step::new(format!("Build and push {name}"))
-            .uses("docker", "build-push-action", BUILD_PUSH)
-            .id(build)
-            .add_with(("context", image.context))
-            .add_with(("file", image.dockerfile))
-            .add_with(("platforms", "linux/amd64"))
-            .add_with(("push", true))
-            .add_with(("tags", tags))
-            .add_with(("labels", labels))
-            .add_with(("provenance", "mode=max"))
-            .add_with(("sbom", true)),
+        build_image(&format!("Build and push {name}"), image)
+            .push(true)
+            .tags(tags)
+            .labels(labels)
+            .provenance("mode=max")
+            .sbom(true)
+            .step()
+            .id(build),
     )
     .add_step(
-        Step::new(format!("Attest the provenance of {name}"))
-            .uses(
-                "actions",
-                "attest-build-provenance",
-                ATTEST_BUILD_PROVENANCE,
-            )
-            .add_with(("subject-name", repository.clone()))
-            .add_with(("subject-digest", digest.clone()))
-            .add_with(("push-to-registry", true))
+        ActionsAttestBuildProvenance::new(&format!("Attest the provenance of {name}"))
+            .subject_name(&repository)
+            .subject_digest(&digest)
+            .push_to_registry(true)
             // A storage record is an organisation's inventory of artifacts
             // and needs a permission of its own.
-            .add_with(("create-storage-record", false)),
+            .create_storage_record(false)
+            .step(),
     )
     .add_step(
         Step::new(format!("Report the digest of {name}"))
