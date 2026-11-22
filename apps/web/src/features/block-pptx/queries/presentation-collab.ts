@@ -5,6 +5,7 @@
  * The editor runs over it with `openCollaborativePresentation`.
  */
 
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { fireAndForget } from '@core/util/fireAndForget';
 import { schema } from '@loro-mirror/core';
 import { createAwareness } from '@macro-inc/collaboration/collab/awareness';
@@ -214,8 +215,7 @@ export function createPresentationCollabSession(
     if (version > PPTX_FORMAT_VERSION) {
       setState({
         t: 'error',
-        message:
-          'This presentation was saved by a newer version of Macro. Reload to open it.',
+        message: `This presentation was saved by a newer version of ${PRODUCT_NAME}. Reload to open it.`,
       });
       return;
     }

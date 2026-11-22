@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { fireAndForget } from '@core/util/fireAndForget';
 import { Button } from '@ui';
 import { createSignal, For, Show } from 'solid-js';
@@ -10,7 +11,7 @@ import {
 } from '../core/message-operation';
 
 const labels: Record<MessageResolutionAction, string> = {
-  keep_local: 'Keep Macro version',
+  keep_local: `Keep ${PRODUCT_NAME} version`,
   use_provider: 'Use mailbox version',
   recheck: 'Check again',
   retry_send: 'Retry send',
@@ -102,8 +103,8 @@ export function MessageOperationRecovery(props: {
                     : decision()?.action === 'retry_send'
                       ? 'Send this email again? The earlier attempt may already have reached its recipients.'
                       : decision()?.action === 'use_provider'
-                        ? 'Replace the saved Macro draft with the mailbox version?'
-                        : 'Replace the mailbox draft with the saved Macro version?'}
+                        ? `Replace the saved ${PRODUCT_NAME} draft with the mailbox version?`
+                        : `Replace the mailbox draft with the saved ${PRODUCT_NAME} version?`}
                 </p>
                 <Show
                   when={

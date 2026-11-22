@@ -142,7 +142,7 @@ test('without an inbox the last step shows Macro’s templates at once', async (
     routineSuggestions: { status: 'none', suggestions: TEMPLATES },
   });
   await expect(page.getByText('Share updates', { exact: true })).toBeVisible();
-  await expect(page.getByText('Template from Macro')).toHaveCount(2);
+  await expect(page.getByText('Template from SupaMac')).toHaveCount(2);
   // A row opens to rename the routine before it is created.
   await page.getByRole('button', { name: /Share updates/ }).click();
   await expect(page.getByRole('textbox', { name: 'Name' })).toBeVisible();

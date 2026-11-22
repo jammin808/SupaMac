@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/constants/product';
 import { PLAN_USAGE_LABELS } from '../../paywall/plans';
 
 /** Feature comparison shown below the unchanged trial offer. */
@@ -10,7 +11,7 @@ export const PLAN_COMPARISON = [
   {
     feature: 'Email branding',
     values: {
-      free: '“Sent with Macro”',
+      free: `“Sent with ${PRODUCT_NAME}”`,
       premium: 'No watermark',
       max: 'No watermark',
     },

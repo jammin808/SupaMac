@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import MegaphoneIcon from '@phosphor/megaphone-simple.svg';
 import PlusIcon from '@phosphor/plus.svg';
 import UserIcon from '@phosphor/user.svg';
@@ -134,7 +135,7 @@ export function ChatList(props: {
                         aria-label={
                           props.adding.has(chat.jid)
                             ? 'Adding…'
-                            : 'Add to Macro'
+                            : `Add to ${PRODUCT_NAME}`
                         }
                         disabled={props.adding.has(chat.jid)}
                         onClick={() => props.onAdd(chat)}
@@ -144,7 +145,7 @@ export function ChatList(props: {
                         <span class="mobile:hidden">
                           {props.adding.has(chat.jid)
                             ? 'Adding…'
-                            : 'Add to Macro'}
+                            : `Add to ${PRODUCT_NAME}`}
                         </span>
                       </Button>
                     }

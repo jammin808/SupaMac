@@ -2,6 +2,7 @@ import {
   DateTimeRange,
   DateTimeRangeFields,
 } from '@app/components/date-time-range/date-time-range-fields';
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { MarkdownTextarea } from '@core/component/LexicalMarkdown/component/core/MarkdownTextarea';
 import SpinnerIcon from '@icon/system/regular/spinner.svg';
 import type { CalendarUpdateScope } from '@service-email/client';
@@ -522,9 +523,9 @@ function Notices() {
               }
             >
               <span>
-                Macro checks for conflicts in the background while this calendar
-                is connected. Replies already sent cannot be undone by changing
-                this event.
+                {PRODUCT_NAME} checks for conflicts in the background while this
+                calendar is connected. Replies already sent cannot be undone by
+                changing this event.
               </span>
             </Show>
             <Show when={notice().declineMessage}>

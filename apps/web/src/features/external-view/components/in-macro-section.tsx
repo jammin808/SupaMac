@@ -1,5 +1,6 @@
 import { ViewSidebar } from '@app/components/view-shell';
 import { ViewSkeleton } from '@app/components/view-shell/ViewSkeleton';
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import UserIcon from '@phosphor/user.svg';
 import UsersThreeIcon from '@phosphor/users-three.svg';
 import { Button, Tooltip } from '@ui';
@@ -113,7 +114,7 @@ export function InMacroChats(props: {
           >
             <div
               role="navigation"
-              aria-label={`${props.label} chats in Macro`}
+              aria-label={`${props.label} chats in ${PRODUCT_NAME}`}
               class="flex flex-col"
             >
               <ConversationSectionList

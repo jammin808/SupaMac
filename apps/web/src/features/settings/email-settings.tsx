@@ -3,6 +3,7 @@ import {
   chosenEmailRowStyle,
   setEmailRowStyle,
 } from '@app/features/email-view/primitives/email-row-style';
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { t } from '@app/lib/i18n';
 import { toast } from '@core/component/Toast/Toast';
 import { useSettingsState } from '@core/constant/SettingsState';
@@ -37,7 +38,7 @@ export function EmailSettings(props: { displayOptions: boolean }) {
     >
       <SettingsSection
         title="Accounts"
-        description="Connect email accounts and manage their sync with Macro."
+        description={`Connect email accounts and manage their sync with ${PRODUCT_NAME}.`}
       >
         <Suspense
           fallback={

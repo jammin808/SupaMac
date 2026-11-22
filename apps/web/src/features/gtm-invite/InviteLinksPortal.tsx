@@ -1,4 +1,5 @@
 import { useAnalytics } from '@app/lib/analytics/analytics-context';
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { toast } from '@core/component/Toast/Toast';
 import { useEmail, useIsAuthenticated } from '@core/context/user';
 import { idToDisplayName } from '@core/user/util';
@@ -73,7 +74,7 @@ export function InviteLinksPortal() {
           <Match when={isAuthenticated() === false}>
             <Gate
               title="Log in to continue"
-              body="This page is for Macro staff."
+              body={`This page is for ${PRODUCT_NAME} staff.`}
               action={
                 <Button
                   variant="primary"
@@ -91,7 +92,7 @@ export function InviteLinksPortal() {
           </Match>
           <Match when={isAuthenticated() === true && !isStaff()}>
             <Gate
-              title="Macro staff only"
+              title={`${PRODUCT_NAME} staff only`}
               body="Invite links can only be created from a @macro.com account."
             />
           </Match>

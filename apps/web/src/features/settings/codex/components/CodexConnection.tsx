@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import OpenAiIcon from '@core/component/AI/assets/openai.svg';
 import { fireAndForget } from '@core/util/fireAndForget';
 import ArrowUpRightIcon from '@icon/system/regular/arrow-up-right.svg';
@@ -42,7 +43,7 @@ export function CodexConnection(props: {
     if (props.pending) return;
     const confirmed = await confirmDialog({
       title: 'Disconnect ChatGPT?',
-      body: 'Remove your ChatGPT connection from Macro? Existing Codex cloud sessions keep running. You can reconnect at any time.',
+      body: `Remove your ChatGPT connection from ${PRODUCT_NAME}? Existing Codex cloud sessions keep running. You can reconnect at any time.`,
       confirmLabel: 'Disconnect',
       tone: 'danger',
     });
@@ -65,7 +66,7 @@ export function CodexConnection(props: {
           </Show>
         </div>
         <p class="mt-1 text-sm text-ink-muted">
-          Use your ChatGPT account to run Codex cloud sessions in Macro.
+          {`Use your ChatGPT account to run Codex cloud sessions in ${PRODUCT_NAME}.`}
         </p>
         <Show when={props.error}>
           <p role="alert" class="mt-3 text-sm text-negative">

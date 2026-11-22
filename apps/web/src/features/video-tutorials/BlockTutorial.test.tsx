@@ -14,6 +14,15 @@ import {
   TutorialSidebarItem,
 } from './views/BlockTutorial';
 
+// The build's switch for the tutorial entries.
+const build = vi.hoisted(() => ({ videoTutorials: true }));
+vi.mock(import('@core/constant/featureFlags'), async (importOriginal) => ({
+  ...(await importOriginal()),
+  get ENABLE_VIDEO_TUTORIALS() {
+    return build.videoTutorials;
+  },
+}));
+
 const track = vi.hoisted(() => vi.fn());
 vi.mock('@app/lib/analytics', () => ({ analytics: { track } }));
 
@@ -81,6 +90,7 @@ const play = vi.fn(() => Promise.resolve());
 const pause = vi.fn();
 
 beforeEach(() => {
+  build.videoTutorials = true;
   localStorage.clear();
   useDevice(DESKTOP);
   channelList.channels = [];
@@ -115,12 +125,28 @@ afterEach(() => {
 });
 
 const row = () =>
-  screen.queryByRole('button', { name: /Learn how to use Macro Mail/ });
+  screen.queryByRole('button', { name: /Learn how to use SupaMac Mail/ });
 const video = () => document.querySelector('video');
 const playButton = () => screen.getByRole('button', { name: /^Play / });
 // jsdom keeps Kobalte's dialog mounted for its exit; it is closed once marked so.
 const dialogClosed = () =>
   screen.queryByRole('dialog')?.hasAttribute('data-closed') ?? true;
+
+describe('a build without video tutorials', () => {
+  it('shows no tutorial entry of any kind', () => {
+    build.videoTutorials = false;
+    render(() => (
+      <>
+        <TutorialRow tutorial="mail" />
+        <TutorialPill tutorial="mail" />
+        <TutorialSidebarItem tutorial="mail" />
+      </>
+    ));
+
+    expect(screen.queryByRole('button')).toBeNull();
+    expect(screen.queryByText('Watch tutorial')).toBeNull();
+  });
+});
 
 describe('block tutorial row', () => {
   it('opens the video paused and plays it only from the play button', async () => {
@@ -131,7 +157,7 @@ describe('block tutorial row', () => {
     expect(play).not.toHaveBeenCalled();
     // The play pill names the video and shows its presenter and length.
     const pill = screen.getByRole('button', {
-      name: 'Play Learn how to use Macro Mail, 1:42',
+      name: 'Play Learn how to use SupaMac Mail, 1:42',
     });
     expect(pill.textContent).toContain('Jacob Beckerman');
     expect(pill.textContent).toContain('Watch demo · 1:42');
@@ -189,22 +215,22 @@ describe('shelf after a video ends', () => {
     const dialog = await screen.findByRole('dialog');
     fireEvent.click(playButton());
     fireEvent.playing(video()!);
-    expect(screen.queryByText('More videos from Macro')).toBeNull();
+    expect(screen.queryByText('More videos from SupaMac')).toBeNull();
 
     fireEvent.ended(video()!);
 
-    screen.getByText('More videos from Macro');
+    screen.getByText('More videos from SupaMac');
     expect(
-      screen.queryByRole('button', { name: /^Learn how to use Macro Mail,/ })
+      screen.queryByRole('button', { name: /^Learn how to use SupaMac Mail,/ })
     ).toBeNull();
     expect(video()?.controls).toBe(false);
 
     fireEvent.click(
-      screen.getByRole('button', { name: /^Learn how to use Macro CRM,/ })
+      screen.getByRole('button', { name: /^Learn how to use SupaMac CRM,/ })
     );
 
-    expect(screen.queryByText('More videos from Macro')).toBeNull();
-    expect(dialog.textContent).toContain('Learn how to use Macro CRM');
+    expect(screen.queryByText('More videos from SupaMac')).toBeNull();
+    expect(dialog.textContent).toContain('Learn how to use SupaMac CRM');
     expect(video()?.getAttribute('src')).toBe(TUTORIALS.crm?.videoUrl);
     expect(document.activeElement).toBe(playButton());
     expect(track).toHaveBeenLastCalledWith('tutorial_video', {
@@ -234,7 +260,7 @@ describe('shelf after a video ends', () => {
 
     expect(play).toHaveBeenCalledTimes(1);
     expect(video()?.currentTime).toBe(0);
-    expect(screen.queryByText('More videos from Macro')).toBeNull();
+    expect(screen.queryByText('More videos from SupaMac')).toBeNull();
   });
 });
 
@@ -255,10 +281,10 @@ describe('support link under the video', () => {
     ];
     render(() => <TutorialPill tutorial="crm" />);
     fireEvent.click(
-      screen.getByRole('button', { name: /Learn how to use Macro CRM/ })
+      screen.getByRole('button', { name: /Learn how to use SupaMac CRM/ })
     );
     await screen.findByRole('dialog');
-    screen.getByText('Have questions about Macro CRM?');
+    screen.getByText('Have questions about SupaMac CRM?');
 
     fireEvent.click(
       screen.getByRole('button', {
@@ -316,7 +342,7 @@ describe('support link under the video', () => {
     fireEvent.click(row()!);
     await screen.findByRole('dialog');
 
-    expect(screen.queryByText('Have questions about Macro Mail?')).toBeNull();
+    expect(screen.queryByText('Have questions about SupaMac Mail?')).toBeNull();
   });
 });
 
@@ -324,7 +350,7 @@ describe('block tutorial pill', () => {
   it('opens the same paused video and dismisses separately from other tutorials', async () => {
     render(() => <TutorialPill tutorial="mail" />);
     fireEvent.click(
-      screen.getByRole('button', { name: /Learn how to use Macro Mail/ })
+      screen.getByRole('button', { name: /Learn how to use SupaMac Mail/ })
     );
     await screen.findByRole('dialog');
     expect(play).not.toHaveBeenCalled();
@@ -356,14 +382,16 @@ describe('block tutorial sidebar item', () => {
       </>
     ));
     const spreadsheets = screen.getByRole('button', {
-      name: 'Watch tutorial: Learn how to use Macro Spreadsheets, 0:56',
+      name: 'Watch tutorial: Learn how to use SupaMac Spreadsheets, 0:56',
     });
-    expect(spreadsheets.textContent).toContain('Macro Spreadsheets');
+    expect(spreadsheets.textContent).toContain('SupaMac Spreadsheets');
     expect(spreadsheets.textContent).not.toContain('Watch tutorial');
 
     fireEvent.click(spreadsheets);
     const dialog = await screen.findByRole('dialog');
-    expect(dialog.textContent).toContain('Learn how to use Macro Spreadsheets');
+    expect(dialog.textContent).toContain(
+      'Learn how to use SupaMac Spreadsheets'
+    );
     expect(video()?.getAttribute('src')).toBe(TUTORIALS.spreadsheets?.videoUrl);
     expect(track).toHaveBeenCalledWith('tutorial_video', {
       tutorial: 'macro-spreadsheets',
@@ -374,7 +402,7 @@ describe('block tutorial sidebar item', () => {
   it('says "Watch tutorial" on its own', () => {
     render(() => <TutorialSidebarItem tutorial="docs" />);
     const docs = screen.getByRole('button', {
-      name: /Learn how to use Macro Docs/,
+      name: /Learn how to use SupaMac Docs/,
     });
     expect(docs.textContent).toContain('Watch tutorial');
   });
@@ -397,7 +425,7 @@ describe('block tutorials on touch devices', () => {
     useDevice(size);
     renderEntries();
     expect(
-      screen.getAllByRole('button', { name: /Learn how to use Macro/ })
+      screen.getAllByRole('button', { name: /Learn how to use SupaMac/ })
     ).toHaveLength(3);
   });
 

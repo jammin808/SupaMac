@@ -161,8 +161,8 @@ it('settles after a Macro call is picked', async () => {
   const edits = showForm();
   const trigger = screen.getByRole('button', { name: /Video conferencing/ });
   await user.click(trigger);
-  await user.click(screen.getByRole('option', { name: 'Macro call' }));
-  expect(trigger.textContent).toContain('Macro call');
+  await user.click(screen.getByRole('option', { name: 'SupaMac call' }));
+  expect(trigger.textContent).toContain('SupaMac call');
   expect(edits.count).toBeLessThan(10);
 });
 

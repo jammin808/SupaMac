@@ -6,7 +6,9 @@
  * redirect (`withFormRespondShell` in `routes/shells.tsx`). The form itself is the shared
  * `RespondView`.
  */
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { TraceFlow, usePending } from '@app/observability/flow';
+import { SELF_HOSTED } from '@core/constant/servers';
 import { useUserId } from '@core/context/user';
 import { fireAndForget } from '@core/util/fireAndForget';
 import Eye from '@icon/system/regular/eye.svg';
@@ -22,15 +24,19 @@ import { RespondView } from './views/respond-view';
 function RespondFooter() {
   return (
     <footer class="mx-auto flex w-full max-w-[680px] flex-col gap-1 px-4 pb-8 text-center text-[11px] text-ink-muted">
-      <p>Never submit passwords through Macro Forms.</p>
-      <p>
-        <a
-          href="mailto:abuse@macro.com?subject=Report%20a%20form"
-          class="hover:underline"
-        >
-          Report this form
-        </a>
-      </p>
+      <p>Never submit passwords through {PRODUCT_NAME} Forms.</p>
+      {/* Reports go to the hosted service's abuse desk, which does not answer
+          for the forms of a self-hosted instance. */}
+      <Show when={!SELF_HOSTED}>
+        <p>
+          <a
+            href="mailto:abuse@macro.com?subject=Report%20a%20form"
+            class="hover:underline"
+          >
+            Report this form
+          </a>
+        </p>
+      </Show>
     </footer>
   );
 }

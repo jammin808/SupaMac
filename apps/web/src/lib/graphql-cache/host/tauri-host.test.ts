@@ -408,7 +408,7 @@ describe('createTauriCacheHost', () => {
     ).rejects.toBeInstanceOf(NativeCacheUpgradeRequiredError);
     expect(onInitializationError).toHaveBeenCalledWith(
       expect.objectContaining({
-        message: expect.stringContaining('Update Macro'),
+        message: expect.stringContaining('Update SupaMac'),
       })
     );
     expect(invokeMock.mock.calls.map(([command]) => command)).toEqual([

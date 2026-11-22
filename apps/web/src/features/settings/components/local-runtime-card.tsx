@@ -1,4 +1,5 @@
 import { LocalRuntimeSetup } from '@app/features/local-runtime/local-runtime-setup';
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { toast } from '@core/component/Toast/Toast';
 import { fireAndForget } from '@core/util/fireAndForget';
 import { isDesktopPlatform } from '@core/util/platform';
@@ -175,9 +176,9 @@ export function LocalRuntimeCard() {
                 </Show>
               </div>
               <p class="mt-1 text-sm text-ink-muted">
-                Macro runs agents you already have installed — Claude Code,
-                Codex, and more — right here on your machine, using your own
-                subscriptions and your local files.
+                {PRODUCT_NAME} runs agents you already have installed — Claude
+                Code, Codex, and more — right here on your machine, using your
+                own subscriptions and your local files.
               </p>
 
               <Switch>
@@ -219,7 +220,8 @@ export function LocalRuntimeCard() {
                           <span class="font-medium text-ink">
                             {snapshot()?.agentName ?? 'Your agent'}
                           </span>{' '}
-                          is connected, but no Macro agent runs on it yet.
+                          is connected, but no {PRODUCT_NAME} agent runs on it
+                          yet.
                         </p>
                         <Button
                           type="button"

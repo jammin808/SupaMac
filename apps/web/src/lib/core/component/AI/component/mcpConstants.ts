@@ -1,4 +1,11 @@
-export const MACRO_MCP_URL = 'https://mcp-server.macro.com/mcp';
+import { selfHostedBackendUrl } from '@core/constant/servers';
+
+/**
+ * The MCP endpoint people connect their AI client to: the instance's own
+ * behind a self-hosted backend, the hosted service's otherwise.
+ */
+export const MACRO_MCP_URL =
+  selfHostedBackendUrl('/mcp') ?? 'https://mcp-server.macro.com/mcp';
 
 export const MACRO_MCP_CONFIG = JSON.stringify(
   {

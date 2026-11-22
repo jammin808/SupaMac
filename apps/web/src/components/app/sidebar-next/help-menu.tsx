@@ -1,5 +1,6 @@
 import { createSupportLink } from '@app/features/video-tutorials/primitives/create-support-link';
 import { t } from '@app/lib/i18n';
+import { SELF_HOSTED } from '@core/constant/servers';
 import { openExternalUrl } from '@core/util/url';
 import CalendarIcon from '@icon/system/regular/calendar-blank.svg';
 import ChatIcon from '@icon/system/regular/chat-circle.svg';
@@ -12,8 +13,18 @@ const DEMO_URL =
   'https://macro.com/app/book/6de4003c-15e4-549f-b5a9-0e930bbf56e4/macro-demo';
 const SUPPORT_EMAIL = 'support@macro.com';
 
-/** The rail's question-mark button: ways to reach the Macro team. */
+/**
+ * The rail's question-mark button: ways to reach the hosted service's team
+ * (its support channel, a demo call, its support address). A self-hosted
+ * instance has no such team to reach, so it shows no button.
+ */
 export function HelpMenu() {
+  if (SELF_HOSTED) return null;
+
+  return <HostedHelpMenu />;
+}
+
+function HostedHelpMenu() {
   const support = createSupportLink();
 
   return (

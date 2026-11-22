@@ -131,7 +131,9 @@ describe('SetupStatus', () => {
 
     expect(screen.getByRole('button', { name: 'Grant access' })).toBeTruthy();
     expect(
-      screen.queryByText('Grant calendar access to show your events in Macro.')
+      screen.queryByText(
+        'Grant calendar access to show your events in SupaMac.'
+      )
     ).toBeNull();
   });
 
@@ -186,7 +188,7 @@ describe('SetupStatus', () => {
       screen.getByText('Calendar for stopped@example.com stopped syncing')
     ).toBeTruthy();
     expect(
-      screen.queryByText('Reconnect to show its events in Macro again.')
+      screen.queryByText('Reconnect to show its events in SupaMac again.')
     ).toBeNull();
     await user.click(screen.getByRole('button', { name: 'Reconnect' }));
 
@@ -252,7 +254,7 @@ describe('SetupStatus', () => {
       screen.getByText('Calendar for stopped@example.com stopped syncing')
     ).toBeTruthy();
     expect(
-      screen.getByText('Reconnect to show its events in Macro again.')
+      screen.getByText('Reconnect to show its events in SupaMac again.')
     ).toBeTruthy();
   });
 

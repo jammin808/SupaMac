@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import IconJira from '@icon/import/jira.svg';
 import IconNotion from '@icon/import/notion.svg';
 import IconLinear from '@icon/mcp-linear.svg';
@@ -115,7 +116,7 @@ function PhaseStatus(props: {
         .with('unknown', () => (
           <p role="alert" class="text-sm text-failure">
             {error() ??
-              'The import may not have started. Check Macro before trying again.'}
+              `The import may not have started. Check ${PRODUCT_NAME} before trying again.`}
           </p>
         ))
         .exhaustive()}
@@ -132,7 +133,10 @@ function AlreadyInMacro(props: {
 }) {
   const [expanded, setExpanded] = createSignal(false);
   return (
-    <section aria-label="Already in Macro" class="flex min-w-0 flex-col gap-1">
+    <section
+      aria-label={`Already in ${PRODUCT_NAME}`}
+      class="flex min-w-0 flex-col gap-1"
+    >
       <button
         type="button"
         class="flex min-w-0 items-center gap-1.5 self-start rounded-sm text-left text-xs text-ink-muted touch:min-h-[44px] not-touch:hover:text-ink"
@@ -337,7 +341,7 @@ function PlanContents(
           <Show when={!planning()}>
             <p class="text-xs text-ink-muted">
               {props.alreadyInMacro.length > 0
-                ? 'Everything shared by this source is already in Macro.'
+                ? `Everything shared by this source is already in ${PRODUCT_NAME}.`
                 : 'The plan has no objects to show.'}
             </p>
           </Show>

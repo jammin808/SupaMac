@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { getMeetingShareToken, getMeetingUrl } from '@channel/Call/call-link';
 import { toast } from '@core/component/Toast/Toast';
 import { useVisibleCalendarsQuery } from '@queries/calendar/calendars';
@@ -328,7 +329,9 @@ export function useEventEditor(props: UseEventEditorProps) {
       values.time.kind === 'timed' &&
       Date.parse(values.time.endsAt) <= Date.parse(values.time.startsAt)
     ) {
-      setSaveError('Give this event a duration before adding a Macro call.');
+      setSaveError(
+        `Give this event a duration before adding a ${PRODUCT_NAME} call.`
+      );
       setPending(false);
       return;
     }

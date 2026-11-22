@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { fireAndForget } from '@core/util/fireAndForget';
 import CheckIcon from '@icon/system/regular/check.svg';
 import SparkleIcon from '@icon/system/regular/sparkle.svg';
@@ -162,8 +163,8 @@ export function StepRevision(props: {
           {(problems) => (
             <div role="alert" class="grid min-w-0 gap-1.5">
               <span class="text-sm text-failure">
-                Rewritten, but it doesn’t type-check against Macro’s SDK, so it
-                can’t be kept. Undo and try saying it differently.
+                Rewritten, but it doesn’t type-check against {PRODUCT_NAME}’s
+                SDK, so it can’t be kept. Undo and try saying it differently.
               </span>
               <For each={problems()}>
                 {(problem) => (

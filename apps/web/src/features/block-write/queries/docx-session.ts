@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { fireAndForget } from '@core/util/fireAndForget';
 import { thrownResultErrorHasCode } from '@core/util/result';
 import { createAwareness } from '@macro-inc/collaboration/collab/awareness';
@@ -206,7 +207,7 @@ export function createDocxSession(options: DocxSessionOptions): DocxSession {
     if (version !== undefined && version > DOCX_FORMAT_VERSION) {
       setState({
         t: 'error',
-        message: 'This document uses a newer format. Update Macro to open it.',
+        message: `This document uses a newer format. Update ${PRODUCT_NAME} to open it.`,
       });
       return;
     }

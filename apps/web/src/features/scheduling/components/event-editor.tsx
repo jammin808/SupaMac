@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { fireAndForget } from '@core/util/fireAndForget';
 import ArrowCounterClockwise from '@icon/system/regular/arrow-counter-clockwise.svg';
 import PencilSimple from '@icon/system/regular/pencil-simple.svg';
@@ -445,7 +446,7 @@ export function EventEditor(props: EventEditorProps) {
                   >
                     <For
                       each={[
-                        { kind: 'macro', label: 'Macro call' },
+                        { kind: 'macro', label: `${PRODUCT_NAME} call` },
                         { kind: 'google', label: 'Video meeting' },
                         { kind: 'custom', label: 'Custom' },
                       ]}

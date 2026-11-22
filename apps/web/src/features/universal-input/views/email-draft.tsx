@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { MarkdownTextarea } from '@core/component/LexicalMarkdown/component/core/MarkdownTextarea';
 import { fireAndForget } from '@core/util/fireAndForget';
 import { createMemo, createSignal, For, onCleanup, Show } from 'solid-js';
@@ -88,7 +89,7 @@ export function EmailDraft(props: {
                   focusOnMount={false}
                   disabled={s.sending()}
                   includeSelf
-                  placeholder="Macro users or email addresses"
+                  placeholder={`${PRODUCT_NAME} users or email addresses`}
                 />
               </ComposeFieldRow>
             </Show>

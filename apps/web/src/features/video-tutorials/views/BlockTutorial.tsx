@@ -1,3 +1,4 @@
+import { ENABLE_VIDEO_TUTORIALS } from '@core/constant/featureFlags';
 import { isTouchDevice } from '@core/mobile/isTouchDevice';
 import { Match, Show, Switch } from 'solid-js';
 import { TUTORIALS, type Tutorial } from '../catalog';
@@ -101,12 +102,13 @@ function Entry(props: {
 }
 
 /**
- * The block's tutorial, if it has one and this isn't a touch device. Phones,
- * tablets and the native apps never show tutorials, so on them no entry,
- * dialog or video mounts.
+ * The block's tutorial, if it has one, the build shows tutorials and this
+ * isn't a touch device. Phones, tablets and the native apps never show
+ * tutorials, and neither does a build with ENABLE_VIDEO_TUTORIALS off, so on
+ * them no entry, dialog or video mounts.
  */
 function availableTutorial(id: TutorialId): Tutorial | undefined {
-  if (isTouchDevice()) return undefined;
+  if (!ENABLE_VIDEO_TUTORIALS || isTouchDevice()) return undefined;
   return TUTORIALS[id];
 }
 

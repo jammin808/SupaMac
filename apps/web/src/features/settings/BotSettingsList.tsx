@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { BotAvatar } from '@channel/Bots/BotAvatar';
 import { LoadingSpinner } from '@core/component/LoadingSpinner';
 import CaretRightIcon from '@icon/system/regular/caret-right.svg';
@@ -98,8 +99,8 @@ export function BotSettingsList(props: {
                     Create your first bot
                   </div>
                   <div class="mt-1 max-w-80 text-xs text-ink-muted">
-                    Give your program a name and profile in Macro. We’ll
-                    generate a token when you create the bot.
+                    Give your program a name and profile in {PRODUCT_NAME}.
+                    We’ll generate a token when you create the bot.
                   </div>
                   <Button
                     class="mt-4"

@@ -1,5 +1,4 @@
 import { t } from '@app/lib/i18n';
-import { useHasPaidAccess } from '@core/auth';
 import {
   createFilesReadyHandler,
   getDragDropPosition,
@@ -84,6 +83,7 @@ import { confirmDialog } from '@ui';
 import { getOwner } from 'solid-js';
 import { createMessageOperationSource } from '../email-message/queries/message-operation';
 import { toEmailThread } from '../email-thread/queries/thread-source';
+import { useComposePaidAccess } from './compose-paid-access';
 import {
   type ComposeNoticeOptions,
   type DraftClientHandles,
@@ -234,7 +234,7 @@ export function createEmailComposeContext(): EmailComposeContext {
     viewerEmail,
     recipients: () => [],
     createRecipientSource: useContactRecipientSource,
-    hasPaidAccess: useHasPaidAccess(),
+    hasPaidAccess: useComposePaidAccess(),
     presentation: {
       viewerLoading: user.isLoading,
       prepareSignatureLinks: interceptMailtoLinks,

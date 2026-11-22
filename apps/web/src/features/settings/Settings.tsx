@@ -18,7 +18,6 @@ import {
 import {
   settingsSlugToTab,
   settingsTabToSlug,
-  useSettingsTabs,
 } from '@core/constant/settingsTabsConfig';
 import { registerHotkey, useHotkeyDOMScope } from '@core/hotkey/hotkeys';
 import type { ValidHotkey } from '@core/hotkey/types';
@@ -52,6 +51,7 @@ import {
   searchSettings,
 } from './core/settings-search';
 import { SettingsTabContent } from './SettingsTabContent';
+import { shownSettingsTab, useShownSettingsTabs } from './shown-settings-tabs';
 import { TeamSidebarAction } from './TeamSidebarAction';
 import { useTeamSettingsGroups } from './teamSettingsGroups';
 
@@ -67,7 +67,9 @@ export function SettingsPanelComponentWrapper() {
   // activeTabId read is untracked so a tab click (which sets it, then updates
   // the URL) isn't reverted by this effect firing before the URL catches up.
   createRenderEffect(() => {
-    const tab = settingsSlugToTab(params.tab ?? '') ?? 'Account';
+    const tab = shownSettingsTab(
+      settingsSlugToTab(params.tab ?? '') ?? 'Account'
+    );
 
     if (untrack(activeTabId) !== tab) setActiveTabId(tab);
   });
@@ -106,7 +108,7 @@ type SettingsPanelProps = {
 export function SettingsPanel(props: SettingsPanelProps) {
   const { closeSettings, activeTabId, selectTab } = useSettingsState();
   const splitNavigate = useSplitNavigate();
-  const { groups, searchGroups } = useSettingsTabs();
+  const { groups, searchGroups } = useShownSettingsTabs();
   const navGroups = useTeamSettingsGroups(groups);
   // Hotkeys and touch pills follow the visible nav, which hides team pages
   // from people without a team.

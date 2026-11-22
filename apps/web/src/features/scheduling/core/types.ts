@@ -1,3 +1,5 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
+
 export type SchedulingMode = 'individual' | 'collective' | 'roundRobin';
 export type TimeWindow = { start: string; end: string };
 export type WeeklyDay = {
@@ -257,7 +259,7 @@ export function meetingPlaceLabel(event: {
   googleMeet: boolean;
   location: string;
 }): string {
-  if (event.macroCall) return 'Macro call';
+  if (event.macroCall) return `${PRODUCT_NAME} call`;
   if (event.googleMeet) return 'Video meeting';
   return event.location || 'Meeting';
 }

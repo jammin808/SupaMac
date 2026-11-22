@@ -1,5 +1,6 @@
 import { ViewShell, ViewSidebar } from '@app/components/view-shell';
 import { TutorialSidebarItem } from '@app/features/video-tutorials';
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { SplitRouter, useNavigate, useParams } from '@app/lib/split-router';
 import { externalChatRoute, externalRoute } from '@app/routes/routes';
 import { useSplitDisplayName } from '@components/app/split-layout/layoutUtils';
@@ -126,7 +127,7 @@ export function ExternalView() {
               id="external-chats"
               class="px-2 pt-4 pb-1 text-xs font-semibold tracking-tight text-ink-extra-muted"
             >
-              In Macro
+              In {PRODUCT_NAME}
             </h2>
             <For each={PROVIDERS}>{(provider) => inMacroChats(provider)}</For>
           </section>

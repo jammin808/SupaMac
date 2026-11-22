@@ -46,7 +46,7 @@ describe('native booking navigation', () => {
       ));
 
       expect(screen.getByText(text)).toBeTruthy();
-      fireEvent.click(screen.getByRole('button', { name: 'Back to Macro' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Back to SupaMac' }));
 
       expect(
         await screen.findByRole('heading', { name: 'Macro home' })
@@ -79,7 +79,7 @@ describe('native booking navigation', () => {
     ));
 
     expect(screen.getByText('Loading booking page…')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Back to Macro' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Back to SupaMac' }));
     expect(
       await screen.findByRole('heading', { name: 'Macro home' })
     ).toBeTruthy();
@@ -105,7 +105,7 @@ describe('native booking navigation', () => {
 
       expect(screen.getByText('Choose an event')).toBeTruthy();
       expect(
-        screen.queryByRole('button', { name: 'Back to Macro' })
+        screen.queryByRole('button', { name: 'Back to SupaMac' })
       ).toBeNull();
     }
   );

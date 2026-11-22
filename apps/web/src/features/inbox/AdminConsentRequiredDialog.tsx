@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { toast } from '@core/component/Toast/Toast';
 import { fireAndForget } from '@core/util/fireAndForget';
 import { Button, Dialog, Panel } from '@ui';
@@ -46,8 +47,8 @@ export function AdminConsentRequiredDialog(props: {
         </Panel.Header>
         <Panel.Body class="p-6 font-sans flex flex-col gap-3">
           <Dialog.Description class="text-ink-muted text-sm/tight font-normal">
-            Your organization requires an IT admin to approve Macro before you
-            can connect this account.
+            Your organization requires an IT admin to approve {PRODUCT_NAME}{' '}
+            before you can connect this account.
           </Dialog.Description>
           <Show when={props.adminConsentUrl === undefined}>
             <p class="text-ink-muted text-sm">

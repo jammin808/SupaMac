@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { openDocument } from '@core/component/LexicalMarkdown/component/core/BlockLink';
 import { toast } from '@core/component/Toast/Toast';
 import { UserIcon, type UserIconProps } from '@core/component/UserIcon';
@@ -482,7 +483,7 @@ export function EventDetails(props: {
   );
   const conferenceLabel = () =>
     macroMeetingUrl()
-      ? 'Join Macro call'
+      ? `Join ${PRODUCT_NAME} call`
       : props.event.conferenceProvider === 'google_meet'
         ? 'Join Google Meet'
         : props.event.conferenceProvider === 'microsoft_teams'

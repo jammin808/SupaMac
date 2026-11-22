@@ -1,6 +1,7 @@
 import { VIEW_SHELL_TOUR } from '@app/components/view-shell/tour';
 import { APP_TOUR } from '@app/features/command/sidebar/tour';
 import { defineViewTour } from '@app/features/tours/core/view-tour';
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { defineTourTargets } from '@ui/components/Tour';
 
 export const AGENTS_TOUR = defineTourTargets('agents', [
@@ -35,8 +36,7 @@ export const agentsTour = defineViewTour({
       entry: [AGENTS_TOUR.modeSwitch, APP_TOUR.createMenu],
       entryLabel: 'Choose Chat or Code to pick an agent',
       title: 'Choose your agent and model',
-      description:
-        'Open this picker to choose an agent for the current mode. In Chat, Macro’s models are listed here too; each agent’s submenu lets you choose a model for that conversation.',
+      description: `Open this picker to choose an agent for the current mode. In Chat, ${PRODUCT_NAME}’s models are listed here too; each agent’s submenu lets you choose a model for that conversation.`,
     },
     {
       target: AGENTS_TOUR.agentList,

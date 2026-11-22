@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import EmptyStateNoFilterMatchGraphic from '@design/empty-state-no-filter-match.svg';
 import EmptyStateNoSearchMatchGraphic from '@design/empty-state-no-search-match.svg';
 import GitPullRequestIcon from '@icon/system/regular/git-pull-request.svg';
@@ -113,7 +114,7 @@ export function ReviewsEmptyState(props: {
           centered
           graphic={GitPullRequestIcon}
           title="No pull requests authored by you"
-          description="Pull requests you authored and can access in Macro will appear here."
+          description={`Pull requests you authored and can access in ${PRODUCT_NAME} will appear here.`}
         />
       </Match>
       <Match when={props.scope === 'assigned'}>
@@ -121,7 +122,7 @@ export function ReviewsEmptyState(props: {
           centered
           graphic={GitPullRequestIcon}
           title="No pull requests assigned to you"
-          description="Pull requests assigned to you and accessible in Macro will appear here."
+          description={`Pull requests assigned to you and accessible in ${PRODUCT_NAME} will appear here.`}
         />
       </Match>
       <Match when={props.scope === 'review_requests'}>

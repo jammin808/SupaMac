@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import DotsThreeIcon from '@phosphor/dots-three.svg';
 import LinkBreakIcon from '@phosphor/link-break.svg';
 import WhatsappIcon from '@phosphor/whatsapp-logo.svg';
@@ -25,12 +26,12 @@ export function ConnectCard(props: {
         <Item.Description>
           {props.reconnect
             ? 'WhatsApp signed this device out. Link it again to keep your chats syncing.'
-            : 'Link your personal WhatsApp as a linked device. Only chats you choose come into Macro.'}
+            : `Link your personal WhatsApp as a linked device. Only chats you choose come into ${PRODUCT_NAME}.`}
         </Item.Description>
         <Show when={props.phone}>
           <Item.Description>
-            To link, open Macro on a computer, go to External → WhatsApp, and
-            scan the code it shows with this phone.
+            To link, open {PRODUCT_NAME} on a computer, go to External →
+            WhatsApp, and scan the code it shows with this phone.
           </Item.Description>
         </Show>
       </Item.Content>

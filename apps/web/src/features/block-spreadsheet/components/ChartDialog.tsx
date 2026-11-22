@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { Button } from '@ui/components/Button';
 import { createSignal, createUniqueId, For, Show } from 'solid-js';
 import {
@@ -42,8 +43,8 @@ function ChartForm(props: {
     >
       <Dialog.Title class="mb-2 text-sm font-semibold">Edit chart</Dialog.Title>
       <Dialog.Description class="mb-4 text-xs text-ink-muted">
-        Charts redraw as their cells change. Macro writes edited charts in Excel
-        downloads with its own formatting.
+        Charts redraw as their cells change. {PRODUCT_NAME} writes edited charts
+        in Excel downloads with its own formatting.
       </Dialog.Description>
       <div class="grid grid-cols-2 gap-3 text-xs">
         <label class="block">

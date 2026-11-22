@@ -18,6 +18,7 @@ import {
   updatePipelineTeamShare,
 } from '@app/features/crm/sharing-adapter';
 import { useAnalytics } from '@app/lib/analytics/analytics-context';
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { useChannelParticipants } from '@channel/use-channel-participants';
 import { HeaderActionButton } from '@components/app/HeaderActionButton';
 import { HeaderActionGroup } from '@components/app/HeaderActionGroup';
@@ -204,8 +205,7 @@ export function shareLevelsFor(
   return undefined;
 }
 
-const SHARE_LINK_SUBTEXT =
-  'Sending this link in a Macro message will automatically update permissions to include recipients.';
+const SHARE_LINK_SUBTEXT = `Sending this link in a ${PRODUCT_NAME} message will automatically update permissions to include recipients.`;
 
 // Only these items' owners (a pipeline's editors) can grant access, so only
 // they may forward. Their links don't grant access to recipients either, so

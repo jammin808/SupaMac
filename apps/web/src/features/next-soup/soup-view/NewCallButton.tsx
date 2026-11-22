@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { joinChannelCall } from '@channel/Call/join-channel-call';
 import { NewMeetingButton } from '@channel/Call/NewMeetingButton';
 import { RecipientSelector } from '@core/component/RecipientSelector';
@@ -115,7 +116,7 @@ export function NewCallButton(props: { presentation?: 'sidebar' | 'toolbar' }) {
                   createSource={useCombinedRecipientSource}
                   selectedOptions={selectedOptions()}
                   setSelectedOptions={setSelectedOptions}
-                  placeholder="To: Macro users or email addresses"
+                  placeholder={`To: ${PRODUCT_NAME} users or email addresses`}
                   triedToSubmit={triedToSubmit}
                   focusOnMount
                   triggerMode="input"

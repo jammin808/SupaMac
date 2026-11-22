@@ -1,5 +1,6 @@
 import { EMAIL_COMPOSE_TO_INPUT_ID } from '@app/features/email-compose/core/constants';
 import type { EmailRecipient } from '@app/features/email-compose/core/email-recipient';
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { triggerFocusInput } from '@core/directive/focusInput';
 import { cn } from '@ui';
 import { createSignal, type JSX, onCleanup, Show } from 'solid-js';
@@ -218,7 +219,9 @@ export function ComposeRecipients(props: {
           activate(field);
         }
       }}
-      placeholder={ctx.isMobile() ? '' : 'Macro users or email addresses'}
+      placeholder={
+        ctx.isMobile() ? '' : `${PRODUCT_NAME} users or email addresses`
+      }
       focusOnMount={opts?.focusOnMount}
       openOnFocus={false}
       hideBorder

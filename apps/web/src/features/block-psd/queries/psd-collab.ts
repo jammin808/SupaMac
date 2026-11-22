@@ -5,6 +5,7 @@
  * stored `.psd` stays the base every person opens.
  */
 
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { fireAndForget } from '@core/util/fireAndForget';
 import { schema } from '@loro-mirror/core';
 import { createAwareness } from '@macro-inc/collaboration/collab/awareness';
@@ -246,8 +247,7 @@ export function createPsdCollabSession(
     if (version > PSD_FORMAT_VERSION) {
       setState({
         t: 'error',
-        message:
-          'This document was edited by a newer version of Macro. Reload to open it.',
+        message: `This document was edited by a newer version of ${PRODUCT_NAME}. Reload to open it.`,
       });
       return;
     }

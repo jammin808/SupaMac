@@ -54,10 +54,10 @@ test.describe('a draft changed in the mailbox while Macro saved it, in an Outloo
   }) => {
     const notice = await conflicted(page, mailbox, 'Offsite plan');
     await notice
-      .getByRole('button', { name: 'Keep Macro version', exact: true })
+      .getByRole('button', { name: 'Keep SupaMac version', exact: true })
       .click();
     await expect(notice).toContainText(
-      'Replace the mailbox draft with the saved Macro version?'
+      'Replace the mailbox draft with the saved SupaMac version?'
     );
     await notice.getByRole('button', { name: 'Confirm', exact: true }).click();
     did('AL-190', 'F-120');
@@ -82,7 +82,7 @@ test.describe('a draft changed in the mailbox while Macro saved it, in an Outloo
       .getByRole('button', { name: 'Use mailbox version', exact: true })
       .click();
     await expect(notice).toContainText(
-      'Replace the saved Macro draft with the mailbox version?'
+      'Replace the saved SupaMac draft with the mailbox version?'
     );
     await notice.getByRole('button', { name: 'Confirm', exact: true }).click();
     did('AL-190', 'F-120');

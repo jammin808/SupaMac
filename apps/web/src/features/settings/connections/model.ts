@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { SLACK_PIPEDREAM_SLUGS } from '@core/pipedream/slugs';
 import type {
   PipedreamConnectionResponse,
@@ -83,21 +84,19 @@ export const CURATED_AI: Record<
 > = {
   github: {
     title: 'GitHub',
-    outcome:
-      'Macro AI can answer questions about your repos, pull requests, and issues.',
+    outcome: `${PRODUCT_NAME} AI can answer questions about your repos, pull requests, and issues.`,
   },
   linear: {
     title: 'Linear',
-    outcome:
-      'Macro AI can create, read, and update Linear issues without leaving Macro.',
+    outcome: `${PRODUCT_NAME} AI can create, read, and update Linear issues without leaving ${PRODUCT_NAME}.`,
   },
   notion: {
     title: 'Notion',
-    outcome: 'Macro AI can search your pages and wikis.',
+    outcome: `${PRODUCT_NAME} AI can search your pages and wikis.`,
   },
   slack: {
     title: 'Slack',
-    outcome: 'Macro AI can search conversations and post updates for you.',
+    outcome: `${PRODUCT_NAME} AI can search conversations and post updates for you.`,
   },
 };
 

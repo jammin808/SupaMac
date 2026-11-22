@@ -1,7 +1,6 @@
 import { t } from '@app/lib/i18n';
 import { useLogout } from '@core/auth/logout';
 import { UserIcon } from '@core/component/UserIcon';
-import { useSettingsTabs } from '@core/constant/settingsTabsConfig';
 import { useEmail, useUserId } from '@core/context/user';
 import { fireAndForget } from '@core/util/fireAndForget';
 import { useOutlookAvailable } from '@queries/auth/outlook-link';
@@ -11,6 +10,7 @@ import { Show, Suspense } from 'solid-js';
 import { useMobileSettings } from './context/mobile-settings';
 import { MobileSettingsSheet } from './MobileSettingsSheet';
 import { SettingsTabContent } from './SettingsTabContent';
+import { shownSettingsTab, useShownSettingsTabs } from './shown-settings-tabs';
 import { useTeamSettingsGroups } from './teamSettingsGroups';
 
 export function MobileSettings() {
@@ -18,12 +18,16 @@ export function MobileSettings() {
   const macroComputers = useMacroComputersRollout();
   // Always mounted on phones; read the providers only once settings open.
   const outlook = useOutlookAvailable(settings.open);
-  const { groups, searchGroups } = useSettingsTabs();
+  const { groups, searchGroups } = useShownSettingsTabs();
   const navGroups = useTeamSettingsGroups(groups);
   const userId = useUserId();
   const email = useEmail();
   const name = useOwnUserName();
   const logout = useLogout();
+  const page = () => {
+    const tab = settings.page();
+    return tab && shownSettingsTab(tab);
+  };
   const displayName = () => {
     const value = name();
     return (
@@ -36,7 +40,7 @@ export function MobileSettings() {
   return (
     <MobileSettingsSheet
       open={settings.open()}
-      page={settings.page()}
+      page={page()}
       groups={navGroups()}
       searchGroups={searchGroups()}
       emailRowStyle={false}

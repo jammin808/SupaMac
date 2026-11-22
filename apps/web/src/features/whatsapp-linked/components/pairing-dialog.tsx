@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { ActionDialogShell, Button, Dialog } from '@ui';
 import { For, type JSX, Match, Show, Switch } from 'solid-js';
 import { match } from 'ts-pattern';
@@ -156,23 +157,25 @@ function PasskeyStep(props: {
           {(url) => (
             <>
               <p class="text-sm text-ink-muted">
-                WhatsApp asks for your phone's passkey, which only the Macro
-                desktop app can use. Finish this same request there.
+                WhatsApp asks for your phone's passkey, which only the{' '}
+                {PRODUCT_NAME} desktop app can use. Finish this same request
+                there.
               </p>
               <a
                 href={url()}
                 onClick={props.onHandOff}
                 class="text-sm font-medium text-ink underline underline-offset-2"
               >
-                Continue in Macro desktop
+                Continue in {PRODUCT_NAME} desktop
               </a>
             </>
           )}
         </Match>
         <Match when={props.mode.kind === 'unsupported'}>
           <p role="alert" class="text-sm text-ink-muted">
-            WhatsApp asks for your phone's passkey, which only the Macro desktop
-            app can use. Start linking again from Macro on your computer.
+            WhatsApp asks for your phone's passkey, which only the{' '}
+            {PRODUCT_NAME} desktop app can use. Start linking again from{' '}
+            {PRODUCT_NAME} on your computer.
           </p>
         </Match>
       </Switch>
@@ -196,7 +199,10 @@ function description(step: PairingStep): string {
       { kind: 'passkey' },
       () => 'WhatsApp wants to confirm it’s you before linking.'
     )
-    .with({ kind: 'connected' }, () => 'Your phone linked WhatsApp to Macro.')
+    .with(
+      { kind: 'connected' },
+      () => `Your phone linked WhatsApp to ${PRODUCT_NAME}.`
+    )
     .with(
       { kind: 'failed' },
       { kind: 'cancelled' },

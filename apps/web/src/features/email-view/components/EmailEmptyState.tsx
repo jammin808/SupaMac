@@ -1,4 +1,5 @@
-import { DOCS_BASE } from '@app/constants/docs-links';
+import { docsUrl } from '@app/constants/docs-links';
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { useAddInboxFlow, useEmailLinksStatus } from '@core/email-link';
 import { fireAndForget } from '@core/util/fireAndForget';
 import EmptyStateEmailGraphic from '@design/empty-state-email.svg';
@@ -13,7 +14,7 @@ import { canSearchEmailTab } from '../constants';
 import { useEmailView } from '../email-view-context';
 import type { EmailTab } from '../types';
 
-const EMAIL_DOCS_URL = `${DOCS_BASE}/product/email`;
+const EMAIL_DOCS_URL = docsUrl('/product/email');
 
 function tabCopy(tab: EmailTab): { title: string; description: string } {
   return match(tab)
@@ -99,7 +100,7 @@ export function EmailEmptyState() {
           centered
           graphic={EmptyStateEmailGraphic}
           title="Connect your email"
-          description="Bring your inbox into Macro to triage signal from noise, reply faster, and let agents work alongside your mail."
+          description={`Bring your inbox into ${PRODUCT_NAME} to triage signal from noise, reply faster, and let agents work alongside your mail.`}
           primaryAction={{
             label: 'Connect email',
             onClick: () => fireAndForget(startAddInbox(), 'add-inbox'),
@@ -132,7 +133,7 @@ export function EmailEmptyState() {
                 ? 'Focus search covers subjects, senders, and previews. Try a different query.'
                 : 'Search across subjects, senders, and message content. Try a different query.'
             }
-            documentationUrl={`${DOCS_BASE}/product/search`}
+            documentationUrl={docsUrl('/product/search')}
           />
         )}
       </Match>

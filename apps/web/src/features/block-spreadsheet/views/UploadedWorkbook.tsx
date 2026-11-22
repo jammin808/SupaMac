@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { useSplitPanelOrThrow } from '@components/app/split-layout/layoutUtils';
 import { useBlockId } from '@core/block';
 import { toast } from '@core/component/Toast/Toast';
@@ -172,7 +173,7 @@ function UploadedWorkbookPreview(props: {
           disabled={!!actions.pending()}
           onClick={() => fireAndForget(actions.edit(), 'uploaded-workbook')}
         >
-          {actions.pending() ? 'Saving…' : 'Edit in Macro'}
+          {actions.pending() ? 'Saving…' : `Edit in ${PRODUCT_NAME}`}
         </Button>
         <Show when={props.workbook.warnings.length}>
           <details class="w-full">

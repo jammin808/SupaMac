@@ -1,3 +1,5 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
+
 /** The tool a pull request was started from. */
 export type PrOriginTool =
   | 'claude'
@@ -42,11 +44,11 @@ export const PR_ORIGIN_LABELS: Record<PrOriginTool, string> = {
   devin: 'Devin',
   copilot: 'Copilot',
   jules: 'Jules',
-  macro: 'Macro',
+  macro: PRODUCT_NAME,
 };
 
 export const PR_ORIGIN_SIGNAL_LABELS: Record<PrOriginSignal, string> = {
-  'agent-session': 'opened by a Macro agent session',
+  'agent-session': `opened by a ${PRODUCT_NAME} agent session`,
   'session-link': 'session linked in the description',
   description: 'named in the description',
   author: 'opened by its bot account',

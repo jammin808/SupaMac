@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import HeadCircuit from '@icon/system/regular/head-circuit.svg';
 import UserGear from '@icon/system/regular/user-gear.svg';
 import type { NamedTool } from '@service-cognition/generated/tools/tool';
@@ -9,7 +10,7 @@ import { Tool } from './Tool';
 import { createToolRenderer } from './ToolRenderer';
 
 const HARNESS_NAMES: Record<string, string> = {
-  'in-memory': 'Macro',
+  'in-memory': PRODUCT_NAME,
   cursor: 'Cursor',
   macrod: 'Self-hosted harness',
 };

@@ -367,7 +367,7 @@ for (const provider of PROVIDERS) {
       did('AC-910');
 
       const watermark = page.getByRole('button', {
-        name: '-- Sent with Macro',
+        name: '-- Sent with SupaMac',
       });
       await expect(watermark).toBeVisible();
       saw('STC-093');
@@ -379,7 +379,9 @@ for (const provider of PROVIDERS) {
         prompt.getByRole('heading', { name: 'Upgrade your plan' })
       ).toBeVisible();
       await expect(
-        prompt.getByText('Upgrade to send emails without the Macro signature.')
+        prompt.getByText(
+          'Upgrade to send emails without the SupaMac signature.'
+        )
       ).toBeVisible();
       saw('STC-981');
     });

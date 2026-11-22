@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { useSplitLayout } from '@components/app/split-layout/layout';
 import { RecipientSelector } from '@core/component/RecipientSelector';
 import { toast } from '@core/component/Toast/Toast';
@@ -535,8 +536,8 @@ export function CreateChannelModal() {
                     <strong class="font-semibold text-ink">
                       Working with people outside your team?
                     </strong>{' '}
-                    Type their email above and press Enter. If they don’t have a
-                    Macro account, clicking Add emails them an invite.
+                    Type their email above and press Enter. If they don’t have a{' '}
+                    {PRODUCT_NAME} account, clicking Add emails them an invite.
                   </>
                 }
               >

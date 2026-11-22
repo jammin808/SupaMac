@@ -1,5 +1,6 @@
 import { useCalendarPager } from '@app/features/calendar/components/CalendarPagerContext';
 import { isCalendarRangeSupported } from '@app/features/calendar/utils/calendar-supported-range';
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { useUserId } from '@core/context/user';
 import { useAddInboxFlow } from '@core/email-link';
 import { calendarStoppedSyncing } from '@core/email-link/consent';
@@ -19,12 +20,12 @@ const SETUP_MESSAGES = {
   },
   permission: {
     title: 'Enable calendar',
-    description: 'Grant calendar access to show your events in Macro.',
+    description: `Grant calendar access to show your events in ${PRODUCT_NAME}.`,
     action: 'Grant access',
   },
   disabled: {
     title: 'Calendar is off',
-    description: 'Grant calendar access again to show your events in Macro.',
+    description: `Grant calendar access again to show your events in ${PRODUCT_NAME}.`,
     action: 'Turn on',
   },
   reauth: {
@@ -34,7 +35,7 @@ const SETUP_MESSAGES = {
   },
   stopped: {
     title: 'Calendar stopped syncing',
-    description: 'Reconnect to show its events in Macro again.',
+    description: `Reconnect to show its events in ${PRODUCT_NAME} again.`,
     action: 'Reconnect',
   },
 } as const;

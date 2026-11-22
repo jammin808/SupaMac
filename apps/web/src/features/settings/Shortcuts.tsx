@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { IS_MAC } from '@core/constant/isMac';
 import { cn, Hotkey } from '@ui';
 import { createMemo, createSignal, For, Index, type JSX, Show } from 'solid-js';
@@ -1170,7 +1171,7 @@ export function Shortcuts() {
   return (
     <SettingsPage
       title="Keyboard shortcuts"
-      description="Quick ways to navigate, search, and work in Macro."
+      description={`Quick ways to navigate, search, and work in ${PRODUCT_NAME}.`}
     >
       <SettingsSurface class="px-5 py-4">
         <details>

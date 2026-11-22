@@ -24,7 +24,8 @@ vi.mock('@core/mobile/isMobile', () => ({ isMobile: () => true }));
 vi.mock('@core/mobile/nativePhotoLibrary', () => ({
   pickPhotoLibraryMediaOrFiles: pickPhotos,
 }));
-vi.mock('@core/util/platform', () => ({
+vi.mock('@core/util/platform', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@core/util/platform')>()),
   isPlatform: (platform: string) => platform === 'ios' && editor.isIOS,
 }));
 vi.mock('@core/component/LexicalMarkdown/utils/create-composer-layout', () => ({

@@ -1,4 +1,5 @@
 import { ListSkeleton } from '@app/components/view-shell/ListSkeleton';
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { URL_PARAMS as CHANNEL_URL_PARAMS } from '@block-channel/constants';
 import type { SplitContent } from '@components/app/split-layout/layoutManager';
 import { PopupPreview } from '@core/component/DocumentPreview';
@@ -408,8 +409,8 @@ export function prOriginDescription(origin: PrOrigin) {
   const tool = PR_ORIGIN_LABELS[origin.tool];
   if (origin.signal === 'agent-session')
     return origin.tool === 'macro'
-      ? 'Started from a Macro agent session'
-      : `Started from ${tool} in a Macro agent session`;
+      ? `Started from a ${PRODUCT_NAME} agent session`
+      : `Started from ${tool} in a ${PRODUCT_NAME} agent session`;
   return `Started from ${tool}, ${PR_ORIGIN_SIGNAL_LABELS[origin.signal]}`;
 }
 

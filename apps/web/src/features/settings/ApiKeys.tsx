@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { CredentialField } from '@channel/Bots/CredentialField';
 import { LoadingSpinner } from '@core/component/LoadingSpinner';
 import { toast } from '@core/component/Toast/Toast';
@@ -102,8 +103,8 @@ export function ApiKeys() {
                       Create your first API key
                     </div>
                     <div class="mt-1 max-w-80 text-xs text-ink-muted">
-                      Use a key to call Macro on your behalf. The full secret is
-                      shown only at creation.
+                      Use a key to call {PRODUCT_NAME} on your behalf. The full
+                      secret is shown only at creation.
                     </div>
                     <Button
                       class="mt-4"

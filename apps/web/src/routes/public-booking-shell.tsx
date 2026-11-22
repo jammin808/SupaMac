@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { hapticImpact } from '@core/mobile/haptics';
 import { isTauri } from '@core/util/platform';
 import ArrowLeftIcon from '@icon/system/regular/arrow-left.svg';
@@ -18,8 +19,8 @@ export function PublicBookingShell(props: ParentProps) {
       <Show when={showBack()}>
         <header class="sticky top-0 z-10 flex bg-panel/95 px-2 pb-2 pt-[calc(var(--safe-top,0px)+0.5rem)] backdrop-blur-sm">
           <Button
-            aria-label="Back to Macro"
-            tooltip="Back to Macro"
+            aria-label={`Back to ${PRODUCT_NAME}`}
+            tooltip={`Back to ${PRODUCT_NAME}`}
             variant="ghost"
             size="icon-md"
             onPointerDown={() => hapticImpact('light')}

@@ -1,5 +1,6 @@
 import { VIEW_SHELL_TOUR } from '@app/components/view-shell/tour';
 import { defineViewTour } from '@app/features/tours/core/view-tour';
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { defineTourTargets } from '@ui/components/Tour';
 
 export const TASKS_TOUR = defineTourTargets('tasks', ['filter']);
@@ -15,8 +16,7 @@ export const tasksTour = defineViewTour({
       entry: VIEW_SHELL_TOUR.sidebarToggle,
       entryLabel: 'Show the task sidebar to continue',
       title: 'Turn plans into progress',
-      description:
-        'Create a task with a clear next step, or connect Linear to bring your issues into Macro.',
+      description: `Create a task with a clear next step, or connect Linear to bring your issues into ${PRODUCT_NAME}.`,
     },
     {
       target: VIEW_SHELL_TOUR.main,

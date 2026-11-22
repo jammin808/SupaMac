@@ -1,5 +1,6 @@
 import { ChatWithAgentButton } from '@app/features/chat/ChatWithAgentButton';
 import { useBlockEntityCommands } from '@app/features/next-soup/actions';
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { HeaderActionGroup } from '@components/app/HeaderActionGroup';
 import { SplitHeaderRight } from '@components/app/split-layout/components/SplitHeader';
 import {
@@ -157,7 +158,7 @@ function SpreadsheetBlockContent(props: { share?: string }) {
                     <HeaderActionGroup label="Spreadsheet actions">
                       <ChatWithAgentButton
                         grouped
-                        label="Ask Macro"
+                        label={`Ask ${PRODUCT_NAME}`}
                         disabled={!store.ready()}
                         entity={{
                           type: 'document',

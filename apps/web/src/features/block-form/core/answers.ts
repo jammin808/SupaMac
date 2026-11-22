@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { match } from 'ts-pattern';
 import { brokenRuleColumns } from './form-layout';
 import type {
@@ -107,7 +108,7 @@ export function answerProblem(
       { type: 'clear' },
       () => undefined
     )
-    .exhaustive(() => 'Update Macro to answer this question.');
+    .exhaustive(() => `Update ${PRODUCT_NAME} to answer this question.`);
 }
 
 /** Every problem with a section's answers, in question order. */

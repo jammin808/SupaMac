@@ -2,6 +2,7 @@ import { WEB_BASE_PATH } from '@app/constants/routerBase';
 import { toast } from '@core/component/Toast/Toast';
 import { useAiUsageLimitState } from '@core/constant/AiUsageLimitState';
 import { useSettingsState } from '@core/constant/SettingsState';
+import { SELF_HOSTED } from '@core/constant/servers';
 import { fireAndForget } from '@core/util/fireAndForget';
 import { isTauri } from '@core/util/platform';
 import { ThrownResultError } from '@core/util/result';
@@ -284,7 +285,9 @@ export function AiUsageLimitDialog() {
         code={usageLimitCode() ?? undefined}
         freePlan={freePlan()}
         resetsAt={usageSnapshot()?.period_end}
-        offer={offer()}
+        // A self-hosted instance sells neither plans nor credits.
+        offer={SELF_HOSTED ? undefined : offer()}
+        noticeOnly={SELF_HOSTED}
         previewNotice={
           usagePreview.active()
             ? `Developer preview: ${usagePreview.plan() === 'free' ? 'Free' : 'paid'} plan. No account billing has changed.`

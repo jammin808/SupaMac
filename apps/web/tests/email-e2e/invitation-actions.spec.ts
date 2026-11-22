@@ -105,7 +105,7 @@ for (const provider of PROVIDERS) {
       saw('STL-514');
       // No calendar is connected: the card says so and offers to connect one.
       await expect(
-        card.getByText('Connect a calendar to respond from Macro.')
+        card.getByText('Connect a calendar to respond from SupaMac.')
       ).toBeVisible();
       saw('STL-096');
       await expect(

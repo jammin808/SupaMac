@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { groupChatName } from '@channel/group-chat-name';
 import {
   getNotificationAction,
@@ -58,7 +59,7 @@ function actorName(
       { kind: 'agent' },
       (actor) => actor.name ?? getNotificationSenderFallbackName(latest)
     )
-    .with({ kind: 'macro' }, () => 'Macro')
+    .with({ kind: 'macro' }, () => PRODUCT_NAME)
     .with({ kind: 'other' }, () => undefined)
     .exhaustive();
 }
@@ -213,7 +214,7 @@ function describeNotification(
       subject: metadata.content.itemName,
     }))
     .with({ tag: 'ai_response' }, () => ({
-      action: 'Macro responded',
+      action: `${PRODUCT_NAME} responded`,
       subject: content ?? entityName,
     }))
     .with(

@@ -1,7 +1,9 @@
 import { globalSplitManager } from '@app/signal/splitLayout';
-import { usePaywallState } from '@core/constant/PaywallState';
+import { limitNoticeTitle, usePaywallState } from '@core/constant/PaywallState';
+import { SELF_HOSTED } from '@core/constant/servers';
 import { useHotkeyDOMScope } from '@core/hotkey/hotkeys';
-import { onMount } from 'solid-js';
+import { onMount, Show } from 'solid-js';
+import { LimitNotice } from './components/limit-notice';
 import { PaywallDialog } from './components/paywall-dialog';
 import PaywallComponent from './PaywallComponent';
 
@@ -62,7 +64,21 @@ export function Paywall() {
         paywallContentEl = element;
       }}
     >
-      <PaywallComponent cb={hidePaywall} errorKey={paywallKey()} />
+      {/* A self-hosted instance sells no plan: it names the limit its server
+          enforced and offers nothing. */}
+      <Show
+        when={SELF_HOSTED}
+        fallback={<PaywallComponent cb={hidePaywall} errorKey={paywallKey()} />}
+      >
+        <Show when={paywallKey()}>
+          {(key) => (
+            <LimitNotice
+              title={limitNoticeTitle(key())}
+              onDismiss={hidePaywall}
+            />
+          )}
+        </Show>
+      </Show>
     </PaywallDialog>
   );
 }

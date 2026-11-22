@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { t } from '@app/lib/i18n';
 import type { ReloadReason } from '@app/observability/generated/native-diagnostics';
 import { reloadApp } from '@app/observability/reload';
@@ -67,7 +68,7 @@ const browserPage: ReloadPage = {
     if (!isTouchDevice()) return;
     toast.custom(
       {
-        title: 'A new version of Macro is ready',
+        title: `A new version of ${PRODUCT_NAME} is ready`,
         icon: MacroLogo,
         color: 'var(--color-accent)',
         dismissLabel: t('common.maybeLater'),

@@ -1,5 +1,6 @@
 import { SearchBar } from '@app/components/view-shell';
 import { ViewSkeleton } from '@app/components/view-shell/ViewSkeleton';
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { toast } from '@core/component/Toast/Toast';
 import { isMobile } from '@core/mobile/isMobile';
 import { fireAndForget } from '@core/util/fireAndForget';
@@ -110,8 +111,8 @@ export function WhatsAppPage(props: {
     // the authority either way.
     toast.success(
       result.value.remoteUnlinkRequested
-        ? 'Disconnected. Macro will disappear from WhatsApp → Linked devices on your phone shortly.'
-        : 'Disconnected in Macro. To finish, remove Macro under WhatsApp → Linked devices on your phone.'
+        ? `Disconnected. ${PRODUCT_NAME} will disappear from WhatsApp → Linked devices on your phone shortly.`
+        : `Disconnected in ${PRODUCT_NAME}. To finish, remove ${PRODUCT_NAME} under WhatsApp → Linked devices on your phone.`
     );
   };
 
@@ -262,7 +263,7 @@ export function WhatsAppPage(props: {
                           <p class="px-4 py-2 text-sm text-ink-extra-muted">
                             {searching()
                               ? 'No chats or contacts match your search. To message someone else, start a new chat with their number.'
-                              : 'Every WhatsApp chat you can add is already in Macro.'}
+                              : `Every WhatsApp chat you can add is already in ${PRODUCT_NAME}.`}
                           </p>
                         </Show>
                         <Show when={sections().unsupported.length}>
@@ -295,7 +296,7 @@ export function WhatsAppPage(props: {
                 open={confirmingDisconnect()}
                 onOpenChange={setConfirmingDisconnect}
                 title="Disconnect WhatsApp?"
-                body="Macro stops syncing and sending from this account. Chats and their history stay in Macro."
+                body={`${PRODUCT_NAME} stops syncing and sending from this account. Chats and their history stay in ${PRODUCT_NAME}.`}
                 confirmLabel="Disconnect"
                 tone="danger"
                 pending={whatsapp.isDisconnecting()}

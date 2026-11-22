@@ -696,7 +696,7 @@ describe('Excel workbook files', () => {
     const imported = await decodeXlsx(await file(workbook));
     expect(imported.sheets[0].cells.A1.value).toHaveLength(10_000);
     expect(imported.warnings).toContain(
-      'Text longer than 10,000 characters was shortened to fit Macro cells.'
+      'Text longer than 10,000 characters was shortened to fit SupaMac cells.'
     );
   });
 

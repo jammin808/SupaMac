@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { NativeCallProvider } from '@channel/Call/native-call-state';
 import { useCallKitSetup } from '@channel/Call/use-callkit';
 import { useAndroidBack } from '@core/mobile/androidBack';
@@ -203,7 +204,7 @@ function TauriProvider(props: { children: JSX.Element }) {
         <Surface depth={2}>
           <div class="flex flex-col gap-2 px-4 py-5">
             <Dialog.Title class="text-lg font-semibold text-ink">
-              Restarting Macro
+              Restarting {PRODUCT_NAME}
             </Dialog.Title>
             <Dialog.Description class="text-sm text-ink-extra-muted">
               Saving your changes before installing the app update…

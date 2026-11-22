@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { formatDate } from '@core/util/date';
 import { fireAndForget } from '@core/util/fireAndForget';
 import ArrowUpRightIcon from '@icon/system/regular/arrow-up-right.svg';
@@ -439,7 +440,7 @@ export function ImportDialog(props: Props): JSX.Element {
             <ActionDialogShell.Header>
               <ActionDialogShell.Title>
                 {choosingMethod()
-                  ? 'Bring Slack to Macro'
+                  ? `Bring Slack to ${PRODUCT_NAME}`
                   : 'Import from Slack'}
               </ActionDialogShell.Title>
               <ActionDialogShell.Description>

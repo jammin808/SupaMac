@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { match } from 'ts-pattern';
 import type { ImportCategoryConfig, ImportProvider } from './providers';
 
@@ -48,7 +49,7 @@ function ledgerSteps(provider: ImportProvider): string[] {
  * import, plans it with ImportFromNotion, and presents the plan for review.
  */
 const NOTION_WORKSPACE_HANDOFF: AgentImportHandoff = {
-  input: 'Import my Notion workspace into Macro.',
+  input: `Import my Notion workspace into ${PRODUCT_NAME}.`,
   instructions: [
     "The user started this from Macro's import dialog and has just connected Notion.",
     'Import their workspace with ImportFromNotion: ask who should see it if the tool says to, plan it, and present the plan for review right away.',
@@ -63,7 +64,7 @@ export function agentImportHandoff(
   if (provider.ledger === 'notion') return NOTION_WORKSPACE_HANDOFF;
   if (provider.ledger === 'linear' || provider.ledger === 'jira') {
     return {
-      input: `Import my ${provider.name} workspace into Macro.`,
+      input: `Import my ${provider.name} workspace into ${PRODUCT_NAME}.`,
       instructions: [
         `The user started this from Macro's import dialog and has just connected ${provider.name}.`,
         `Use ImportFrom${provider.name} to plan their workspace, ask who should see it if required, and present the import review right away.`,

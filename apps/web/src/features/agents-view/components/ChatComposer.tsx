@@ -5,6 +5,7 @@ import {
   DictationPanel,
 } from '@app/features/dictation/components/dictation-controls';
 import { createComposerDictation } from '@app/features/dictation/composer-dictation';
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { t } from '@app/lib/i18n';
 import { InputProvider } from '@channel/Input/context';
 import { Input } from '@channel/Input/Input';
@@ -291,7 +292,7 @@ export function ChatComposer(props: {
         placeholder={
           isTouchDevice()
             ? // Phones are too narrow for the full mention and skills hint.
-              'Message Macro AI'
+              `Message ${PRODUCT_NAME} AI`
             : (props.placeholder ??
               'Type @ to mention docs, people, or channels, / for skills')
         }

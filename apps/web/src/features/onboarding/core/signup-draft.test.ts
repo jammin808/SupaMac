@@ -4,6 +4,7 @@ import {
   parseSignupDraft,
   previousSignupStep,
   serializeSignupDraft,
+  signupSteps,
 } from './signup-draft';
 
 describe('parseSignupDraft', () => {
@@ -42,5 +43,26 @@ describe('signup step order', () => {
     expect(nextSignupStep('work')).toBe('work');
     expect(previousSignupStep('work')).toBe('security');
     expect(previousSignupStep('welcome')).toBeUndefined();
+  });
+});
+
+describe('self-hosted signup step order', () => {
+  const steps = signupSteps(true);
+
+  it('walks welcome → work, without the pitch or the security claims', () => {
+    expect(steps).toEqual(['welcome', 'work']);
+    expect(nextSignupStep('welcome', steps)).toBe('work');
+    expect(nextSignupStep('work', steps)).toBe('work');
+    expect(previousSignupStep('work', steps)).toBe('welcome');
+    expect(previousSignupStep('welcome', steps)).toBeUndefined();
+  });
+
+  it('keeps every slide on the hosted service', () => {
+    expect(signupSteps(false)).toEqual([
+      'welcome',
+      'vision',
+      'security',
+      'work',
+    ]);
   });
 });

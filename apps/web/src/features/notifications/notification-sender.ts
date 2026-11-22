@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { match } from 'ts-pattern';
 import type { UnifiedNotification } from './types';
 
@@ -32,7 +33,7 @@ export function getNotificationSenderFallbackName(
 
   return match(notification.notification_metadata.tag)
     .with('new_email', () => content?.sender ?? undefined)
-    .with('ai_response', () => 'Macro agent')
+    .with('ai_response', () => `${PRODUCT_NAME} agent`)
     .with('routine_run_finished', () => content?.routineName)
     .with('agent_sign_in_expiry', () => content?.computerName)
     .with('computer_setup', () => content?.agent?.name ?? content?.computerName)

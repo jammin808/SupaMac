@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { SERVER_HOSTS } from '@core/constant/servers';
 import { fetchWithToken } from '@core/util/fetchWithToken';
 import type { ObjectLike, ResultError } from '@core/util/result';
@@ -111,7 +112,7 @@ async function withinDeadline<T extends ObjectLike, Code extends string>(
     const result = await request(controller.signal);
     if (result.isErr() && controller.signal.aborted) {
       return err([
-        { code: TIMED_OUT, message: 'Macro did not answer in time.' },
+        { code: TIMED_OUT, message: `${PRODUCT_NAME} did not answer in time.` },
       ]);
     }
     return result;
@@ -158,11 +159,11 @@ async function sharedComputerError(
     >()
     .with(422, () => ({
       code: NO_PAID_PLAN,
-      message: 'Your team has no paid Macro plan to add a computer to.',
+      message: `Your team has no paid ${PRODUCT_NAME} plan to add a computer to.`,
     }))
     .with(502, () => ({
       code: BILLING_PROVIDER_FAILED,
-      message: "Macro's billing provider didn't answer.",
+      message: `${PRODUCT_NAME}'s billing provider didn't answer.`,
     }))
     .with(P.number.gte(500), () => statusError(500))
     .otherwise(() => undefined);

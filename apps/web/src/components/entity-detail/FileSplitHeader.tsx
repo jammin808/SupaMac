@@ -2,6 +2,7 @@ import {
   ChatWithAgentIcon,
   openChatWithAgent,
 } from '@app/features/chat/ChatWithAgentButton';
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import type { BlockTool } from '@components/app/block-tool';
 import { FileDownloadHeader } from '@components/app/FileDownloadHeader';
 import { SidePanel } from '@components/app/side-panel';
@@ -103,7 +104,7 @@ export function FileSplitHeader(props: {
 
   const tools: BlockTool[] = [
     {
-      label: 'Ask Macro',
+      label: `Ask ${PRODUCT_NAME}`,
       icon: ChatWithAgentIcon,
       action: () => fireAndForget(openChatWithAgent(chatEntity()), 'file'),
     },

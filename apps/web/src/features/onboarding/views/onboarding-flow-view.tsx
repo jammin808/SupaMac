@@ -1,4 +1,5 @@
 import { LOCAL_ONLY } from '@core/constant/featureFlags';
+import { SELF_HOSTED } from '@core/constant/servers';
 import { fireAndForget } from '@core/util/fireAndForget';
 import {
   createEffect,
@@ -171,6 +172,12 @@ export function OnboardingFlowView(props: {
       choosePlan(() => finish.finishPremium());
       return;
     }
+    // A self-hosted instance sells no plan, so nothing is left to choose
+    // after the team: the flow ends on what its server already grants.
+    if ((step() === 'team' || skipsTeam) && SELF_HOSTED) {
+      choosePlan(() => finish.finishFree(true));
+      return;
+    }
     goTo(skipsTeam ? 'plan' : next);
   };
   const viewerEmail = () => {
@@ -186,11 +193,20 @@ export function OnboardingFlowView(props: {
       !viewer.viewer.licensed
     );
   };
+  // The trust details are the hosted service's own security and compliance
+  // claims; they say nothing about a self-hosted instance.
+  const showTrustDetails = () => {
+    if (SELF_HOSTED) return false;
+    const current = step();
+    return (
+      current === 'security' || current === 'work' || current === 'personal'
+    );
+  };
   const back = () => {
     const current = step();
     // The plan is settled (and maybe paid for) once routines show.
     if (current === 'routines') return undefined;
-    const previous = current && previousOnboardingStep(current);
+    const previous = current && previousOnboardingStep(current, flow.steps);
     const target = passesTeam(previous) ? 'tools' : previous;
     return target && !finish.finishing() ? () => goTo(target) : undefined;
   };
@@ -227,9 +243,7 @@ export function OnboardingFlowView(props: {
               )
             }
           />
-        ) : step() === 'security' ||
-          step() === 'work' ||
-          step() === 'personal' ? (
+        ) : showTrustDetails() ? (
           <OnboardingTrustDetails
             topic={step() === 'security' ? 'security' : 'google'}
             microsoft={step() === 'work' && outlookAvailable()}

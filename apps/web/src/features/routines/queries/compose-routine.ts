@@ -1,4 +1,5 @@
 import { handleAiUsageLimitError } from '@app/features/paywall/ai-usage-limit-handling';
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { isAiUsageLimitError } from '@app/lib/service-clients/ai-usage-limit';
 import type { ResultError } from '@core/util/result';
 import { sleep } from '@core/util/sleep';
@@ -130,7 +131,8 @@ export function draftFromRoutine(
   defaultModel: string
 ): ScheduleDraft | string {
   const steps = stepsFromWire(routine.steps);
-  if (!steps) return 'The draft used steps Macro can’t run. Try rephrasing.';
+  if (!steps)
+    return `The draft used steps ${PRODUCT_NAME} can’t run. Try rephrasing.`;
   const drafted = steps.map((step, index) => {
     const problems = routine.problems.find(
       (item) => item.index === index

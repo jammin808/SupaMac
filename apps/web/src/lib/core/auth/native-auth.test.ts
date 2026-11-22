@@ -4,7 +4,8 @@ const mocks = vi.hoisted(() => ({
   platform: vi.fn(),
   invoke: vi.fn(),
 }));
-vi.mock('@core/util/platform', () => ({
+vi.mock('@core/util/platform', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@core/util/platform')>()),
   getNativeMobilePlatform: mocks.platform,
 }));
 vi.mock('@tauri-apps/api/core', () => ({

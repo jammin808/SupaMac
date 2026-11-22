@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/constants/product';
 import { useAnalytics } from '@app/lib/analytics/analytics-context';
 import type { AccountDeletionReason } from '@app/lib/analytics/app-events';
 import { useFeatureFlag } from '@app/lib/analytics/posthog';
@@ -17,7 +18,6 @@ import {
 } from '@core/constant/featureFlags';
 import { useSettingsState } from '@core/constant/SettingsState';
 import { staticFileIdEndpoint } from '@core/constant/servers';
-import { useSettingsTabAvailable } from '@core/constant/settingsTabsConfig';
 import { useEmail, useUserId } from '@core/context/user';
 import { isNativeMobilePlatform } from '@core/mobile/isNativeMobilePlatform';
 import {
@@ -76,6 +76,7 @@ import {
   SettingsRow,
   SettingsSection,
 } from './primitives';
+import { useShownSettingsTab } from './shown-settings-tabs';
 
 const DELETE_HOLD_MS = 5000;
 
@@ -346,7 +347,7 @@ export function Account() {
   const email = useEmail();
   const userId = useUserId();
   const logout = useLogout();
-  const isSettingsTabAvailable = useSettingsTabAvailable();
+  const isSettingsTabAvailable = useShownSettingsTab();
   const disableAutoUpdateUIFlag = useFeatureFlag(disableAutoUpdateUi);
   const autoUpdateUIEnabled = createMemo(
     () => enableAutoUpdateUiOverride ?? !disableAutoUpdateUIFlag().enabled
@@ -505,7 +506,7 @@ export function Account() {
       <SettingsCard>
         <SettingsRow
           label="Log out"
-          description="Sign out of Macro on this device."
+          description={`Sign out of ${PRODUCT_NAME} on this device.`}
         >
           <Button variant="secondary" size="sm" onClick={() => logout()}>
             <SignOutIcon class="size-4" />
@@ -604,7 +605,7 @@ export function Account() {
                   onInput={(event) =>
                     setDeleteFeedback(event.currentTarget.value)
                   }
-                  placeholder="Your feedback helps us improve Macro"
+                  placeholder={`Your feedback helps us improve ${PRODUCT_NAME}`}
                 />
                 <span class="text-ink-extra-muted text-xs">
                   Please don't include sensitive information.

@@ -1,4 +1,4 @@
-import { DOCS_BASE } from '@app/constants/docs-links';
+import { docsUrl } from '@app/constants/docs-links';
 import {
   runCreateAction,
   useCreatableEnabled,
@@ -73,7 +73,7 @@ export function ChannelsEmptyState(props: {
       primaryAction={
         isCreatableEnabled('channel') ? content().action : undefined
       }
-      documentationUrl={`${DOCS_BASE}/product/channels`}
+      documentationUrl={docsUrl('/product/channels')}
       documentationIcon={BookOpenIcon}
       class={
         props.topAligned

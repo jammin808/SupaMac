@@ -1,5 +1,6 @@
 import { ListSkeleton } from '@app/components/view-shell/ListSkeleton';
 import { useAnalytics } from '@app/lib/analytics/analytics-context';
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { NoiseBackground } from '@core/component/NoiseBackground';
 import { useIsAuthenticated } from '@core/context/user';
 import LogoIcon from '@icon/macro-logo.svg';
@@ -154,8 +155,9 @@ export function InviteWelcome() {
                       Welcome, {details().firstName}
                     </h1>
                     <p class="max-w-md text-sm leading-relaxed text-ink-muted">
-                      Your Macro workspace is ready to set up. Bring your email,
-                      docs, and team together in one place — and your{' '}
+                      Your {PRODUCT_NAME} workspace is ready to set up. Bring
+                      your email, docs, and team together in one place — and
+                      your{' '}
                       {details().freeMonths === 1
                         ? 'first month'
                         : `first ${details().freeMonths} months`}{' '}
@@ -193,21 +195,21 @@ export function InviteWelcome() {
             <Match when={view().kind === 'expired'}>
               <UnavailableInvite
                 title="This invite link has expired"
-                body="Invite links stay open for 48 hours. Ask your Macro contact for a fresh one and we'll pick up right where this one left off."
+                body={`Invite links stay open for 48 hours. Ask your ${PRODUCT_NAME} contact for a fresh one and we'll pick up right where this one left off.`}
               />
             </Match>
 
             <Match when={view().kind === 'used'}>
               <UnavailableInvite
                 title="This invite link has already been used"
-                body="If that was you, log in to pick up where you left off. Otherwise, ask your Macro contact for a link of your own."
+                body={`If that was you, log in to pick up where you left off. Otherwise, ask your ${PRODUCT_NAME} contact for a link of your own.`}
               />
             </Match>
 
             <Match when={view().kind === 'revoked'}>
               <UnavailableInvite
                 title="This invite link is no longer active"
-                body="Ask your Macro contact for a new link."
+                body={`Ask your ${PRODUCT_NAME} contact for a new link.`}
               />
             </Match>
 
@@ -216,7 +218,7 @@ export function InviteWelcome() {
             >
               <UnavailableInvite
                 title="This invite link isn't valid"
-                body="Double-check the link you were sent, or ask your Macro contact for a new one."
+                body={`Double-check the link you were sent, or ask your ${PRODUCT_NAME} contact for a new one.`}
               />
             </Match>
           </Switch>

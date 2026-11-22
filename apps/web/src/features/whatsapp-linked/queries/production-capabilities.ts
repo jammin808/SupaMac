@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { useUserId } from '@core/context/user';
 import { isNativeMobilePlatform } from '@core/mobile/isNativeMobilePlatform';
 import { getDisplayName } from '@core/user/displayName';
@@ -114,8 +115,7 @@ export function createWhatsAppLinkedCapabilities(host: {
                 submitPasskey.mutateAsync({ pairingId, response }),
                 () => ({
                   kind: 'passkey-failed' as const,
-                  message:
-                    "Your phone confirmed, but Macro couldn't pass it on to WhatsApp. Try again.",
+                  message: `Your phone confirmed, but ${PRODUCT_NAME} couldn't pass it on to WhatsApp. Try again.`,
                 })
               ).map(() => undefined)
           ),

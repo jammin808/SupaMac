@@ -32,14 +32,14 @@ type SetupState = {
 
 const PERMISSION: SetupState = {
   title: 'Enable calendar',
-  description: 'Grant calendar access to show your events in Macro.',
+  description: 'Grant calendar access to show your events in SupaMac.',
   action: 'Grant access',
   // A Gmail inbox the stack links grants its mailbox alone.
   arrange: async () => {},
 };
 const DISABLED: SetupState = {
   title: 'Calendar is off',
-  description: 'Grant calendar access again to show your events in Macro.',
+  description: 'Grant calendar access again to show your events in SupaMac.',
   action: 'Turn on',
   arrange: turnCalendarOff,
 };

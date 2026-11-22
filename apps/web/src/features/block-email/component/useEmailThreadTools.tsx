@@ -20,6 +20,7 @@ import {
   trashEmails,
 } from '@app/features/next-soup/utils';
 import { EmailReminderStatus } from '@app/features/reminders/email-reminder-status';
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { t } from '@app/lib/i18n';
 import type { BlockTool } from '@components/app/block-tool';
 import { getPermissions } from '@core/component/SharePermissions';
@@ -289,7 +290,7 @@ export function useEmailThreadTools(props: EmailThreadToolsOptions) {
       hotkeyToken: TOKENS.entity.action.markRead,
     },
     askMacro: {
-      label: 'Ask Macro',
+      label: `Ask ${PRODUCT_NAME}`,
       icon: ChatWithAgentIcon,
       action: () => {
         const threadId = emailCtx.thread()?.db_id;

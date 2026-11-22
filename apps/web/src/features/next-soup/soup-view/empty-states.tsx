@@ -1,10 +1,11 @@
-import { DOCS_BASE } from '@app/constants/docs-links';
+import { docsUrl } from '@app/constants/docs-links';
 import type { ListView } from '@app/constants/list-views';
 import {
   type CreatableName,
   useCreatableEnabled,
   useCreateAction,
 } from '@app/features/command/Launcher';
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { openNewChannelModal } from '@channel/CreateChannelModal';
 import { useAddInboxFlow, useEmailLinksStatus } from '@core/email-link';
 import { TOKENS } from '@core/hotkey/tokens';
@@ -48,10 +49,9 @@ const FALLBACK_CONTENT: Partial<Record<ListView, FallbackContent>> = {
   documents: {
     plural: 'documents',
     graphic: EmptyStateDocGraphic,
-    description:
-      'Write, collaborate, and share documents right inside Macro. Create notes, specs, or any long-form content and keep it alongside your conversations.',
+    description: `Write, collaborate, and share documents right inside ${PRODUCT_NAME}. Create notes, specs, or any long-form content and keep it alongside your conversations.`,
     create: { label: 'New document', blockName: 'md' },
-    documentationUrl: `${DOCS_BASE}/product/docs`,
+    documentationUrl: docsUrl('/product/docs'),
   },
   channels: {
     plural: 'channels',
@@ -59,19 +59,20 @@ const FALLBACK_CONTENT: Partial<Record<ListView, FallbackContent>> = {
     description:
       'Channels are shared spaces for team conversations organized by topic, project, or team. Create a channel to start collaborating with your team.',
     create: { label: 'New channel', blockName: 'channel' },
-    documentationUrl: `${DOCS_BASE}/product/channels`,
+    documentationUrl: docsUrl('/product/channels'),
   },
   calls: {
     plural: 'calls',
     graphic: EmptyStateCallsGraphic,
     description: (
       <>
-        See recordings, transcriptions and summaries of your Macro calls.
+        See recordings, transcriptions and summaries of your {PRODUCT_NAME}{' '}
+        calls.
         <br />
         Calls are available to agents.
       </>
     ),
-    documentationUrl: `${DOCS_BASE}/product/calls`,
+    documentationUrl: docsUrl('/product/calls'),
   },
 };
 
@@ -108,7 +109,7 @@ export function EmptyState(props: {
               : 'No results'
           }
           description="Search across messages, documents, tasks, and more. Try a different query or broaden your filters."
-          documentationUrl={`${DOCS_BASE}/product/search`}
+          documentationUrl={docsUrl('/product/search')}
         />
       </Match>
 
@@ -138,12 +139,12 @@ export function EmptyState(props: {
         <EmptyStatePanel
           graphic={EmptyStateInboxTrayGraphic}
           title="Your inbox is empty"
-          description="Bring your inbox into Macro to triage signal from noise, reply faster, and let agents work alongside your mail."
+          description={`Bring your inbox into ${PRODUCT_NAME} to triage signal from noise, reply faster, and let agents work alongside your mail.`}
           primaryAction={{
             label: 'Connect email',
             onClick: onConnectEmail,
           }}
-          documentationUrl={`${DOCS_BASE}/product/home`}
+          documentationUrl={docsUrl('/product/home')}
         />
       </Match>
 
@@ -151,12 +152,12 @@ export function EmptyState(props: {
         <EmptyStatePanel
           graphic={EmptyStateEmailGraphic}
           title="Connect your email"
-          description="Bring your inbox into Macro to triage signal from noise, reply faster, and let agents work alongside your mail."
+          description={`Bring your inbox into ${PRODUCT_NAME} to triage signal from noise, reply faster, and let agents work alongside your mail.`}
           primaryAction={{
             label: 'Connect email',
             onClick: onConnectEmail,
           }}
-          documentationUrl={`${DOCS_BASE}/product/email`}
+          documentationUrl={docsUrl('/product/email')}
         />
       </Match>
 
@@ -195,7 +196,7 @@ export function EmptyState(props: {
               graphic={EmptyStateInboxTrayGraphic}
               title={title}
               description={description}
-              documentationUrl={`${DOCS_BASE}/product/home`}
+              documentationUrl={docsUrl('/product/home')}
             />
           );
         })()}
@@ -206,7 +207,7 @@ export function EmptyState(props: {
           graphic={EmptyStateInboxTrayGraphic}
           title="Inbox zero"
           description="You're all caught up. New email will appear here as it arrives."
-          documentationUrl={`${DOCS_BASE}/product/email`}
+          documentationUrl={docsUrl('/product/email')}
         />
       </Match>
 
@@ -220,7 +221,7 @@ export function EmptyState(props: {
             icon: PlusIcon,
             onClick: () => runCreateAction('task'),
           }}
-          documentationUrl={`${DOCS_BASE}/product/tasks`}
+          documentationUrl={docsUrl('/product/tasks')}
         />
       </Match>
 
@@ -236,7 +237,7 @@ export function EmptyState(props: {
             icon: PlusIcon,
             onClick: () => runCreateAction('routine'),
           }}
-          documentationUrl={`${DOCS_BASE}/product/agents`}
+          documentationUrl={docsUrl('/product/agents')}
         />
       </Match>
 
@@ -252,7 +253,7 @@ export function EmptyState(props: {
             icon: PlusIcon,
             onClick: () => runCreateAction('skill'),
           }}
-          documentationUrl={`${DOCS_BASE}/product/agents`}
+          documentationUrl={docsUrl('/product/agents')}
         />
       </Match>
 
@@ -260,13 +261,13 @@ export function EmptyState(props: {
         <EmptyStatePanel
           graphic={EmptyStateAiGraphic}
           title="Get started with agents"
-          description="Create an agent, or use Macro with your favorite AI chat client or code editor via MCP."
+          description={`Create an agent, or use ${PRODUCT_NAME} with your favorite AI chat client or code editor via MCP.`}
           primaryAction={{
             label: 'New agent',
             icon: PlusIcon,
             onClick: () => runCreateAction('agent'),
           }}
-          documentationUrl={`${DOCS_BASE}/product/agents`}
+          documentationUrl={docsUrl('/product/agents')}
         />
       </Match>
 
@@ -288,7 +289,7 @@ export function EmptyState(props: {
             icon: PlusIcon,
             onClick: () => runCreateAction('project'),
           }}
-          documentationUrl={`${DOCS_BASE}/product/drive`}
+          documentationUrl={docsUrl('/product/drive')}
         >
           <FolderDropZone />
         </EmptyStatePanel>
@@ -317,7 +318,7 @@ export function EmptyState(props: {
               </Show>
             </>
           }
-          documentationUrl={`${DOCS_BASE}/product/search`}
+          documentationUrl={docsUrl('/product/search')}
         />
       </Match>
 

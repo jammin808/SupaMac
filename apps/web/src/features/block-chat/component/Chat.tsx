@@ -1,4 +1,5 @@
 import { openChatWithAgent } from '@app/features/chat/ChatWithAgentButton';
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { type ChatData, DEFAULT_CHAT_NAME } from '@block-chat/definition';
 import { pendingLocationParamsSignal } from '@block-chat/signal/pendingLocationParams';
 import { FloatRegionOrInline } from '@components/app/mobile/float-regions/FloatRegion';
@@ -175,7 +176,9 @@ function ChatInner(props: { data: ChatData }) {
             class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-edge-muted bg-surface px-4 py-3 text-sm text-ink-muted"
           >
             <div class="min-w-0">
-              <p class="font-medium text-ink">Macro Chats are now Agents.</p>
+              <p class="font-medium text-ink">
+                {PRODUCT_NAME} Chats are now Agents.
+              </p>
               <p>
                 This chat is read-only. Continue it in Agents to keep going.
               </p>
