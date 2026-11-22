@@ -1,55 +1,55 @@
-import "./polyfills/prism";
-import { configureAppLinksFromEnv } from "./app-links";
-import app from "./index";
+import './polyfills/prism';
+import { configureAppLinksFromEnv } from './app-links';
+import app from './index';
 
-const PORT = parseInt(process.env.PORT || "8096", 10);
+const PORT = parseInt(process.env.PORT || '8096', 10);
 
 // The shared gateway routes `/lexical/*` here without stripping the prefix;
 // the app's routes, and the target group's health check, are at the root.
-const GATEWAY_PREFIX = "/lexical";
+const GATEWAY_PREFIX = '/lexical';
 
 function withoutGatewayPrefix(req: Request): Request {
-	const url = new URL(req.url);
-	if (
-		url.pathname !== GATEWAY_PREFIX &&
-		!url.pathname.startsWith(`${GATEWAY_PREFIX}/`)
-	) {
-		return req;
-	}
-	url.pathname = url.pathname.slice(GATEWAY_PREFIX.length) || "/";
-	return new Request(url, req);
+  const url = new URL(req.url);
+  if (
+    url.pathname !== GATEWAY_PREFIX &&
+    !url.pathname.startsWith(`${GATEWAY_PREFIX}/`)
+  ) {
+    return req;
+  }
+  url.pathname = url.pathname.slice(GATEWAY_PREFIX.length) || '/';
+  return new Request(url, req);
 }
 
 const env = {
-	INTERNAL_AUTH_KEY:
-		process.env.INTERNAL_AUTH_KEY || process.env.INTERNAL_API_SECRET_KEY,
-	SYNC_SERVICE_AUTH_KEY: process.env.SYNC_SERVICE_AUTH_KEY,
-	SYNC_SERVICE_URL: process.env.SYNC_SERVICE_URL,
+  INTERNAL_AUTH_KEY:
+    process.env.INTERNAL_AUTH_KEY || process.env.INTERNAL_API_SECRET_KEY,
+  SYNC_SERVICE_AUTH_KEY: process.env.SYNC_SERVICE_AUTH_KEY,
+  SYNC_SERVICE_URL: process.env.SYNC_SERVICE_URL,
 };
 
 const requiredVars = [
-	"INTERNAL_AUTH_KEY",
-	"SYNC_SERVICE_AUTH_KEY",
-	"SYNC_SERVICE_URL",
+  'INTERNAL_AUTH_KEY',
+  'SYNC_SERVICE_AUTH_KEY',
+  'SYNC_SERVICE_URL',
 ] as const;
 for (const varName of requiredVars) {
-	if (!env[varName]) {
-		console.error(`Missing required environment variable: ${varName}`);
-		process.exit(1);
-	}
+  if (!env[varName]) {
+    console.error(`Missing required environment variable: ${varName}`);
+    process.exit(1);
+  }
 }
 
 // Links in converted documents follow APP_URL and STATIC_FILE_URL.
 configureAppLinksFromEnv({
-	APP_URL: process.env.APP_URL,
-	STATIC_FILE_URL: process.env.STATIC_FILE_URL,
+  APP_URL: process.env.APP_URL,
+  STATIC_FILE_URL: process.env.STATIC_FILE_URL,
 });
 
 const server = Bun.serve({
-	port: PORT,
-	fetch(req) {
-		return app.fetch(withoutGatewayPrefix(req), env);
-	},
+  port: PORT,
+  fetch(req) {
+    return app.fetch(withoutGatewayPrefix(req), env);
+  },
 });
 
 console.log(`Lexical service listening on http://localhost:${server.port}`);

@@ -1,11 +1,11 @@
-import { configureAppLinks } from "@macro-inc/lexical-core";
+import { configureAppLinks } from '@macro-inc/lexical-core';
 
 /** The settings that say where the instance's web app and files are. */
 export type AppLinkEnv = {
-	/** The web app's origin and the folder it is served from. */
-	APP_URL?: string;
-	/** The static-file service's public URL (it serves `/file/<id>`). */
-	STATIC_FILE_URL?: string;
+  /** The web app's origin and the folder it is served from. */
+  APP_URL?: string;
+  /** The static-file service's public URL (it serves `/file/<id>`). */
+  STATIC_FILE_URL?: string;
 };
 
 /**
@@ -15,8 +15,8 @@ export type AppLinkEnv = {
  * Throws on a value that is not an absolute URL, so startup fails on it.
  */
 export function configureAppLinksFromEnv(env: AppLinkEnv): void {
-	configureAppLinks({
-		appUrl: env.APP_URL || undefined,
-		staticFileUrl: env.STATIC_FILE_URL || undefined,
-	});
+  configureAppLinks({
+    appUrl: env.APP_URL || undefined,
+    staticFileUrl: env.STATIC_FILE_URL || undefined,
+  });
 }
