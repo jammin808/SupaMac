@@ -178,18 +178,22 @@ function proxyServers(): Servers | undefined {
 
 /**
  * The hosts of a self-hosted backend: the single-origin proxy's routes, with
- * the two entries that have no route there. Signing out ends the session at
- * the auth service, and there is no identity-provider page to visit after
- * it, so `auth-logout` is the app's own login page. No PDF service runs.
+ * the entries that have no route there. Signing out ends the session at the
+ * auth service, and there is no identity-provider page to visit after it, so
+ * `auth-logout` is the app's own folder, with the trailing slash its server
+ * would otherwise redirect to. No PDF service runs, and no storage socket
+ * service: its empty host keeps the session from opening that socket.
  */
 function selfHostedServers(): Servers | undefined {
   if (!selfHostedBackendOrigin) return undefined;
   const servers = proxyServers();
   if (!servers) return undefined;
+  const base = import.meta.env.BASE_URL;
   return {
     ...servers,
-    'auth-logout': `${globalThis.location?.origin ?? ''}${import.meta.env.BASE_URL}`,
+    'auth-logout': `${globalThis.location?.origin ?? ''}${base.endsWith('/') ? base : `${base}/`}`,
     'pdf-service': `${selfHostedBackendOrigin}/pdf`,
+    'websocket-service': '',
   };
 }
 

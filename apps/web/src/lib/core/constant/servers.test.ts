@@ -129,12 +129,19 @@ it.each([
 it('addresses every service under a self-hosted backend origin', async () => {
   vi.stubEnv('MODE', 'production');
   vi.stubEnv('VITE_BACKEND_ORIGIN', 'https://api.example.com');
+  vi.stubEnv('BASE_URL', '/workspace');
   vi.stubGlobal('location', new URL('https://www.example.org/workspace/login'));
   vi.resetModules();
   const { SERVER_HOSTS, SYNC_SERVICE_HOSTS, selfHostedBackendUrl } =
     await import('./servers');
 
   expect(SERVER_HOSTS['auth-service']).toBe('https://api.example.com/auth');
+  // The page sign-out leads to, as its server serves it without a redirect.
+  expect(SERVER_HOSTS['auth-logout']).toBe(
+    'https://www.example.org/workspace/'
+  );
+  // No storage socket service runs, so the session opens no such socket.
+  expect(SERVER_HOSTS['websocket-service']).toBe('');
   expect(SERVER_HOSTS['connection-gateway']).toBe(
     'wss://api.example.com/connection-gateway'
   );
@@ -147,7 +154,9 @@ it('addresses every service under a self-hosted backend origin', async () => {
   );
 
   const hostnames = new Set(
-    Object.values(SERVER_HOSTS).map((host) => new URL(host).hostname)
+    Object.values(SERVER_HOSTS)
+      .filter((host) => host !== '')
+      .map((host) => new URL(host).hostname)
   );
   expect([...hostnames].sort()).toEqual(['api.example.com', 'www.example.org']);
 });

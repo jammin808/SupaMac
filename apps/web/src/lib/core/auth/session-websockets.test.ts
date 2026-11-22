@@ -11,6 +11,9 @@ const sockets = vi.hoisted(() => ({
   activateGateway: vi.fn(),
   activateStorage: vi.fn(),
 }));
+const servers = vi.hoisted(() => ({
+  storageHost: 'wss://storage.example.com',
+}));
 const telemetry = vi.hoisted(() => ({
   hash: vi.fn(),
   roots: [] as {
@@ -18,6 +21,13 @@ const telemetry = vi.hoisted(() => ({
     span: { setAttr: ReturnType<typeof vi.fn>; end: ReturnType<typeof vi.fn> };
     completed: Promise<void>;
   }[],
+}));
+vi.mock('@core/constant/servers', () => ({
+  SERVER_HOSTS: {
+    get 'websocket-service'() {
+      return servers.storageHost;
+    },
+  },
 }));
 vi.mock('@core/util/hash', () => ({ contentHash: telemetry.hash }));
 vi.mock('@macro-inc/observability', () => ({
@@ -57,6 +67,7 @@ afterEach(() => {
   setAuthenticated(undefined);
   setUserId(undefined);
   telemetry.roots.length = 0;
+  servers.storageHost = 'wss://storage.example.com';
   vi.clearAllMocks();
 });
 
@@ -124,4 +135,18 @@ it('ends activation spans and connects even when identity hashing fails', async 
     true
   );
   expect(telemetry.roots[0].span.end).toHaveBeenCalledOnce();
+});
+
+it('leaves the storage socket closed where the deployment has no host for it', () => {
+  servers.storageHost = '';
+  createRoot((d) => {
+    dispose = d;
+    useSessionWebsockets();
+  });
+
+  setUserId('user-1');
+  setAuthenticated(true);
+
+  expect(sockets.gateway.reconnect).toHaveBeenCalledOnce();
+  expect(sockets.storage.reconnect).not.toHaveBeenCalled();
 });
