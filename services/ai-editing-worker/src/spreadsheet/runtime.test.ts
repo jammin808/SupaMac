@@ -79,7 +79,7 @@ describe('deterministic spreadsheet worker runtime', () => {
   it('AI can write and reread native mention cells without an open editor', async () => {
     const { doc, storage, revision } = store();
     const value =
-      '<m-user-mention>{"userId":"macro|test@macro.com","email":"test@macro.com","displayName":"Taylor"}</m-user-mention>';
+      '<m-user-mention>{"userId":"macro|test@example.com","email":"test@example.com","displayName":"Taylor"}</m-user-mention>';
     await runSpreadsheetRequest(
       {
         action: 'edit',

@@ -118,6 +118,9 @@ x-rust-env: &rust-env
   SMTP_HOST: mail-relay
   SMTP_PORT: "587"
   SENDER_BASE_ADDRESS: ${SUPAMAC_MAIL_DOMAIN:-${SUPAMAC_DOMAIN}}
+  # The address sign-in codes are sent from. The storage and email services
+  # also read it, to recognise the instance's own sign-in mail.
+  AUTH_SENDER_ADDRESS: no-reply@${SUPAMAC_MAIL_DOMAIN:-${SUPAMAC_DOMAIN}}
 
   # The in-network AWS endpoint. The host must be `localstack`: presigned
   # URLs are rewritten for browsers only then.
@@ -275,7 +278,7 @@ x-rust-env: &rust-env
   LIVEKIT_API_KEY: local-livekit-key
   GMAIL_GCP_QUEUE: gmail-gcp-queue-local
   CAL_EVENT_TYPE_CONTENT_NAMES_KEY: '{"1":{"content_name":"local","value":0}}'
-  APPLE_BUNDLE_ID: com.macro.local
+  APPLE_BUNDLE_ID: com.example.supamac
   SNS_APNS_PLATFORM_ARN: arn:aws:sns:us-east-1:000000000000:app/APNS/macro-local
   SNS_FCM_PLATFORM_ARN: arn:aws:sns:us-east-1:000000000000:app/GCM/macro-local
   # Object links are signed by the object store here, never by a CDN key.
@@ -811,7 +814,6 @@ services:
       SIGNUP_ALLOWLIST_JSON: ${SUPAMAC_SIGNUP_ALLOWLIST_JSON:?set SUPAMAC_SIGNUP_ALLOWLIST_JSON}
       # No support channel with the upstream company's staff in new accounts.
       SUPPORT_CHANNEL_PARTICIPANTS_JSON: "[]"
-      AUTH_SENDER_ADDRESS: no-reply@${SUPAMAC_MAIL_DOMAIN:-${SUPAMAC_DOMAIN}}
       # Blank counts as unset here: no sign-up event is sent anywhere, and
       # the flags this service reads are off.
       POSTHOG_API_KEY: ""
@@ -979,6 +981,9 @@ services:
     environment:
       PORT: "8096"
       SYNC_SERVICE_URL: http://sync-service:8787
+      # Where links in the documents it converts point (src/app-links.ts).
+      APP_URL: ${SUPAMAC_UI_ORIGIN}${SUPAMAC_UI_PATH:-}
+      STATIC_FILE_URL: https://${SUPAMAC_API_HOST}/static-file
     networks: [internal, egress]
     depends_on:
       sync-service:
@@ -998,6 +1003,10 @@ services:
     <<: *container
     image: ${SUPAMAC_AI_EDITING_IMAGE:?set SUPAMAC_AI_EDITING_IMAGE}
     env_file: *env-files
+    environment:
+      ALLOWED_ORIGINS: ${SUPAMAC_UI_ORIGIN}
+      APP_URL: ${SUPAMAC_UI_ORIGIN}${SUPAMAC_UI_PATH:-}
+      STATIC_FILE_URL: https://${SUPAMAC_API_HOST}/static-file
     volumes:
       - ai_editing_state:/data
     networks: [internal, egress]

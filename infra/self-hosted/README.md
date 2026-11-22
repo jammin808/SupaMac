@@ -155,7 +155,7 @@ In the deploy tool, with the Compose file. None of these is a secret.
 | `SUPAMAC_API_HOST` | The host name the API is served at, such as `api.example.com`: the API is `https://<this>`. It must share a registrable domain with `SUPAMAC_UI_ORIGIN` (`api.example.com` beside `https://example.com`), because session cookies are strict and set for this host only. Set it before the first start: the identity server's issuer and redirects are written from it once, on an empty database. |
 | `SUPAMAC_DOMAIN` | Domain mail is sent from, unless `SUPAMAC_MAIL_DOMAIN` names another, and the domain of the identity server's admin account. |
 | `SUPAMAC_UI_ORIGIN` | The origin browsers send, `https://example.com`, without path or trailing slash. Every service allows exactly this origin. |
-| `SUPAMAC_UI_PATH` | The folder of the bundle below that origin, `/supamac`; empty at the root. |
+| `SUPAMAC_UI_PATH` | The folder of the bundle below that origin, `/supamac`. The bundle is always built for a folder, never the site's root. |
 | `SUPAMAC_SIGNUP_ALLOWLIST_JSON` | JSON array of the only addresses that can create an account. An invited teammate must be on it too. |
 | `SUPAMAC_OWNER_EMAILS` | Comma-separated accounts that get the paid-plan roles. Optional. |
 | `SUPAMAC_MAIL_DOMAIN` | Domain mail is sent from, if not `SUPAMAC_DOMAIN`. The relay refuses any other sender domain. |

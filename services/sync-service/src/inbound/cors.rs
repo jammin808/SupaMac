@@ -7,16 +7,13 @@ use worker::{Cors, Env};
 /// as a browser sends it in `Origin`: `scheme://host[:port]`.
 const ALLOWED_ORIGINS_VAR: &str = "ALLOWED_ORIGINS";
 
+/// Origins of a developer's machine and the mobile app's webview. A
+/// deployment names its own origins in `ALLOWED_ORIGINS`.
 static BUILT_IN_ORIGINS: &[&str] = &[
     "http://localhost:5173",
     "http://localhost:3000",
     "http://host.local:3000",
-    "https://dev.macro.com",
-    "https://staging.macro.com",
-    "https://www.macro.com",
-    "https://macro.com",
     "capacitor://localhost",
-    "https://apollo-testing.macro.com",
 ];
 
 /// Which browser origins may call this worker. Follows
@@ -24,8 +21,8 @@ static BUILT_IN_ORIGINS: &[&str] = &[
 /// can't share that type because its crate is built on tower-http.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum OriginAllowList {
-    /// `ALLOWED_ORIGINS` names no origin: the built-in origins, loopback
-    /// development ports, and preview deployments.
+    /// `ALLOWED_ORIGINS` names no origin: the built-in origins and loopback
+    /// development ports, and no public origin.
     BuiltIn,
     /// `ALLOWED_ORIGINS` names these origins: they are allowed, compared
     /// exactly, and nothing else is.
@@ -80,12 +77,6 @@ fn is_built_in_origin(origin: &str) -> bool {
         && let Ok(port) = port.parse::<u16>()
     {
         return (3000..=3999).contains(&port) || (20000..=60000).contains(&port);
-    }
-    // Allow feature branch previews: https://{subdomain}.preview.macro.com
-    if let Some(host) = origin.strip_prefix("https://")
-        && let Some(subdomain) = host.strip_suffix(".preview.macro.com")
-    {
-        return !subdomain.is_empty() && !subdomain.contains('/');
     }
     false
 }

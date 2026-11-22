@@ -79,10 +79,11 @@ whose `Origin` header is not on the allow-list; requests without an `Origin`
 (server-side callers) pass. The `ALLOWED_ORIGINS` worker variable holds the list:
 comma-separated origins, each as a browser sends it (`scheme://host[:port]`, no
 path or trailing slash), compared exactly. Empty or missing keeps the built-in
-list in `src/inbound/cors.rs` (upstream's hosts, loopback development ports and
-preview deployments), so a deployment on its own domain sets it. Every `[vars]`
-block of `wrangler.toml` and `wrangler.docker.toml` declares it; the Docker
-image forwards the container's `ALLOWED_ORIGINS` to the worker with `--var`.
+list in `src/inbound/cors.rs`: development origins (loopback ports and `host.local:3000`) and the mobile
+app's `capacitor://localhost`, and no public origin, so every deployment sets
+it. Every `[vars]` block of `wrangler.toml` and `wrangler.docker.toml` declares
+it; the Docker image forwards the container's `ALLOWED_ORIGINS` to the worker
+with `--var`.
 
 ## Comment validation configuration
 

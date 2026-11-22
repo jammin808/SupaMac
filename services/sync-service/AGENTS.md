@@ -73,7 +73,8 @@ to the requested surface. These are scoped sync JWTs, not app-session tokens.
 - The Durable Object answers 403, before upgrading, to a request whose `Origin`
   is off the allow-list (`src/inbound/cors.rs`); a request with no `Origin`
   passes. The `ALLOWED_ORIGINS` worker variable (comma-separated) makes the list
-  exactly those origins; empty or missing keeps the built-in list. Declare it in
+  exactly those origins; empty or missing keeps the built-in list, which allows
+  development origins (loopback ports and `host.local:3000`) and the mobile app only. Declare it in
   every `[vars]` block of both wrangler configs, and keep the Docker launcher
   forwarding the container's value with `--var`.
 

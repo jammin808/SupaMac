@@ -39,6 +39,7 @@ export async function setupMiniflare(
     lexicalServiceUrl?: string;
     lexicalServiceAuthKey?: string | null;
     fetchMock?: MiniflareOptions['fetchMock'];
+    allowedOrigins?: string;
   } = {},
 ) {
   const persist = (name: string) => options.persistPath ? `${options.persistPath}/${name}` : false;
@@ -81,6 +82,7 @@ export async function setupMiniflare(
       ...(options.lexicalServiceUrl
         ? { LEXICAL_SERVICE_URL: options.lexicalServiceUrl, ...(options.lexicalServiceAuthKey === null ? {} : { LEXICAL_SERVICE_AUTH_KEY: options.lexicalServiceAuthKey ?? "lexical-key" }) }
         : {}),
+      ...(options.allowedOrigins === undefined ? {} : { ALLOWED_ORIGINS: options.allowedOrigins }),
     },
     compatibilityDate: '2025-03-05'
   });

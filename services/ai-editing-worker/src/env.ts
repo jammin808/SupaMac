@@ -1,29 +1,34 @@
 import { envsafe, str } from 'envsafe';
+import type { AppLinkBindings } from './app-links';
 import type { CanvasBrowserConfig } from './canvas/render';
 import type { D1Database } from './traces-db';
 
-export type Bindings = CanvasBrowserConfig & {
-  /** Tags exported spans with deployment.environment (matches DD_ENV). */
-  ENVIRONMENT: string | undefined;
-  /** OTLP/HTTP traces endpoint; unset disables trace export. */
-  OTEL_EXPORTER_OTLP_ENDPOINT: string | undefined;
-  /** Datadog API key attached to trace exports when the endpoint is a
-   * Datadog intake; secret, set via `wrangler secret put DD_API_KEY`. */
-  DD_API_KEY: string | undefined;
-  ANTHROPIC_API_KEY: string | undefined;
-  CEREBRAS_API_KEY: string | undefined;
-  OPENAI_API_KEY: string | undefined;
-  /** Optional: only needed when a request names the `google` provider. */
-  GOOGLE_GENERATIVE_AI_API_KEY: string | undefined;
-  SYNC_WS_BASE: string;
-  /** D1 database storing edit-session traces. Absent in envs without the binding. */
-  TRACES_DB: D1Database | undefined;
-  /** Shared admin key gating the trace-read endpoint; validated via getEnv. */
-  TRACE_ADMIN_KEY: string | undefined;
-  /** Org internal service-to-service key; accepted on the trace endpoints via
-   * the `x-internal-auth-key` header (used by the delete-document worker). */
-  INTERNAL_API_KEY: string | undefined;
-};
+export type Bindings = CanvasBrowserConfig &
+  AppLinkBindings & {
+    /** Tags exported spans with deployment.environment (matches DD_ENV). */
+    ENVIRONMENT: string | undefined;
+    /** OTLP/HTTP traces endpoint; unset disables trace export. */
+    OTEL_EXPORTER_OTLP_ENDPOINT: string | undefined;
+    /** Datadog API key attached to trace exports when the endpoint is a
+     * Datadog intake; secret, set via `wrangler secret put DD_API_KEY`. */
+    DD_API_KEY: string | undefined;
+    ANTHROPIC_API_KEY: string | undefined;
+    CEREBRAS_API_KEY: string | undefined;
+    OPENAI_API_KEY: string | undefined;
+    /** Optional: only needed when a request names the `google` provider. */
+    GOOGLE_GENERATIVE_AI_API_KEY: string | undefined;
+    SYNC_WS_BASE: string;
+    /** Browser origins that may read responses, comma-separated; empty or
+     * unset allows only development origins (src/cors.ts). */
+    ALLOWED_ORIGINS: string | undefined;
+    /** D1 database storing edit-session traces. Absent in envs without the binding. */
+    TRACES_DB: D1Database | undefined;
+    /** Shared admin key gating the trace-read endpoint; validated via getEnv. */
+    TRACE_ADMIN_KEY: string | undefined;
+    /** Org internal service-to-service key; accepted on the trace endpoints via
+     * the `x-internal-auth-key` header (used by the delete-document worker). */
+    INTERNAL_API_KEY: string | undefined;
+  };
 
 export type Env = ReturnType<typeof validateEnv>;
 

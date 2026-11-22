@@ -5,9 +5,8 @@
 # The route table follows the local stack's proxy
 # (tooling/xtask/crates/xtask_local/src/local/proxy.rs and inventory.rs), so
 # the paths are the ones the web client calls. What differs is everything the
-# local proxy does for a developer's convenience: this gateway adds no CORS
-# except on one route, forwards no internal credential, and reaches the object
-# store only.
+# local proxy does for a developer's convenience: this gateway adds no CORS,
+# forwards no internal credential, and reaches the object store only.
 {
 	admin off
 	auto_https off
@@ -139,31 +138,8 @@
 			import service agent-harness-service:8080
 		}
 
-		# The AI editing worker answers CORS from a list of origins compiled
-		# into it, which this deployment's UI is not on. It is the one route
-		# where the gateway answers instead, and only for the configured UI
-		# origin. Requests carry a document permission token in the body and
-		# no cookie, so credentials are not allowed.
+		# The worker answers CORS itself, for the origin compose gives it.
 		handle_path /ai-editing/* {
-			@ui_preflight {
-				method OPTIONS
-				header Origin {$SUPAMAC_UI_ORIGIN}
-			}
-			handle @ui_preflight {
-				header Access-Control-Allow-Origin {$SUPAMAC_UI_ORIGIN}
-				header Access-Control-Allow-Methods "GET, POST, OPTIONS"
-				header Access-Control-Allow-Headers {header.Access-Control-Request-Headers}
-				header Access-Control-Max-Age 86400
-				header Vary Origin
-				respond 204
-			}
-
-			@ui header Origin {$SUPAMAC_UI_ORIGIN}
-			header @ui {
-				Access-Control-Allow-Origin {$SUPAMAC_UI_ORIGIN}
-				Vary Origin
-				defer
-			}
 			import service ai-editing-worker:8933
 		}
 

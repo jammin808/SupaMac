@@ -30,6 +30,10 @@ database_id = "16d34e99-3bc6-44e4-a287-1ea65183bd28"
 binding = "BROWSER"
 
 [vars]
+# Declared in every block: named environments do not inherit [vars].
+ALLOWED_ORIGINS = ""
+APP_URL = ""
+STATIC_FILE_URL = ""
 CANVAS_RENDER_URL = "https://macro.com/app/canvas-render.html"
 CANVAS_BROWSER_URL = ""
 # Tags exported spans with deployment.environment, matching the Datadog
@@ -57,6 +61,15 @@ DSS_BASE = "http://document-storage-service:8080"
 SEARCH_SERVICE_BASE = "http://search-processing-service:8080"
 CONTACTS_SERVICE_BASE = "http://contacts-service:8080"
 AUTH_SERVICE_BASE = "http://connection-gateway:8080"
+# Browser origins that may read responses, comma-separated, each as sent in
+# `Origin` (scheme://host[:port]). Empty allows only development origins
+# (src/cors.ts); a deployment passes its own with --var.
+ALLOWED_ORIGINS = ""
+# Where the instance's web app (origin and folder) and its static files are,
+# for links in documents the worker converts (src/app-links.ts). Empty keeps
+# lexical-core's page-relative defaults; a deployment passes its own.
+APP_URL = ""
+STATIC_FILE_URL = ""
 
 # Local dev uses an on-disk SQLite shard, so the id is only a reference.
 [[env.local.d1_databases]]
@@ -68,6 +81,10 @@ database_id = "16d34e99-3bc6-44e4-a287-1ea65183bd28"
 binding = "BROWSER"
 
 [env.dev.vars]
+# Declared in every block: named environments do not inherit [vars].
+ALLOWED_ORIGINS = ""
+APP_URL = ""
+STATIC_FILE_URL = ""
 CANVAS_RENDER_URL = "https://dev.macro.com/app/canvas-render.html"
 CANVAS_BROWSER_URL = ""
 ENVIRONMENT = "development"
@@ -90,6 +107,10 @@ name = "ai-editing-worker-playground"
 binding = "BROWSER"
 
 [env.playground.vars]
+# Declared in every block: named environments do not inherit [vars].
+ALLOWED_ORIGINS = ""
+APP_URL = ""
+STATIC_FILE_URL = ""
 CANVAS_RENDER_URL = "https://dev.macro.com/app/canvas-render.html"
 CANVAS_BROWSER_URL = ""
 ENVIRONMENT = "development"
@@ -112,6 +133,10 @@ name = "ai-editing-worker"
 binding = "BROWSER"
 
 [env.prod.vars]
+# Declared in every block: named environments do not inherit [vars].
+ALLOWED_ORIGINS = ""
+APP_URL = ""
+STATIC_FILE_URL = ""
 CANVAS_RENDER_URL = "https://macro.com/app/canvas-render.html"
 CANVAS_BROWSER_URL = ""
 ENVIRONMENT = "production"

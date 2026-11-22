@@ -88,6 +88,19 @@ before touching the edit flow.
 
 ## Gotchas
 
+- Browsers may read the worker's answers only from the origins the
+  `ALLOWED_ORIGINS` worker variable names (comma-separated, compared exactly,
+  `src/cors.ts`); empty or unset, only a developer's loopback and desktop
+  origins. A deployment passes its own with `--var ALLOWED_ORIGINS:<origins>`.
+  Preflight answers carry `Access-Control-Max-Age` (two hours). A self-hosted
+  stack's gateway no longer answers CORS for `/ai-editing`, so its ops image and
+  this worker's image are deployed from the same commit.
+- `APP_URL` (the web app's origin and folder) and `STATIC_FILE_URL` (the
+  static-file service's public URL) configure lexical-core's links for the
+  documents the worker converts (`src/app-links.ts`). Unset, the instance's
+  video embeds and booking links are not recognised. Declare every worker
+  variable in each `[vars]` block of `wrangler.toml`: named environments do not
+  inherit them.
 - This worker never deploys without explicit approval — `just deploy-dev` /
   `deploy-prod` run `generate-sandbox` first; don't run them unprompted.
 
