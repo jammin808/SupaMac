@@ -15,6 +15,7 @@ import type {
 import { type RichMessage, toBody } from '../../mentions';
 import { iterate, paginate, unwrap } from '../../utils';
 import type { MacroClient } from '../../utils/client';
+import { webAppLink } from '../../utils/web-app';
 import { AgentConversation } from '../agent-sessions/conversation';
 import { Bot } from '../bots/bot';
 import { CallRecord } from '../calls/call-record';
@@ -688,7 +689,7 @@ export class Channel extends PropertiedEntity<ChannelDetail> {
    * @readonly
    */
   webUrl(): string {
-    return `${this.client.webAppUrl}/app/channel/${this.id}`;
+    return webAppLink(this.client.webAppUrl, `/channel/${this.id}`);
   }
 
   /** Identity, loaded detail and {@link webUrl}, so serialized handles carry their link. */

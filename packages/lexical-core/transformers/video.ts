@@ -8,6 +8,7 @@ import {
   type ParagraphNode,
 } from 'lexical';
 import { $createVideoNode, $isVideoNode, VideoNode } from '../nodes/VideoNode';
+import { isStaticFileUrl, staticFileUrlSource } from '../utils/app-links';
 import {
   replaceElementWithUnknownMention,
   UnknownMentionNode,
@@ -37,14 +38,6 @@ function textHasVideoExtension(text: string): boolean {
   return VIDEO_EXTENSIONS.some((ext) => lower.includes(ext));
 }
 
-function isStaticFileServiceHost(hostname: string): boolean {
-  const lower = hostname.toLowerCase();
-  return (
-    lower === 'static-file-service.macro.com' ||
-    lower.endsWith('.static-file-service.macro.com')
-  );
-}
-
 /** True when `url` (and optional link label) identify a video to embed. */
 export const isVideoMarkdownLink = (url: string, linkText = ''): boolean => {
   let parsed: URL;
@@ -60,11 +53,7 @@ export const isVideoMarkdownLink = (url: string, linkText = ''): boolean => {
 
   // Static-file links often omit an extension in the path; the label usually
   // still names the file (e.g. "Screen Recording.mov").
-  if (
-    isStaticFileServiceHost(parsed.hostname) &&
-    parsed.pathname.toLowerCase().startsWith('/file/') &&
-    textHasVideoExtension(linkText)
-  ) {
+  if (isStaticFileUrl(parsed.href) && textHasVideoExtension(linkText)) {
     return true;
   }
 
@@ -72,19 +61,36 @@ export const isVideoMarkdownLink = (url: string, linkText = ''): boolean => {
 };
 
 // Standalone markdown link whose URL path ends in a video extension, or whose
-// label names a video file on Macro static-file-service (`/file/…` has no ext).
-// Lexical slices the match before `replace` runs, so this must not match
-// ordinary links. `^`/`$` keep trailing inline links from replacing a paragraph.
-const VIDEO_LINK_REGEXP = new RegExp(
-  '^(?:' +
-    // Label has a video extension; URL is Macro static-file-service /file/…
-    String.raw`\[([^\]]*\.(?:${VIDEO_EXTENSION_PATTERN})[^\]]*)\]\((https?:\/\/(?:[\w.-]+\.)?static-file-service\.macro\.com\/file\/[^)\s]+)(?:\s"([^"]*)"\s*)?\)` +
-    '|' +
-    // URL path ends with a video extension (query/hash allowed after it)
-    String.raw`\[([^\]]*)\]\(([^)\s?#]*\.(?:${VIDEO_EXTENSION_PATTERN})(?:[?#][^)\s]*)?)(?:\s"([^"]*)"\s*)?\)` +
-    ')\\s*$',
-  'i'
-);
+// label names a video file on the static-file service (its `/file/…` URLs have
+// no extension; `utils/app-links.ts` says where it is). Lexical slices the
+// match before `replace` runs, so this must not match ordinary links. `^`/`$`
+// keep trailing inline links from replacing a paragraph.
+function buildVideoLinkRegExp(staticFileSource: string): RegExp {
+  return new RegExp(
+    '^(?:' +
+      // Label has a video extension; URL is a static-file service file
+      String.raw`\[([^\]]*\.(?:${VIDEO_EXTENSION_PATTERN})[^\]]*)\]\((${staticFileSource}[^)\s]+)(?:\s"([^"]*)"\s*)?\)` +
+      '|' +
+      // URL path ends with a video extension (query/hash allowed after it)
+      String.raw`\[([^\]]*)\]\(([^)\s?#]*\.(?:${VIDEO_EXTENSION_PATTERN})(?:[?#][^)\s]*)?)(?:\s"([^"]*)"\s*)?\)` +
+      ')\\s*$',
+    'i'
+  );
+}
+
+let videoLinkRegExp: { staticFileSource: string; regExp: RegExp } | undefined;
+
+/** The regex for the static-file service configured now, built once per one. */
+function currentVideoLinkRegExp(): RegExp {
+  const staticFileSource = staticFileUrlSource();
+  if (videoLinkRegExp?.staticFileSource !== staticFileSource) {
+    videoLinkRegExp = {
+      staticFileSource,
+      regExp: buildVideoLinkRegExp(staticFileSource),
+    };
+  }
+  return videoLinkRegExp.regExp;
+}
 
 /** The paragraph's video when nothing else in it but blank text and breaks. */
 function $onlyVideo(paragraph: ParagraphNode): LexicalNode | null {
@@ -172,7 +178,10 @@ export const VIDEO_LINK: ElementTransformer = {
   dependencies: [VideoNode],
   type: 'element',
   export: (_node: LexicalNode) => null,
-  regExp: VIDEO_LINK_REGEXP,
+  // Read on every import, so it follows `configureAppLinks`.
+  get regExp() {
+    return currentVideoLinkRegExp();
+  },
   replace: (node, _, match) => {
     const linkText = match[1] ?? match[4] ?? '';
     const url = match[2] ?? match[5] ?? '';

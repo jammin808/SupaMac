@@ -4,6 +4,7 @@ import type {
 } from '../../../generated/storage/types.gen';
 import { MacroNotFoundError, unwrap } from '../../utils';
 import type { MacroClient } from '../../utils/client';
+import { webAppLink } from '../../utils/web-app';
 import { CallRecord } from '../calls/call-record';
 import { CallConnection, type JoinOptions } from '../calls/connection';
 import { callAdmissionError } from '../calls/errors';
@@ -175,6 +176,9 @@ export class Meeting extends MacroEntity<MeetingRecord> {
    * @readonly
    */
   async webUrl(): Promise<string> {
-    return `${this.client.webAppUrl}/app/meet/join/${encodeURIComponent((await this.detail.get()).shareToken)}`;
+    return webAppLink(
+      this.client.webAppUrl,
+      `/meet/join/${encodeURIComponent((await this.detail.get()).shareToken)}`,
+    );
   }
 }

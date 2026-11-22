@@ -97,8 +97,9 @@ export class UiNamespace {
   }
 
   /**
-   * Parse a Macro app link (`https://macro.com/app/...`), such as a list view
-   * or a link the user pasted, for `open`. Throws on anything else.
+   * Parse a link into this client's web app (below `webAppUrl`, or its `/app`
+   * folder when `webAppUrl` is a bare origin), such as a list view or a link
+   * the user pasted, for `open`. Throws on anything else.
    */
   link(url: string): AppLink {
     return AppLink.parse(this.client, url);

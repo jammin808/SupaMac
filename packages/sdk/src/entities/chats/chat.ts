@@ -6,6 +6,7 @@ import type {
 import { type Mentionable, type MentionPart, wrapXml } from '../../mentions';
 import { unwrap } from '../../utils';
 import type { MacroClient } from '../../utils/client';
+import { webAppLink } from '../../utils/web-app';
 import { PropertiedEntity } from '../entity';
 import { Project } from '../projects/project';
 import type { EntityReference } from '../reference';
@@ -218,7 +219,7 @@ export class Chat extends PropertiedEntity<ChatDetail> implements Mentionable {
    * @readonly
    */
   webUrl(): string {
-    return `${this.client.webAppUrl}/app/chat/${this.id}`;
+    return webAppLink(this.client.webAppUrl, `/chat/${this.id}`);
   }
 
   /** Identity, loaded detail and {@link webUrl}, so serialized handles carry their link. */

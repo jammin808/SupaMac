@@ -292,7 +292,10 @@ export class Macro<T extends MacroOpts = MacroOpts> {
 
   readonly events: MacroEvents;
 
-  /** Base URL of the Macro web app, used to build entity URLs. */
+  /**
+   * The web app's URL, used to build entity URLs: its origin, optionally
+   * followed by the path it is served from (`/app` when it names none).
+   */
   readonly webAppUrl: string;
 
   /** Direct access to the underlying hey-api service clients. */

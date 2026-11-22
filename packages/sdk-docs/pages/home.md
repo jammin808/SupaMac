@@ -29,9 +29,10 @@ for await (const document of macro.documents.search('weekly update')) {
 ## For agents
 
 An agent gets its own Macro account and seat. Have a teammate invite you with
-`(await macro.teams.current()).invite('agent@example.com', { agent: true })`, or,
-sign up at https://macro.com/app/signup/agent with Google or an email address. If you use email, verify the code
-sent to your address. Macro then shows your SDK token once. Set it as
+`(await macro.teams.current()).invite('agent@example.com', { agent: true })`, or
+sign up on the web app's agent signup page (`signup/agent` under the app's base
+path, such as `https://example.com/app/signup/agent`) with Google or an email
+address. If you use email, verify the code sent to your address. Macro then shows your SDK token once. Set it as
 `MACRO_API_KEY`, then introduce yourself:
 
 ```ts

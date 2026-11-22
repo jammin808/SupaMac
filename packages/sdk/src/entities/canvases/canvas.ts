@@ -7,6 +7,7 @@ import type {
 } from '../../../generated/storage/types.gen';
 import type { MacroClient } from '../../utils/client';
 import { MacroApiError, unwrap } from '../../utils/unwrap';
+import { webAppLink } from '../../utils/web-app';
 import {
   DocumentEditRefusedError,
   EditOutcomeUnknownError,
@@ -210,7 +211,7 @@ export class Canvas {
    * @readonly
    */
   webUrl(): string {
-    return `${this.client.webAppUrl}/app/canvas/${this.id}`;
+    return webAppLink(this.client.webAppUrl, `/canvas/${this.id}`);
   }
 
   /**

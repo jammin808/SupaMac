@@ -53,6 +53,11 @@ comment/markdown rendering. Production runs on ECS behind the gateway at
   (`INTERNAL_AUTH_KEY`); it also calls `sync-service` with
   `SYNC_SERVICE_AUTH_KEY`. On ECS these come from its Doppler project and
   Secrets Manager; locally from `docker/docker-compose.yml`.
+- `APP_URL` (the web app's origin and folder) and `STATIC_FILE_URL` (the
+  static-file service's public URL) configure lexical-core's links at startup
+  (`src/app-links.ts`), so converted documents keep the instance's video embeds
+  and booking links. Unset, none of them are recognised; a value that is not a
+  URL stops startup.
 - Run the bundle, not `src/server.ts` directly: unbundled, Bun hits a TDZ in
   the circular `@lexical/*` imports (see the Dockerfile).
 - Deploys to dev on every push to `main` and to prod on release. Never deploy

@@ -46,7 +46,9 @@ Markdown link to any other URL imports as its text alone; use
 `STANDARD_TRANSFORMERS` from `transformers/customTransformers.ts`, never
 Lexical's `TRANSFORMERS`, whose `LINK` does not check. PR and booking mentions
 drop such a URL from saved JSON, and the web renderers check again before
-rendering an anchor or opening a URL.
+rendering an anchor or opening a URL. A booking mention keeps only a link to
+this app's booking page (`utils/app-links.ts`) and rebuilds any other from its
+profile and slug.
 
 ## Canvas text
 

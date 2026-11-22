@@ -6,6 +6,7 @@ import type {
 } from '../../../generated/storage/types.gen';
 import { unwrap } from '../../utils';
 import type { MacroClient } from '../../utils/client';
+import { webAppLink } from '../../utils/web-app';
 import { Channel } from '../channels/channel';
 import { shareWithChannel } from '../channels/share';
 import { Thread } from '../channels/thread';
@@ -238,7 +239,7 @@ export class CallRecord extends FavoritableEntity<CallRecordDetail> {
    * @readonly
    */
   webUrl(): string {
-    return `${this.client.webAppUrl}/app/call/${this.id}`;
+    return webAppLink(this.client.webAppUrl, `/call/${this.id}`);
   }
 
   /** Identity, loaded detail and {@link webUrl}, so serialized handles carry their link. */

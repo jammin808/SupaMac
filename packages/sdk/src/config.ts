@@ -122,7 +122,11 @@ export interface MacroOpts {
   env?: Env;
   /** Override individual service hosts (e.g. point one at localhost). */
   hosts?: Partial<Record<ServiceName, string>>;
-  /** Override the web app base URL (e.g. for local frontend dev). Also reads MACRO_WEB_URL. */
+  /**
+   * Override the web app's URL (e.g. for local frontend dev): its origin,
+   * optionally followed by the path it is served from, `/app` when omitted.
+   * Also reads MACRO_WEB_URL.
+   */
   webAppUrl?: string;
   /**
    * Signing secret for verifying incoming persisted-webhook deliveries.

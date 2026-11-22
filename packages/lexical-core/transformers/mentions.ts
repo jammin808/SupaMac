@@ -40,6 +40,7 @@ import {
 import { TagMentionNode } from '../nodes/TagMentionNode';
 import { ThemeMentionNode } from '../nodes/ThemeMentionNode';
 import { UserMentionNode } from '../nodes/UserMentionNode';
+import { appLinkUrl } from '../utils/app-links';
 import {
   replaceElementWithUnknownMention,
   replaceTextWithUnknownMention,
@@ -274,25 +275,6 @@ export const I_DOCUMENT_MENTION: TextMatchTransformer = {
 
 // External Document Mentions
 
-function cleanHostname(rawHostname: string): string {
-  const hostname = rawHostname.replace('www.', '').toLowerCase();
-  if (hostname === 'localhost') {
-    return 'dev.macro.com';
-  }
-  return hostname;
-}
-
-function currentBrowserHostname(): string | null {
-  if (
-    typeof window === 'undefined' ||
-    !window.location ||
-    !window.location.hostname
-  ) {
-    return null;
-  }
-  return cleanHostname(window.location.hostname);
-}
-
 export const E_DOCUMENT_MENTION: ElementTransformer = {
   dependencies: [DocumentMentionNode],
   type: 'element',
@@ -308,12 +290,12 @@ export const E_DOCUMENT_MENTION: ElementTransformer = {
       return null;
     }
 
-    const hostname = cleanHostname(window.location.hostname);
     const path =
       blockType === 'routine' || blockType === 'automation'
         ? 'routines'
         : blockType;
-    const documentUrl = `https://${hostname}/app/${path}/${documentId}`;
+    const documentUrl = appLinkUrl(`/${path}/${documentId}`);
+    if (!documentUrl) return documentName;
     return `[${documentName}](${documentUrl})`;
   },
   replace: (
@@ -386,10 +368,8 @@ export const E_PR_MENTION: ElementTransformer = {
       return url ? `[${label}](${url})` : null;
     }
 
-    const hostname = currentBrowserHostname();
-    if (!hostname) return label;
-
-    const prUrl = `https://${hostname}/app/pr/${id}`;
+    const prUrl = appLinkUrl(`/pr/${id}`);
+    if (!prUrl) return label;
     return `[${label}](${prUrl})`;
   },
   replace: (
@@ -466,11 +446,9 @@ export const E_AGENT_SESSION_MENTION: ElementTransformer = {
     if (!id) return null;
 
     const label = node.getLabel() || 'Agent session';
-    const hostname = currentBrowserHostname();
-    if (!hostname) return label;
-
-    const prUrl = `https://${hostname}/app/agent/${id}`;
-    return `[${label}](${prUrl})`;
+    const sessionUrl = appLinkUrl(`/agent/${id}`);
+    if (!sessionUrl) return label;
+    return `[${label}](${sessionUrl})`;
   },
   replace: (
     _parentNode: ElementNode,
@@ -776,8 +754,8 @@ export const E_DOCUMENT_CARD: ElementTransformer = {
       return null;
     }
 
-    const hostname = cleanHostname(window.location.hostname);
-    const documentUrl = `https://${hostname}/app/${blockType}/${documentId}`;
+    const documentUrl = appLinkUrl(`/${blockType}/${documentId}`);
+    if (!documentUrl) return documentName;
     return `[${documentName}](${documentUrl})`;
   },
   replace: (
@@ -818,11 +796,12 @@ export const I_BOOKING_LINK_MENTION: TextMatchTransformer = {
       if (!profileId && !url) {
         throw new Error('Missing field profileId or url');
       }
+      // Without this app's booking URL the node builds one from the profile.
       const bookingMentionNode = $createBookingLinkMentionNode({
         profileId,
         slug: typeof data.slug === 'string' ? data.slug : undefined,
         label: typeof data.label === 'string' ? data.label : undefined,
-        url: url || `https://macro.com/app/book/${profileId}`,
+        url: url ?? '',
       });
       node.replace(bookingMentionNode);
     } catch (e) {
@@ -842,6 +821,7 @@ export const E_BOOKING_LINK_MENTION: ElementTransformer = {
 
     const url = node.getUrl();
     const label = node.getLabel() || node.getSlug() || 'Booking link';
+    if (!url) return label;
 
     return `[${label}](${url})`;
   },

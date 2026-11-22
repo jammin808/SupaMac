@@ -27,6 +27,10 @@ enforced by the ordinary backend APIs.
   `Document.bytes()` downloads through the CloudFront export host (`document-content`
   in the harness's `sdk_endpoints`). Never return a presigned S3 URL as the only path.
 - `src/entities/entity.ts`: lazy detail reads, mutation invalidation and safe JSON.
+- `src/utils/web-app.ts`: every web link (`webUrl()`, booking pages, referral
+  links, `AppLink`) is built with `webAppLink`. `webAppUrl` is the app's origin,
+  optionally followed by the path it is served from (`/app` when it names none);
+  never append an `/app` literal to it.
 - `Document.readPresentation`/`editPresentation`/`copyPresentation`,
   `readWord`/`editWord`, and `readDesign`/`readPhotoshop`/`readIllustrator`
   run the matching direct tools' services through storage routes; the edit
@@ -128,7 +132,8 @@ enforced by the ordinary backend APIs.
   and `Connector.inspect()` mirror `DiscoverConnectors`; `addServer` mirrors
   `ConnectMcpServer`. Only works inside a running execution.
 - `src/entities/ui/`: `macro.ui.open(execution, item)` opens an item (a handle
-  with `webUrl()`, or `macro.ui.link(url)`, which refuses non-Macro links) in a
+  with `webUrl()`, or `macro.ui.link(url)`, which refuses links outside the
+  client's own web app) in a
   new pane of the tab the user prompted from, through the harness's
   `ui-commands` route; it resolves `sent`, `no_client` or `declined` with the
   item's `url` to link instead. Only works inside a running execution.

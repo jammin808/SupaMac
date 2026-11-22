@@ -1,4 +1,7 @@
+import { WEB_BASE_PATH } from '@app/constants/routerBase';
+import { SELF_HOSTED, SERVER_HOSTS } from '@core/constant/servers';
 import { lazyNamed } from '@core/util/lazyNamed';
+import { getWebOrigin } from '@core/util/webOrigin';
 import {
   AccountManagerRequestNode,
   AgentActivityNode,
@@ -9,6 +12,7 @@ import {
   ConnectAppNode,
   ContactMentionNode,
   CursorSystemNotificationNode,
+  configureAppLinks,
   DatabaseQueryNode,
   DateMentionNode,
   DiffInsertNode,
@@ -85,6 +89,14 @@ const HtmlRender = (props: HtmlRenderDecoratorProps) =>
  * This has to run once before any Lexicals mount. Currently imported in index.tsx.
  */
 export function initializeLexical() {
+  // A self-hosted bundle links content to the origin and base path serving it
+  // and to its own static files; a hosted one keeps lexical-core's defaults.
+  if (SELF_HOSTED) {
+    configureAppLinks({
+      appUrl: `${getWebOrigin()}${WEB_BASE_PATH}`,
+      staticFileUrl: SERVER_HOSTS['static-file'],
+    });
+  }
   clearDecorators();
   setDecorator(AgentContextNode, AgentContext);
   setDecorator(AgentActivityNode, AgentActivity);

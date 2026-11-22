@@ -1,5 +1,6 @@
 import { MacroError, unwrap } from '../../utils';
 import type { MacroClient } from '../../utils/client';
+import { webAppLink } from '../../utils/web-app';
 
 /** The caller's referral code and the signup link that carries it. */
 export interface ReferralLink {
@@ -26,7 +27,7 @@ export class ReferralNamespace {
    */
   async link(): Promise<ReferralLink> {
     const code = unwrap(await this.client.auth.getReferralCode());
-    const url = new URL('/app/signup', this.client.webAppUrl);
+    const url = new URL(webAppLink(this.client.webAppUrl, '/signup'));
     url.searchParams.set('referral_code', code);
     return { code, url: url.toString() };
   }

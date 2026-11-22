@@ -19,6 +19,7 @@ import type {
 import type { EntityAppearance } from '../../../generated/storage/types.gen';
 import { unwrap } from '../../utils';
 import type { MacroClient } from '../../utils/client';
+import { webAppLink } from '../../utils/web-app';
 import { AgentSession } from '../agent-sessions/agent-session';
 import type { Agent } from '../agents/agent';
 import { Chat } from '../chats/chat';
@@ -227,7 +228,7 @@ export class Routine extends MacroEntity<ScheduledActionResponse> {
    * @readonly
    */
   webUrl(): string {
-    return `${this.client.webAppUrl}/app/routines/${this.id}`;
+    return webAppLink(this.client.webAppUrl, `/routines/${this.id}`);
   }
 
   /** Identity, loaded detail and {@link webUrl}, so serialized handles carry their link. */

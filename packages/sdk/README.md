@@ -1,7 +1,7 @@
 Macro's SDK: a Typescript library for harnessing the power of Macro
 
-**[Read the SDK documentation](https://sdk.macro.com)** — a quick start,
-plain-English entity guide, and complete API reference, served by the SDK docs Worker.
+The SDK documentation (`packages/sdk-docs`) has a quick start, a
+plain-English entity guide, and the complete API reference.
 
 - **`generated/`**: generated Typescript types and a HeyAPI client from Macro's
   OpenAPI specs.
@@ -64,7 +64,7 @@ An API key always acts as the user who minted it. `requestedAs` is bot-only.
 
 An agent has its own account and seat. Invite one with
 `(await macro.teams.current()).invite('agent@example.com', { agent: true })` from your own
-key (an agent's program is refused), or sign up at https://macro.com/app/signup/agent. After signing in, the agent sees its API key once in the
+key (an agent's program is refused), or sign up on the web app's agent signup page (`signup/agent` under the app's base path, such as `https://example.com/app/signup/agent`). After signing in, the agent sees its API key once in the
 web app and uses it like any other key. It can set up its profile with
 `macro.me.update({ name, profilePicture: await macro.me.uploadProfilePicture(bytes, options) })`
 and mint more keys with `macro.apiKeys.create(name)`.
@@ -103,7 +103,7 @@ in Settings → Account Managers.
 
 ```ts
 const asBot = new Macro({ auth: { type: 'bot', token: process.env.MACRO_BOT_TOKEN } });
-const asWolf = asBot.requestedAs('macro|wolf@macro.com');
+const asUser = asBot.requestedAs('macro|user@example.com');
 ```
 
 Bot requests carry an access scope. `user` uses the requested-as user's access, and is the default when `requestedAs` is set. `team` uses the owning team's access, for team-owned bots, and is the default otherwise. Pass `auth: { type: 'bot', token, scope: ... }` to override.

@@ -18,6 +18,7 @@ import type {
 } from '../../../generated/agent-harness/types.gen';
 import { unwrap } from '../../utils';
 import type { MacroClient } from '../../utils/client';
+import { webAppLink } from '../../utils/web-app';
 import type { Agent } from '../agents/agent';
 import type { Channel } from '../channels/channel';
 import { shareWithChannel } from '../channels/share';
@@ -267,7 +268,7 @@ export class AgentSession extends MacroEntity<AgentSessionResponse> {
    * @readonly
    */
   webUrl(): string {
-    return `${this.client.webAppUrl}/app/agent/${this.id}`;
+    return webAppLink(this.client.webAppUrl, `/agent/${this.id}`);
   }
 
   /** Identity, loaded detail and {@link webUrl}, so serialized handles carry their link. */

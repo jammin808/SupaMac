@@ -2,6 +2,7 @@ import type { PropertyInput } from '../../../generated/storage/types.gen';
 import { MacroError, unwrap } from '../../utils';
 import type { MacroClient } from '../../utils/client';
 import { rejectUnknownOptions } from '../../utils/options';
+import { webAppLink } from '../../utils/web-app';
 import { Document } from '../documents/document';
 import type { Initiative } from '../initiatives/initiative';
 import type { Project } from '../projects/project';
@@ -251,7 +252,7 @@ export class Task extends Document {
    * @readonly
    */
   override webUrl(): string {
-    return `${this.client.webAppUrl}/app/task/${this.id}`;
+    return webAppLink(this.client.webAppUrl, `/task/${this.id}`);
   }
 
   /** Search tasks by name and content, most relevant first, auto-paginated; `maxItems` caps the total. */

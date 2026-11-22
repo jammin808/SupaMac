@@ -41,6 +41,7 @@ import {
   INTERNAL_TRANSFORMERS,
 } from '../transformers';
 import { E_TABLE_NODE, isolatePipeTables } from '../transformers/tables';
+import { configureAppLinks } from '../utils/app-links';
 
 function createTestEditor() {
   return createEditor({
@@ -1334,20 +1335,25 @@ describe('pipe characters inside pipe-table cells', () => {
 
 describe('video link transformer', () => {
   it('converts markdown links with video URLs to video nodes', async () => {
-    const editor = createTestEditor();
-    await importMarkdown(
-      editor,
-      '[Screen Recording 2026-10-06 at 4.03.28 PM.mov](https://static-file-service.macro.com/file/3d7ab8c8-05b7-477f-aa83-7dd514219867)'
-    );
-
-    editor.getEditorState().read(() => {
-      const root = $getRoot();
-      const video = root.getChildren().find($isVideoNode);
-      expect(video).toBeDefined();
-      expect(video!.getUrl()).toBe(
-        'https://static-file-service.macro.com/file/3d7ab8c8-05b7-477f-aa83-7dd514219867'
+    configureAppLinks({ staticFileUrl: 'https://api.example.com/static-file' });
+    try {
+      const editor = createTestEditor();
+      await importMarkdown(
+        editor,
+        '[Screen Recording 2026-10-06 at 4.03.28 PM.mov](https://api.example.com/static-file/file/3d7ab8c8-05b7-477f-aa83-7dd514219867)'
       );
-    });
+
+      editor.getEditorState().read(() => {
+        const root = $getRoot();
+        const video = root.getChildren().find($isVideoNode);
+        expect(video).toBeDefined();
+        expect(video!.getUrl()).toBe(
+          'https://api.example.com/static-file/file/3d7ab8c8-05b7-477f-aa83-7dd514219867'
+        );
+      });
+    } finally {
+      configureAppLinks({});
+    }
   });
 
   it('converts links with .mp4 extension to video nodes', async () => {
