@@ -132,6 +132,14 @@ export const SELF_HOSTED_FLAGS: Record<string, FlagDecision> = {
     'Off in development too: channel labels are not released.',
   ],
   ENABLE_CHANNEL_THREADS_PREVIEW: [true, 'The Threads tab of the Chat view.'],
+  ENABLE_CHANNEL_NOTIFICATION_SETTINGS: [
+    true,
+    'Per-channel and per-section notification settings; the notification service serves them unflagged.',
+  ],
+  ENABLE_CHANNEL_NOTIFICATION_GUTTER: [
+    false,
+    'The gutter of Mark done checks is in its first rollout upstream; production default.',
+  ],
   ENABLE_CALLS: [
     false,
     'Calls need a media server, which the stack does not run.',
@@ -191,6 +199,10 @@ export const SELF_HOSTED_FLAGS: Record<string, FlagDecision> = {
   ],
 
   // CRM.
+  ENABLE_CONTACT_LISTS: [
+    false,
+    'Reads list membership the server reads from PostHog (contacts-list-reads), which answers off here.',
+  ],
   ENABLE_CRM_LISTS: [
     true,
     'Lists of companies, kept by the storage service with the saved views.',
@@ -205,6 +217,10 @@ export const SELF_HOSTED_FLAGS: Record<string, FlagDecision> = {
   ENABLE_TASK_SOURCE_PROPERTY: [
     true,
     'Fills a task’s Source from the place it was created in.',
+  ],
+  ENABLE_TASK_TEMPLATES: [
+    true,
+    'Task templates in the composer; the storage service serves them.',
   ],
   ENABLE_GANTT: [
     false,
@@ -234,6 +250,15 @@ export const SELF_HOSTED_FLAGS: Record<string, FlagDecision> = {
   ],
   ENABLE_ACTIVITY_FEED: [true, 'The Activity view, from the activity log.'],
   ENABLE_UNIFIED_NOTIFICATIONS: [true, 'The Notifications view and its bell.'],
+  ENABLE_AGENT_NOTIFICATIONS: [
+    true,
+    'The Agent pings setting. The notification service lets agents send pings whenever ENVIRONMENT=local, as this stack runs, so people need the setting to turn them off.',
+  ],
+  ENABLE_NEW_HOME: [
+    false,
+    'The Home with Recent and Notifications tabs is in rollout upstream; production default.',
+  ],
+  DISABLE_OLD_HOME: [false, 'Only meaningful with ENABLE_NEW_HOME on.'],
   ENABLE_NAVIGATION_UNREAD_COUNTS: [
     false,
     'Production default: off in every build.',
@@ -353,6 +378,8 @@ export const SELF_HOSTED_FLAGS: Record<string, FlagDecision> = {
 export const SELF_HOSTED_FLAGS_WITHOUT_SWITCH: Record<string, string> = {
   'desktop-app': 'The download page of the desktop app; this fork ships none.',
   'enable-crm-thread-exclusions':
+    'The server requires the same flag, which it reads from PostHog.',
+  'enable-crm-member-access-changes':
     'The server requires the same flag, which it reads from PostHog.',
   'enable-supported-soup-foreign-entities':
     'Adds GitHub pull requests to Home; no GitHub app is connected.',
