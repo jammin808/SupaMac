@@ -99,9 +99,15 @@ pub enum MacroCallEventError {
     MeetingLink(#[from] MeetingLinkError),
 }
 
-/// Text prefixing the generated join line. The calendar UI matches on it
-/// to recognize the paragraph as generated rather than user-written.
-const JOIN_LINE_LABEL: &str = "Join Macro call";
+/// Text prefixing the generated join line. The calendar UI writes the same
+/// label and matches on it to recognize the paragraph as generated rather
+/// than user-written.
+const JOIN_LINE_LABEL: &str = "Join SupaMac call";
+
+/// Labels the generated join line has also carried: events stored before
+/// [`JOIN_LINE_LABEL`] and invitations from the hosted product hold them, and
+/// are recognized the same way.
+const OTHER_JOIN_LINE_LABELS: [&str; 1] = ["Join Macro call"];
 
 /// Write a meeting link into an event's location and description.
 ///
@@ -166,13 +172,15 @@ pub fn strip_macro_call(description_text: &str, location: &str, url: &str) -> (S
 /// Whether `line` is the generated join line: the label alone, or the label
 /// followed by a Macro call link.
 fn is_join_line(line: &str) -> bool {
-    match line.strip_prefix(JOIN_LINE_LABEL) {
-        Some("") => true,
-        Some(rest) => rest
-            .strip_prefix(": ")
-            .is_some_and(|link| first_macro_call_url(Some(link), None).as_deref() == Some(link)),
-        None => false,
-    }
+    std::iter::once(JOIN_LINE_LABEL)
+        .chain(OTHER_JOIN_LINE_LABELS)
+        .any(|label| match line.strip_prefix(label) {
+            Some("") => true,
+            Some(rest) => rest.strip_prefix(": ").is_some_and(|link| {
+                first_macro_call_url(Some(link), None).as_deref() == Some(link)
+            }),
+            None => false,
+        })
 }
 
 /// Create an event that carries a Macro call.

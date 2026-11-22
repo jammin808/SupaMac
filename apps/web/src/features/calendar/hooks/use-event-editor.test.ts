@@ -211,7 +211,7 @@ describe('editing event times', () => {
       form.setField('title', 'A new point call');
       await editor.save(form.submitValues()!);
       expect(editor.saveError()).toBe(
-        'Give this event a duration before adding a Macro call.'
+        'Give this event a duration before adding a SupaMac call.'
       );
       expect(editor.pending()).toBe(false);
       expect(mocks.updateEvent).not.toHaveBeenCalled();
@@ -761,7 +761,7 @@ describe('scheduling a Macro call', () => {
       await editor.save(values);
       expect(mocks.createMeeting).toHaveBeenCalledOnce();
       expect(mocks.updateEvent.mock.lastCall?.[0].patch.description).toContain(
-        'Join Macro call'
+        'Join SupaMac call'
       );
     } finally {
       dispose();
