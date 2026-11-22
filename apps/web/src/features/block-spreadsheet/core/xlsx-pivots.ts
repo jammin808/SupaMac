@@ -18,6 +18,12 @@ const MAIN = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main';
 const RELATIONSHIPS =
   'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
 
+/** Text as a regular expression that matches exactly that text. */
+const literalPattern = (text: string) =>
+  text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const MAIN_PATTERN = literalPattern(MAIN);
+const RELATIONSHIPS_PATTERN = literalPattern(RELATIONSHIPS);
+
 const BUILTIN_FORMATS = 164;
 
 /** Why some pivot tables are downloaded without the data Excel saved. */
@@ -36,8 +42,8 @@ function mainPrefix(xml: string, root: string): string | undefined {
   if (!match) return;
   const prefix = match[1];
   const declared = prefix
-    ? new RegExp(`xmlns:${prefix}="${MAIN}"`).test(xml)
-    : new RegExp(`xmlns="${MAIN}"`).test(xml);
+    ? new RegExp(`xmlns:${literalPattern(prefix)}="${MAIN_PATTERN}"`).test(xml)
+    : new RegExp(`xmlns="${MAIN_PATTERN}"`).test(xml);
   return declared ? (prefix ? `${prefix}:` : '') : undefined;
 }
 
@@ -335,7 +341,7 @@ export function readSheetPivotTables(options: {
     // A source Macro does not hold keeps the records Excel saved, when they
     // fit, and Excel refreshes it only when asked to.
     const relationshipPrefix = new RegExp(
-      `xmlns:([A-Za-z_][\\w.-]*)="${RELATIONSHIPS}"`
+      `xmlns:([A-Za-z_][\\w.-]*)="${RELATIONSHIPS_PATTERN}"`
     ).exec(cache)?.[1];
     let records: string | undefined;
     if (cached) {
@@ -575,7 +581,7 @@ export function pivotParts(
   if (records || link) {
     // Relationship ids need the namespace; an imported cache may not
     // declare it with this prefix.
-    const declared = new RegExp(`\\sxmlns:r="${RELATIONSHIPS}"`).test(
+    const declared = new RegExp(`\\sxmlns:r="${RELATIONSHIPS_PATTERN}"`).test(
       /^[^>]*>/.exec(cache)?.[0] ?? ''
     );
     if (!declared && /^[^>]*\sxmlns:r="/.test(cache)) return;
