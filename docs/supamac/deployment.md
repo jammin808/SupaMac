@@ -199,9 +199,9 @@ stack's README lists what was run under
 Not verified: a real server, Traefik, a real domain and a real SMTP
 provider; the `email` and `search` profiles; the AI assistant answering
 (the rehearsal had no provider key); restore on a started stack; anything
-under load. Known to be wrong, and outside these files: signing out does not
-revoke the session on the server, so a copied session cookie works until its
-tokens expire. No security scanner result is claimed. The full list is in
+under load. Signing out revokes the session's refresh token; an access token
+copied before sign-out still works until it expires, within the hour. No
+security scanner result is claimed. The full list is in
 the README's
 [Not covered, not verified](../../infra/self-hosted/README.md#not-covered-not-verified).
 

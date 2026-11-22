@@ -101,16 +101,20 @@ pub fn create_access_token_cookie(token: &str, same_site: SameSite) -> Cookie<'s
     cookie
 }
 
-/// See [`create_access_token_cookie`] for `same_site`.
-pub fn create_refresh_token_cookie(token: &str, same_site: SameSite) -> Cookie<'static> {
-    let domain = domain();
-    let refresh_token_cookie_name = match Environment::new_or_prod() {
+/// The name of the refresh token cookie in this environment.
+pub fn refresh_token_cookie_name() -> String {
+    match Environment::new_or_prod() {
         Environment::Production => MACRO_REFRESH_TOKEN_COOKIE.to_string(),
         Environment::Develop => format!("dev-{MACRO_REFRESH_TOKEN_COOKIE}"),
         Environment::Local => format!("local-{MACRO_REFRESH_TOKEN_COOKIE}"),
-    };
+    }
+}
+
+/// See [`create_access_token_cookie`] for `same_site`.
+pub fn create_refresh_token_cookie(token: &str, same_site: SameSite) -> Cookie<'static> {
+    let domain = domain();
     let mut cookie = Cookie::new(
-        refresh_token_cookie_name,
+        refresh_token_cookie_name(),
         token.to_owned(), // Convert the borrowed str to an owned String
     );
     cookie.set_secure(true);

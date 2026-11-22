@@ -280,6 +280,11 @@ inputs cannot select an agent, and ordinary user credentials remain unattributed
   through `api::utils::create_access_token_cookie` and
   `create_refresh_token_cookie` with that value, so a logout names the cookie
   the login set.
+- Sign-out (`src/api/logout.rs`) revokes the session's refresh token at
+  FusionAuth (the `x-macro-refresh-token` header, else the cookie) before it
+  clears the cookies; FusionAuth's `/oauth2/logout` alone revokes nothing. A
+  failed revocation is logged and recorded on the span
+  (`refresh_token_revoked`), and the cookies are cleared regardless.
 - A person's new account gets a `Macro Support x <name>` channel with the
   Macro support team (`MACRO_SUPPORT_EMAILS`), one of whom posts the welcome.
   `SUPPORT_CHANNEL_PARTICIPANTS_JSON` replaces the team and drops the welcome;

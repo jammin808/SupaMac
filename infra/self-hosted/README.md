@@ -533,12 +533,15 @@ Nothing below has been observed working, unless it says what was observed.
 
 **Sign-in**
 
-- Signing out does not end the session on the server. The service expires
-  the two cookies and calls FusionAuth's logout page, which revokes nothing:
-  in the rehearsal a copy of the cookies taken before sign-out still
-  answered as the user, and FusionAuth still exchanged its refresh token for
-  a new access token. Refresh tokens live 30 days from their last use. The
-  fix is in `services/authentication_service/src/api/logout.rs`.
+- Signing out revokes the session's refresh token at FusionAuth before the
+  cookies are cleared (`services/authentication_service/src/api/logout.rs`),
+  so a copy of them can no longer mint access tokens. An access token taken
+  before sign-out stays valid until it expires, at most an hour: the
+  services check its signature and expiry, not a revocation list. The
+  rehearsal saw the gap this closes and ran before the change; the change is
+  covered by unit tests, not yet by a run of the stack. Without a token in
+  the request, or when FusionAuth cannot be reached, sign-out still clears
+  the cookies and the span records `refresh_token_revoked`.
 - When the relay refuses a message, for instance because the recipient's
   domain does not exist, the code request still answers 200 and the person
   waits for a mail that never comes. The relay's log is the only trace.
