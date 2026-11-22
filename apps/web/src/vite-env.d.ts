@@ -48,6 +48,24 @@ interface ImportMetaEnv {
   readonly VITE_DISABLE_CRM_CONTACT_SEARCH?: string;
   readonly VITE_ENABLE_CONTACT_LISTS?: string;
   readonly VITE_ENABLE_WHATSAPP_LINKED?: string;
+  /**
+   * Sign-in methods of a self-hosted bundle besides the emailed code; each is
+   * off there unless set to `true`. Other builds do not read them.
+   */
+  readonly VITE_ENABLE_GOOGLE_SIGN_IN?: string;
+  readonly VITE_ENABLE_APPLE_SIGN_IN?: string;
+  readonly VITE_ENABLE_PASSWORD_SIGN_IN?: string;
+  readonly VITE_ENABLE_DOMAIN_SSO_SIGN_IN?: string;
+  /** Continue with Microsoft, in every build. */
+  readonly VITE_ENABLE_MICROSOFT_SIGNUP?: string;
+  /** `false` removes calls, for a backend with no media server. */
+  readonly VITE_ENABLE_CALLS?: string;
+  /**
+   * `false` removes the tutorial video entries, for a bundle published under
+   * another name or without the videos.
+   */
+  readonly VITE_ENABLE_VIDEO_TUTORIALS?: string;
+  readonly VITE_ENABLE_SOUP_GROUP_BY?: string;
 }
 
 interface ImportMeta {

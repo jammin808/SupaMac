@@ -2,7 +2,7 @@ import { ROUTER_BASE_CONCAT, WEB_BASE_PATH } from '@app/constants/routerBase';
 import { teamInviteLinkUrl } from '@app/features/settings/TeamInviteLinkSection';
 import { useAnalytics } from '@app/lib/analytics/analytics-context';
 import { toast } from '@core/component/Toast/Toast';
-import { SERVER_HOSTS } from '@core/constant/servers';
+import { SELF_HOSTED, SERVER_HOSTS } from '@core/constant/servers';
 import { deriveIsAuthenticated } from '@core/context/user';
 import { useAddInboxFlow } from '@core/email-link';
 import { idToDisplayName } from '@core/user/util';
@@ -451,6 +451,9 @@ export function createAppOnboardingContext(): OnboardingContext {
 
     applyAccent: applyWorkspaceAccent,
     createGithubStars: () => {
+      // Only the hosted flow's security slide shows the count; a self-hosted
+      // flow has no such slide and asks nobody about the repository.
+      if (SELF_HOSTED) return () => undefined;
       const stars = useGithubStarsQuery();
       return () => (queryReadyGate(stars) ? stars.data : undefined);
     },

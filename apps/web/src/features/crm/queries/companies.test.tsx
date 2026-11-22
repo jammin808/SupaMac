@@ -6,7 +6,7 @@ import {
 } from '@tanstack/solid-query';
 import { err, ok } from 'neverthrow';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import type { CrmRecordDependencies } from './dependencies';
+import type { CrmQueryDependencies } from './dependencies';
 
 const track = vi.hoisted(() => vi.fn());
 vi.mock('@app/lib/analytics', () => ({ analytics: { track } }));
@@ -26,6 +26,7 @@ const storage = {
   createContact: vi.fn(),
   setCompanyName: vi.fn(),
 };
+const feedback = { success: vi.fn(), failure: vi.fn() };
 let client: QueryClient;
 
 beforeEach(() => {
@@ -33,6 +34,8 @@ beforeEach(() => {
   storage.createCompany.mockReset();
   storage.createContact.mockReset();
   storage.setCompanyName.mockReset();
+  feedback.success.mockReset();
+  feedback.failure.mockReset();
   client = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
 });
 afterEach(() => {
@@ -41,7 +44,7 @@ afterEach(() => {
 });
 
 function mount() {
-  const deps = { storage, client } as unknown as CrmRecordDependencies;
+  const deps = { storage, client, feedback } as unknown as CrmQueryDependencies;
   let mutations!: {
     company: ReturnType<typeof useCreateCompanyMutation>;
     contact: ReturnType<typeof useCreateContactMutation>;
@@ -187,9 +190,10 @@ it("renames the company in its contacts' details before the server answers", asy
   });
   answer(ok({}));
   await rename;
+  expect(feedback.failure).not.toHaveBeenCalled();
 });
 
-it('restores the name and reads no detail again when a rename fails', async () => {
+it('restores the name, says so and reads no detail again when a rename fails', async () => {
   storage.setCompanyName.mockResolvedValue(err([{ message: 'Refused' }]));
   const own = crmKeys.contact('contact-1').queryKey;
   client.setQueryData(own, {
@@ -207,4 +211,7 @@ it('restores the name and reads no detail again when a rename fails', async () =
     company: { name: 'Old' },
   });
   expect(client.getQueryState(own)?.isInvalidated).toBe(false);
+  expect(feedback.failure).toHaveBeenCalledExactlyOnceWith(
+    'Could not save this change. Try again.'
+  );
 });

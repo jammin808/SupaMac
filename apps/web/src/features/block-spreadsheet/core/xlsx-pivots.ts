@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import type { ConditionalStyle } from '@macro-inc/spreadsheet/sheet-rules';
 import type { WorkbookTable } from '@macro-inc/spreadsheet/structured-references';
 import {
@@ -417,11 +418,11 @@ export function readSheetPivotTables(options: {
   }
   if (pivots.some((pivot) => !pivot.workbook && !pivot.connection))
     warnings.add(
-      'Pivot tables show their last values in Macro; Excel rebuilds them from their data when the downloaded file opens.'
+      `Pivot tables show their last values in ${PRODUCT_NAME}; Excel rebuilds them from their data when the downloaded file opens.`
     );
   if (pivots.some((pivot) => pivot.workbook || pivot.connection))
     warnings.add(
-      'Pivot tables over other workbooks or data connections show their last values in Macro; the download keeps them with the data Excel saved, to refresh in Excel.'
+      `Pivot tables over other workbooks or data connections show their last values in ${PRODUCT_NAME}; the download keeps them with the data Excel saved, to refresh in Excel.`
     );
   if (removedPasswords)
     warnings.add(

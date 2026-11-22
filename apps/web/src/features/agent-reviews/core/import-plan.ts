@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import type { ImportDraft as SavedImportDraft } from '@service-agent-reviews/generated/types';
 import { match } from 'ts-pattern';
 import type { Review, ReviewItem } from './review';
@@ -346,7 +347,7 @@ export function alreadyInMacroSummary(entries: ImportPlanEntry[]): string {
   const copies = alreadyInMacro(entries);
   if (copies.length === 0) return '';
   const by = [...new Set(copies.map((entry) => entry.alreadyImported.by))];
-  return `${copies.length} already in Macro (imported by ${by.join(', ')})`;
+  return `${copies.length} already in ${PRODUCT_NAME} (imported by ${by.join(', ')})`;
 }
 
 /** Objects the import will write once approved. */
@@ -442,7 +443,9 @@ export function planTotals(
         }
       : null,
     skipped > 0 ? { label: 'Skipped', value: `${skipped}` } : null,
-    already > 0 ? { label: 'Already in Macro', value: `${already}` } : null,
+    already > 0
+      ? { label: `Already in ${PRODUCT_NAME}`, value: `${already}` }
+      : null,
   ].filter((total): total is ImportTotal => total !== null);
 }
 

@@ -4,6 +4,7 @@ import { globalSplitManager } from '@app/signal/splitLayout';
 import { SidebarOpenInSplitMenu } from '@components/app/app-sidebar/sidebar';
 import { UserIcon } from '@core/component/UserIcon';
 import { useSettingsState } from '@core/constant/SettingsState';
+import { SELF_HOSTED } from '@core/constant/servers';
 import { useSettingsTabAvailable } from '@core/constant/settingsTabsConfig';
 import { useEmail, useUserId } from '@core/context/user';
 import { TOKENS } from '@core/hotkey/tokens';
@@ -40,10 +41,11 @@ const isSettingsActive = () => {
 /**
  * Get the mobile app: opens the Mobile App settings page, which carries the
  * App Store and Google Play links. Hidden inside the native app, where that
- * page shows the installed app's version instead, and wherever the page is
- * unavailable.
+ * page shows the installed app's version instead, wherever the page is
+ * unavailable, and on a self-hosted instance, which the store's app does not
+ * connect to.
  */
-const MobileAppButton = () => {
+export const MobileAppButton = () => {
   const analytics = useAnalytics();
   const { openSettings, openSettingsInSplit, activeTabId } = useSettingsState();
   const isTabAvailable = useSettingsTabAvailable();
@@ -58,7 +60,13 @@ const MobileAppButton = () => {
   };
 
   return (
-    <Show when={!isNativeMobilePlatform() && isTabAvailable('Mobile App')}>
+    <Show
+      when={
+        !SELF_HOSTED &&
+        !isNativeMobilePlatform() &&
+        isTabAvailable('Mobile App')
+      }
+    >
       <Button
         aria-label={t('nav.getMobileApp')}
         variant="ghost"

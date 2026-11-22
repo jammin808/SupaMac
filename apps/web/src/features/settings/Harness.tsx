@@ -1,4 +1,5 @@
 import { TutorialPill } from '@app/features/video-tutorials';
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { useCodexAgentsAccess } from '@core/codex/flag';
 import { toast } from '@core/component/Toast/Toast';
 import { MACRO_HARNESS_NAME } from '@core/constant/macroAgent';
@@ -173,7 +174,7 @@ export function Harness(
     if (disconnectCursor.isPending) return;
     const confirmed = await confirmDialog({
       title: 'Disconnect Cursor?',
-      body: "Remove your Cursor connection from Macro? This removes Macro's copy of the API key but does not revoke it in Cursor.",
+      body: `Remove your Cursor connection from ${PRODUCT_NAME}? This removes ${PRODUCT_NAME}'s copy of the API key but does not revoke it in Cursor.`,
       confirmLabel: 'Disconnect',
       tone: 'danger',
     });
@@ -266,8 +267,9 @@ export function Harness(
                       </span>
                     </div>
                     <p class="mt-1 text-sm text-ink-muted">
-                      Macro in house fast and powerful agent. Uses official
-                      Macro tools and MCPs to get the job done.
+                      {PRODUCT_NAME} in house fast and powerful agent. Uses
+                      official {PRODUCT_NAME} tools and MCPs to get the job
+                      done.
                     </p>
                   </div>
                 </MachineSection>
@@ -288,8 +290,8 @@ export function Harness(
                       </Show>
                     </div>
                     <p class="mt-1 text-sm text-ink-muted">
-                      Bring your own Cursor subscription to Macro. Manage Cursor
-                      Cloud sessions directly in the app.
+                      Bring your own Cursor subscription to {PRODUCT_NAME}.
+                      Manage Cursor Cloud sessions directly in the app.
                     </p>
 
                     <Show
@@ -344,8 +346,8 @@ export function Harness(
                               </Button>
                             </div>
                             <p class="text-xs text-ink-extra-muted">
-                              Create an API key in Cursor and paste it here.
-                              Macro stores it encrypted.
+                              Create an API key in Cursor and paste it here.{' '}
+                              {PRODUCT_NAME} stores it encrypted.
                             </p>
                           </div>
                         }
@@ -366,8 +368,8 @@ export function Harness(
 
                         <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
                           <p class="flex-1 basis-56 text-xs text-ink-extra-muted">
-                            Disconnecting removes Macro's copy of the key but
-                            does not revoke it in Cursor.
+                            Disconnecting removes {PRODUCT_NAME}'s copy of the
+                            key but does not revoke it in Cursor.
                           </p>
                           <Button
                             type="button"

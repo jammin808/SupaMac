@@ -36,9 +36,9 @@ describe('sessionRepositoryUrl', () => {
 
 describe('harnessDisplayName', () => {
   it('names Macro runtimes after the product', () => {
-    expect(harnessDisplayName('in-memory')).toBe('Macro Agent');
-    expect(harnessDisplayName('macro-inmem')).toBe('Macro Agent');
-    expect(harnessDisplayName('sandbox')).toBe('Macro Agent');
+    expect(harnessDisplayName('in-memory')).toBe('SupaMac Agent');
+    expect(harnessDisplayName('macro-inmem')).toBe('SupaMac Agent');
+    expect(harnessDisplayName('sandbox')).toBe('SupaMac Agent');
   });
 
   it('names the Cursor runtime', () => {
@@ -52,9 +52,9 @@ describe('harnessDisplayName', () => {
 
 describe('harnessTitle', () => {
   it('uses the product name for Macro slugs instead of title-casing them', () => {
-    expect(harnessTitle('macro-inmem')).toBe('Macro Agent');
-    expect(harnessTitle('in-memory')).toBe('Macro Agent');
-    expect(harnessTitle('sandbox')).toBe('Macro Agent');
+    expect(harnessTitle('macro-inmem')).toBe('SupaMac Agent');
+    expect(harnessTitle('in-memory')).toBe('SupaMac Agent');
+    expect(harnessTitle('sandbox')).toBe('SupaMac Agent');
   });
 
   it('title-cases other slugs', () => {
@@ -80,8 +80,10 @@ describe('sessionHarnessTitle', () => {
   });
 
   it('uses the product name for Macro slugs', () => {
-    expect(sessionHarnessTitle({ harness: 'macro-inmem' })).toBe('Macro Agent');
-    expect(sessionHarnessTitle({ harness: 'in-memory' })).toBe('Macro Agent');
+    expect(sessionHarnessTitle({ harness: 'macro-inmem' })).toBe(
+      'SupaMac Agent'
+    );
+    expect(sessionHarnessTitle({ harness: 'in-memory' })).toBe('SupaMac Agent');
   });
 });
 

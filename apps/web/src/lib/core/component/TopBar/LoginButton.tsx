@@ -1,7 +1,9 @@
 import { WEB_BASE_PATH } from '@app/constants/routerBase';
 import { useIsAuthenticated } from '@core/auth';
+import { SELF_HOSTED } from '@core/constant/servers';
 import { useNavigate } from '@solidjs/router';
 import { Button } from '@ui';
+import { Show } from 'solid-js';
 
 export function openLoginModal() {
   const isAuthenticated = useIsAuthenticated();
@@ -23,14 +25,17 @@ export function LoginButton() {
       >
         Login
       </Button>
-      <span class="text-xs text-ink-muted italic">or</span>
-      <Button
-        variant="primary"
-        size="sm"
-        onClick={() => navigate(`/welcome${window.location.search}`)}
-      >
-        Sign Up
-      </Button>
+      {/* A self-hosted instance admits only the addresses its owner allows. */}
+      <Show when={!SELF_HOSTED}>
+        <span class="text-xs text-ink-muted italic">or</span>
+        <Button
+          variant="primary"
+          size="sm"
+          onClick={() => navigate(`/welcome${window.location.search}`)}
+        >
+          Sign Up
+        </Button>
+      </Show>
     </div>
   );
 }

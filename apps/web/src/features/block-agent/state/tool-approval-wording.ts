@@ -4,6 +4,7 @@
  * possessive of the owner whose access the call spends ("your", "Alice's").
  */
 
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import type { ToolName as MacroToolName } from '@service-cognition/generated/tools/tool';
 
 type Wording = (whose: string) => string;
@@ -225,7 +226,7 @@ export function describeToolCall(
   const wording = isMacroTool(tool) ? MACRO_TOOLS[tool] : null;
   return wording
     ? wording(whose)
-    : `use ${whose} Macro workspace (${toolWords(tool)})`;
+    : `use ${whose} ${PRODUCT_NAME} workspace (${toolWords(tool)})`;
 }
 
 /**

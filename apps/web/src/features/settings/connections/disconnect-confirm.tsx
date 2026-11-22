@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { ConfirmDialog } from '@ui';
 
 export type DisconnectConfirm = {
@@ -17,7 +18,7 @@ export function DisconnectConfirmDialog(props: {
       onOpenChange={(open) => {
         if (!open) props.onClose();
       }}
-      title={props.request?.title ?? 'Disconnect from Macro'}
+      title={props.request?.title ?? `Disconnect from ${PRODUCT_NAME}`}
       body={props.request?.body}
       confirmLabel={props.request?.confirmLabel ?? 'Disconnect'}
       tone="danger"

@@ -146,10 +146,10 @@ it('addresses every service under a self-hosted backend origin', async () => {
     'https://api.example.com/ai-editing'
   );
 
-  const upstream = Object.values(SERVER_HOSTS).filter(
-    (host) => host.includes('macro.com') || host.includes('localhost')
+  const hostnames = new Set(
+    Object.values(SERVER_HOSTS).map((host) => new URL(host).hostname)
   );
-  expect(upstream).toEqual([]);
+  expect([...hostnames].sort()).toEqual(['api.example.com', 'www.example.org']);
 });
 
 it('keeps the hosted services when no self-hosted origin is set', async () => {

@@ -14,6 +14,7 @@ use axum::{
 };
 use axum_extra::extract::Cached;
 use macro_authorization::{OptionalMacroAuthorizationExtractor, UserOrInternalService};
+use macro_cors::AllowedUpgradeOrigin;
 use opentelemetry::trace::TraceContextExt;
 use std::time::Duration;
 use sync_router::session::{
@@ -36,6 +37,7 @@ struct TraceQuery {
 }
 
 async fn upgrade(
+    _origin: AllowedUpgradeOrigin,
     State(state): State<ApiContext>,
     Cached(auth): Cached<
         OptionalMacroAuthorizationExtractor<AuthorizationService, UserOrInternalService>,

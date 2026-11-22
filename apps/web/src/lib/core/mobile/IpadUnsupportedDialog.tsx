@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { isPlatform } from '@core/util/platform';
 import { makePersisted } from '@solid-primitives/storage';
 import { Button, Dialog, Surface } from '@ui';
@@ -50,8 +51,9 @@ export function IpadUnsupportedDialog() {
                 Optimized for iPhone
               </Dialog.Title>
               <Dialog.Description class="text-sm leading-5 text-ink-extra-muted">
-                The Macro iOS app is currently built for iPhone. Some parts of
-                the app may feel off on iPad. Full iPad support coming soon.
+                The {PRODUCT_NAME} iOS app is currently built for iPhone. Some
+                parts of the app may feel off on iPad. Full iPad support coming
+                soon.
               </Dialog.Description>
             </div>
             <div class="flex justify-end">

@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { fireAndForget } from '@core/util/fireAndForget';
 import { Button, TextField } from '@ui';
 import { Show } from 'solid-js';
@@ -24,7 +25,7 @@ export function DirectAccessInvite(props: {
           value={invite.email()}
           onChange={invite.setEmail}
         >
-          <TextField.Label>Macro email address</TextField.Label>
+          <TextField.Label>{PRODUCT_NAME} email address</TextField.Label>
           <TextField.Input
             type="email"
             required

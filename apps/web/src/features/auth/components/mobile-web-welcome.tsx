@@ -1,4 +1,5 @@
 import { WEB_BASE_PATH } from '@app/constants/routerBase';
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import LogoIcon from '@icon/macro-logo.svg';
 import { createSignal } from 'solid-js';
 
@@ -17,9 +18,11 @@ export function MobileWebWelcome(props: {
     <div class="flex flex-col size-full p-6 overflow-hidden relative">
       <div class="flex flex-col items-start gap-4 w-full max-w-md mx-auto mt-6">
         <LogoIcon class="size-16 text-accent self-center" />
-        <h2 class="text-3xl font-semibold text-ink mt-3">Welcome to Macro.</h2>
+        <h2 class="text-3xl font-semibold text-ink mt-3">
+          Welcome to {PRODUCT_NAME}.
+        </h2>
         <p class="text-base text-ink/60 mt-4">
-          Macro is a unified system for work{'\u2060'}—built for{' '}
+          {PRODUCT_NAME} is a unified system for work{'\u2060'}—built for{' '}
           <strong>speed</strong> and <strong>focus</strong>.
         </p>
 

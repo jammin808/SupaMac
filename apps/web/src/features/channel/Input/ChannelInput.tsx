@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { t } from '@app/lib/i18n';
 import { useMacroMentionLinkResolver } from '@components/app/split-layout/split-router/mention-links';
 import { EntityIcon } from '@core/component/EntityIcon';
@@ -622,7 +623,7 @@ export function ChannelInput(props: ChannelInputProps) {
                   id: 'ask-macro',
                   label: t('channelComposer.askMacro'),
                   icon: <EntityIcon targetType="agent" size="xs" />,
-                  hint: '@macro',
+                  hint: `@${PRODUCT_NAME.toLowerCase()}`,
                   onSelect: () =>
                     runInEditor(
                       (editor) => {

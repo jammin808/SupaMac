@@ -1,3 +1,4 @@
+import { SELF_HOSTED } from '@core/constant/servers';
 import {
   type Accessor,
   createEffect,
@@ -17,6 +18,7 @@ import {
   nextOnboardingStep,
   ONBOARDING_STEPS,
   type OnboardingStep,
+  onboardingSteps,
   restoreOnboardingStep,
   type StepOutcome,
 } from '../core/steps';
@@ -59,6 +61,8 @@ export function createOnboardingFlow(
   }
 ) {
   const [step, setStep] = createSignal<OnboardingStep>();
+  /** The steps this deployment walks; `index` stays a step's place in the full flow. */
+  const steps = onboardingSteps(SELF_HOSTED);
   // Read once from the sign-up draft, which restore clears, so a later return
   // (an inbox consent round-trip) does not repeat what it triggers.
   const [signupProvider, setSignupProvider] = createSignal<SignupProvider>();
@@ -81,7 +85,8 @@ export function createOnboardingFlow(
     const initial = restoreOnboardingStep(
       draft?.authenticating ? 'work' : readSavedStep(userId),
       options.checkoutReturn() !== undefined,
-      options.requestedStep()
+      options.requestedStep(),
+      steps
     );
     saveStep(userId, initial);
     if (draft?.authenticating && draft.accent)
@@ -166,8 +171,8 @@ export function createOnboardingFlow(
       index: index(),
       state: outcome,
     });
-    return nextOnboardingStep(current, outcome);
+    return nextOnboardingStep(current, outcome, steps);
   };
 
-  return { status, step, index, commit, leave, signupProvider };
+  return { status, step, steps, index, commit, leave, signupProvider };
 }

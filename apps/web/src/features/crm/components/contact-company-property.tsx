@@ -107,7 +107,7 @@ export function ContactCompanyProperty(props: {
   const editor = () => (
     <>
       <Show when={!props.editable}>
-        <p class="ph-no-capture truncate px-3 pt-3 text-sm">
+        <p class="ph-no-capture truncate px-3 pt-3 text-sm select-text">
           {props.companyName ?? t('crm.company')}
         </p>
       </Show>
@@ -233,7 +233,7 @@ export function ContactCompanyProperty(props: {
               class="min-w-0 shrink focus-visible:ring-2 focus-visible:ring-accent/20"
             >
               <BuildingsIcon class="size-3 shrink-0" />
-              <span class="truncate">
+              <span class="truncate select-text">
                 {props.companyName ??
                   (props.companyId ? t('crm.company') : t('crm.noCompany'))}
               </span>

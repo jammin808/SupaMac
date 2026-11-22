@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { emailToMacroId } from '@core/user/macroId';
 import { createSignal, onCleanup } from 'solid-js';
 import type { SharingSource } from '../context/contracts';
@@ -24,7 +25,7 @@ export function createDirectAccessInvite(source: SharingSource) {
     } catch {
       if (alive)
         setError(
-          "Couldn't add this person. Check their Macro email and try again."
+          `Couldn't add this person. Check their ${PRODUCT_NAME} email and try again.`
         );
     }
   };

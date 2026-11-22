@@ -20,4 +20,8 @@ export const decepticonTheme = defineLegacyDefaultTheme({
     c3: { l: 0.62, c: 0.008, h: 295 },
     c4: { l: 0.72, c: 0.006, h: 295 },
   },
+  // Placeholder text holds 4.5:1 on white and on the page.
+  overrides: [
+    { token: 'ink-placeholder', value: { l: 0.55, c: 0.006, h: 295 } },
+  ],
 });

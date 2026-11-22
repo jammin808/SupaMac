@@ -4,6 +4,7 @@ import {
   isCoderHarness,
 } from '@app/features/agents-view/core/agent-kind';
 import { AGENTS_TOUR } from '@app/features/agents-view/tour';
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { t } from '@app/lib/i18n';
 import { useSplitBackInterceptor } from '@components/app/split-layout/back-interceptor';
 import { useSplitPanel } from '@components/app/split-layout/layoutUtils';
@@ -156,10 +157,10 @@ const IN_MEMORY_HARNESS: ConnectedHarness = {
 
 const MACRO_AGENT: AgentSummary = {
   id: MACRO_AGENT_BOT_ID,
-  name: 'Macro',
+  name: PRODUCT_NAME,
   tag: 'macro',
   instructions: '',
-  whereItRuns: 'In Macro',
+  whereItRuns: `In ${PRODUCT_NAME}`,
   defaultModel: MODEL_PRETTYNAME[Model.sonnet55],
   channelSummary: 'All channels',
   share: 'Team',
@@ -568,7 +569,7 @@ function summarizeAgent(
 }
 
 function whereItRunsLabel(id: string, harness?: ConnectedHarness): string {
-  if (id === 'in-memory') return 'In Macro';
+  if (id === 'in-memory') return `In ${PRODUCT_NAME}`;
   if (id === 'cursor') return 'In Cursor';
   // Any other id is a registered macrod harness uuid; if it is not in the
   // connected list any more, the harness has been removed.
@@ -1046,11 +1047,11 @@ function AgentEditorPage(props: {
     const saved = savedApiKey();
     if (apiKeyLocked())
       return saved
-        ? 'Agent API keys are part of the Premium and Max plans. This agent runs on Macro usage until you upgrade.'
+        ? `Agent API keys are part of the Premium and Max plans. This agent runs on ${PRODUCT_NAME} usage until you upgrade.`
         : 'Agent API keys are part of the Premium and Max plans.';
     if (saved && saved.provider !== provider.id)
       return `The saved ${apiKeyProviderName(saved.provider)} key isn’t used with this model.`;
-    return `Bills this agent’s usage to your ${provider.name} account instead of Macro. Leave it empty to run on Macro.`;
+    return `Bills this agent’s usage to your ${provider.name} account instead of ${PRODUCT_NAME}. Leave it empty to run on ${PRODUCT_NAME}.`;
   };
   // Optional, so it stays a one-line offer until asked for or already set.
   const [apiKeyOpen, setApiKeyOpen] = createSignal(false);
@@ -1073,7 +1074,7 @@ function AgentEditorPage(props: {
                 <p class="mt-0.5 text-xs text-ink-extra-muted">
                   {apiKeyLocked()
                     ? apiKeyHelp(provider())
-                    : 'Runs on Macro usage unless you add one.'}
+                    : `Runs on ${PRODUCT_NAME} usage unless you add one.`}
                 </p>
               </div>
               <Show when={!apiKeyLocked()}>
@@ -1399,8 +1400,8 @@ function AgentEditorPage(props: {
                   <legend class="sr-only">Where it runs</legend>
                   <WhereItRunsOption
                     value="in-memory"
-                    title="In Macro"
-                    description="Fast and built in. Uses Macro tools and your connected apps."
+                    title={`In ${PRODUCT_NAME}`}
+                    description={`Fast and built in. Uses ${PRODUCT_NAME} tools and your connected apps.`}
                     icon={<MacroLogo />}
                     checked={harnessId() === IN_MEMORY_HARNESS.id}
                     onSelect={() => handleHarnessChange(IN_MEMORY_HARNESS.id)}

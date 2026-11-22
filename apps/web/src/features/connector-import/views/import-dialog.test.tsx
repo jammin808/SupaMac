@@ -94,7 +94,7 @@ describe('connector import dialog', () => {
     await waitFor(() => expect(open()).toBe(false));
     expect(context.startAgentImport).toHaveBeenCalledWith(
       expect.objectContaining({
-        input: 'Import my Jira workspace into Macro.',
+        input: 'Import my Jira workspace into SupaMac.',
       })
     );
   });
@@ -119,7 +119,7 @@ describe('connector import dialog', () => {
     await waitFor(() => expect(open()).toBe(false));
     expect(context.startAgentImport).toHaveBeenCalledWith(
       expect.objectContaining({
-        input: 'Import my Notion workspace into Macro.',
+        input: 'Import my Notion workspace into SupaMac.',
         instructions: expect.stringContaining('ImportFromNotion'),
       })
     );

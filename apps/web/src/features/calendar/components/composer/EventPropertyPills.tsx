@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { PickerSheet } from '@components/app/mobile/PickerSheet';
 import BellSimpleIcon from '@icon/system/regular/bell-simple.svg';
 import CalendarDotsIcon from '@icon/system/regular/calendar-dots.svg';
@@ -451,7 +452,7 @@ const MICROSOFT_TEAMS_OPTION: EventComposerConferenceOption = {
 };
 const MACRO_CALL_OPTION: EventComposerConferenceOption = {
   value: 'macro',
-  label: 'Macro call',
+  label: `${PRODUCT_NAME} call`,
 };
 const NO_CONFERENCING_OPTION: EventComposerConferenceOption = {
   value: 'none',

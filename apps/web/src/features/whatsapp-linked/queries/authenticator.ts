@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { isPlatform, isTauri } from '@core/util/platform';
 import { Channel, invoke } from '@tauri-apps/api/core';
 import { ResultAsync } from 'neverthrow';
@@ -28,7 +29,8 @@ function passkeyFailure(error: unknown): PasskeyFailure {
     // Desktop builds from before the command answer "command ... not found".
     .with(
       P.string.regex(/not found/i),
-      () => 'Update Macro desktop to confirm WhatsApp passkeys, then try again.'
+      () =>
+        `Update ${PRODUCT_NAME} desktop to confirm WhatsApp passkeys, then try again.`
     )
     .with(
       P.union('unavailable', 'unsupported'),

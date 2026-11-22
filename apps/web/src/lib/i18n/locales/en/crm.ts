@@ -189,6 +189,7 @@ export default {
   primaryContactEmail: '{{email}} (primary)',
   makePrimaryContactEmail: 'Make primary',
   removeContactEmail: 'Remove',
+  copyContactEmail: 'Copy address',
   contactEmailLinksCompany:
     'This address links the contact to its company, so it cannot be removed.',
   contactEmailPlaceholder: 'person@example.com',

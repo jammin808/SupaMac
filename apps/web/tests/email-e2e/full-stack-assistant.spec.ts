@@ -37,7 +37,7 @@ async function openThread(page: Page, mailbox: Mailbox) {
  * stand-in (`harness/model.ts`): the message names the script that answers.
  */
 async function askMacro(page: Page, message: string) {
-  await page.getByRole('button', { name: 'Ask Macro' }).click();
+  await page.getByRole('button', { name: 'Ask SupaMac' }).click();
   const composer = page.getByRole('textbox', { name: 'Message the agent' });
   await expect(composer.getByRole('link', { name: 'Lunch?' })).toBeVisible();
   await composer.click();
@@ -109,7 +109,7 @@ for (const provider of PROVIDERS) {
     }) => {
       await openThread(page, mailbox);
 
-      await page.getByRole('button', { name: 'Ask Macro' }).click();
+      await page.getByRole('button', { name: 'Ask SupaMac' }).click();
       did('AL-129');
       await expect(
         page

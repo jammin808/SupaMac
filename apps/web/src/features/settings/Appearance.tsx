@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { toast } from '@core/component/Toast/Toast';
 import { fireAndForget } from '@core/util/fireAndForget';
 import ClipboardIcon from '@icon/system/regular/clipboard.svg';
@@ -500,7 +501,7 @@ export function Appearance() {
       <SettingsPage title="Appearance">
         <SettingsSection
           title="Color Theme"
-          description="Choose how Macro looks on your screen."
+          description={`Choose how ${PRODUCT_NAME} looks on your screen.`}
         >
           <div
             class="mx-auto w-full max-w-lg py-2"

@@ -200,7 +200,7 @@ test.describe('connecting an Outlook account', { tag: '@full-stack' }, () => {
     });
     await expect(
       required.getByText(
-        'Your organization requires an IT admin to approve Macro before you can connect this account.'
+        'Your organization requires an IT admin to approve SupaMac before you can connect this account.'
       )
     ).toBeVisible();
     saw('STX-026');

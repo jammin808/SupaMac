@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import FileIcon from '@phosphor/file.svg';
 import SpinnerIcon from '@phosphor/spinner.svg';
 import WarningIcon from '@phosphor/warning-circle.svg';
@@ -77,7 +78,7 @@ export function InboundAttachmentPlaceholder(props: {
         <Match when={props.state === 'unsupported'}>
           <WarningIcon class="size-4 shrink-0" aria-hidden="true" />
           <span class="min-w-0 truncate">
-            {props.fileName} can't be shown in Macro
+            {props.fileName} can't be shown in {PRODUCT_NAME}
           </span>
         </Match>
       </Switch>

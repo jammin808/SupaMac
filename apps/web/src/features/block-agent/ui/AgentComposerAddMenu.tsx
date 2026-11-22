@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import {
   ComposerAddDrawer,
   ComposerAddMenu,
@@ -157,7 +158,7 @@ export function AgentComposerAddMenu(props: {
         {
           id: 'connect',
           label: 'Add connections',
-          description: 'Connect more apps to Macro',
+          description: `Connect more apps to ${PRODUCT_NAME}`,
           icon: <PlusIcon />,
           onSelect: () => openTarget({ kind: 'overview', mode: 'discover' }),
         },

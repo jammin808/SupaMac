@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { MobileDrawer } from '@components/app/mobile/MobileDrawer';
 import { EmojiSelector } from '@core/component/Emoji/EmojiSelector';
 import { recordEmojiUsage } from '@core/component/Emoji/emojiUsage';
@@ -88,7 +89,7 @@ function buildActionItems(
     },
     {
       id: 'ask-macro',
-      label: 'Ask Macro',
+      label: `Ask ${PRODUCT_NAME}`,
       icon: SparkleIcon,
       onClick: actions?.onChat,
     },

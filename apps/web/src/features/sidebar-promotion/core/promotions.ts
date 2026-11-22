@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import IconGoogleCalendar from '@icon/import/google-calendar.svg';
 import IconGoogleDrive from '@icon/import/google-drive.svg';
 import IconJira from '@icon/import/jira.svg';
@@ -34,9 +35,8 @@ export const HOME_SETUP_PROMOTION = {
     logo('Google Drive', IconGoogleDrive),
     logo('Jira', IconJira),
   ],
-  headline: 'Make Macro your home base',
-  pitch:
-    'Connect the tools you use every day and invite teammates to work in Macro.',
+  headline: `Make ${PRODUCT_NAME} your home base`,
+  pitch: `Connect the tools you use every day and invite teammates to work in ${PRODUCT_NAME}.`,
   action: 'Connect tools',
   secondaryAction: 'Invite team',
 } satisfies PromotionCopy;

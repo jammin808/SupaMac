@@ -1,4 +1,5 @@
 import { SlackImport } from '@app/features/slack-import/slack-import';
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { ENABLE_EMAIL } from '@core/constant/featureFlags';
 import { useEmailLinks } from '@core/email-link';
 import { OutlookBetaBadge } from '@core/email-link/OutlookBetaBadge';
@@ -224,8 +225,7 @@ export function useGithubItem(
     kind: 'native',
     icon: providerIcon('github'),
     get description() {
-      const summary =
-        'Pull request reviews and status in Macro, and repository access for agents.';
+      const summary = `Pull request reviews and status in ${PRODUCT_NAME}, and repository access for agents.`;
       const username = github.username();
       return username ? `@${username} · ${summary}` : summary;
     },
@@ -402,15 +402,14 @@ export function aiAppItems(hosts: IntegrationItemHosts): IntegrationItem[] {
       name: 'Claude Code, Codex, and ChatGPT',
       kind: 'mcp',
       icon: <ClaudeIcon />,
-      description:
-        'Use your Macro workspace from Claude Code, Codex, ChatGPT, Claude.ai, and IDEs through the Macro MCP server.',
+      description: `Use your ${PRODUCT_NAME} workspace from Claude Code, Codex, ChatGPT, Claude.ai, and IDEs through the ${PRODUCT_NAME} MCP server.`,
       categories: ['AI apps'],
       status: 'available',
       Actions: () => (
         <ConnectAction
           label="Set up"
           variant="neutral"
-          ariaLabel="Set up Macro in AI apps"
+          ariaLabel={`Set up ${PRODUCT_NAME} in AI apps`}
           onClick={hosts.onOpenMacroMcp}
         />
       ),
@@ -423,8 +422,7 @@ export function aiAppItems(hosts: IntegrationItemHosts): IntegrationItem[] {
       name: 'Coding agents on your computer',
       kind: 'native',
       icon: <DesktopIcon />,
-      description:
-        'Pair your computer so Macro agents run on Claude Code, Codex, OpenCode, OpenClaw, or Hermes there, with each session streamed into Macro.',
+      description: `Pair your computer so ${PRODUCT_NAME} agents run on Claude Code, Codex, OpenCode, OpenClaw, or Hermes there, with each session streamed into ${PRODUCT_NAME}.`,
       categories: ['AI apps'],
       status: 'available',
       Actions: () => (

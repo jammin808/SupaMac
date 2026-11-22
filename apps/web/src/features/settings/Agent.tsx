@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { McpSetupCards } from '@core/component/AI/component/McpSetupCards';
 import { SettingsPage, SettingsSection } from './primitives';
 
@@ -10,8 +11,8 @@ import { SettingsPage, SettingsSection } from './primitives';
 export function Agent() {
   return (
     <SettingsPage
-      title="Macro MCP server"
-      description="Connect other agents and tools to your Macro workspace."
+      title={`${PRODUCT_NAME} MCP server`}
+      description={`Connect other agents and tools to your ${PRODUCT_NAME} workspace.`}
     >
       <SettingsSection title="Connect a client">
         <McpSetupCards class="max-w-none" />

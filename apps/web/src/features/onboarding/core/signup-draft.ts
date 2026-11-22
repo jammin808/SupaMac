@@ -1,6 +1,20 @@
 const SIGNUP_STEPS = ['welcome', 'vision', 'security', 'work'] as const;
 export type SignupStep = (typeof SIGNUP_STEPS)[number];
 
+/**
+ * Slides only the hosted service shows: its product pitch and its company's
+ * security claims. Neither describes a self-hosted instance.
+ */
+const HOSTED_ONLY_SIGNUP_STEPS: readonly SignupStep[] = ['vision', 'security'];
+
+/** The signed-out steps a deployment walks, in order. */
+export function signupSteps(selfHosted: boolean): readonly SignupStep[] {
+  if (!selfHosted) return SIGNUP_STEPS;
+  return SIGNUP_STEPS.filter(
+    (step) => !HOSTED_ONLY_SIGNUP_STEPS.includes(step)
+  );
+}
+
 /** The identity providers a new account can sign up with. */
 export type SignupProvider = 'google' | 'microsoft';
 
@@ -51,12 +65,18 @@ export function parseSignupDraft(raw: string | null): SignupDraft | undefined {
 export const serializeSignupDraft = (draft: SignupDraft) =>
   JSON.stringify(draft);
 
-export function previousSignupStep(step: SignupStep): SignupStep | undefined {
-  const index = SIGNUP_STEPS.indexOf(step);
-  return index > 0 ? SIGNUP_STEPS[index - 1] : undefined;
+export function previousSignupStep(
+  step: SignupStep,
+  steps: readonly SignupStep[] = SIGNUP_STEPS
+): SignupStep | undefined {
+  const index = steps.indexOf(step);
+  return index > 0 ? steps[index - 1] : undefined;
 }
 
-export function nextSignupStep(step: SignupStep): SignupStep {
-  const index = SIGNUP_STEPS.indexOf(step);
-  return SIGNUP_STEPS[Math.min(index + 1, SIGNUP_STEPS.length - 1)];
+export function nextSignupStep(
+  step: SignupStep,
+  steps: readonly SignupStep[] = SIGNUP_STEPS
+): SignupStep {
+  const index = steps.indexOf(step);
+  return steps[Math.min(index + 1, steps.length - 1)];
 }

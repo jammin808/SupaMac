@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { deferredGate } from '@core/util/debounce';
 import { fireAndForget } from '@core/util/fireAndForget';
 import {
@@ -95,8 +96,7 @@ export function createDraftSyncStatus(options: {
         message: draft
           ? 'Saved on this device; waiting to sync'
           : 'Draft synchronization unavailable',
-        detail:
-          'Queued changes are preserved. Update or reload Macro to recover local storage.',
+        detail: `Queued changes are preserved. Update or reload ${PRODUCT_NAME} to recover local storage.`,
         failed: true,
         action: 'reload',
         canKeepEditing: false,

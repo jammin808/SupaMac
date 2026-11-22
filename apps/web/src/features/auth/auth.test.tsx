@@ -8,12 +8,29 @@ import {
   waitFor,
 } from '@solidjs/testing-library';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Login } from './auth';
+import { Login, MobileWebSignup } from './auth';
 import type { createFakeAuth } from './tests/fake-auth-context';
 
 const world = vi.hoisted(() => ({
   microsoftSignup: false,
+  selfHosted: false,
+  googleSignIn: false,
+  navigate: vi.fn(),
   auth: undefined as ReturnType<typeof createFakeAuth> | undefined,
+}));
+
+vi.mock(import('@core/constant/servers'), async (importOriginal) => ({
+  ...(await importOriginal()),
+  get SELF_HOSTED() {
+    return world.selfHosted;
+  },
+}));
+
+vi.mock(import('@core/constant/featureFlags'), async (importOriginal) => ({
+  ...(await importOriginal()),
+  get ENABLE_GOOGLE_SIGN_IN() {
+    return world.googleSignIn;
+  },
 }));
 
 vi.mock('@app/lib/analytics/posthog', () => ({
@@ -64,7 +81,7 @@ vi.mock('@app/features/onboarding/onboarding', async () => {
 vi.mock('@solidjs/router', async (original) => ({
   ...(await original<typeof import('@solidjs/router')>()),
   useSearchParams: () => [{}, vi.fn()],
-  useNavigate: () => vi.fn(),
+  useNavigate: () => world.navigate,
 }));
 
 beforeEach(() => {
@@ -72,6 +89,9 @@ beforeEach(() => {
   localStorage.clear();
   stubOnboardingBrowser();
   world.microsoftSignup = false;
+  world.selfHosted = false;
+  world.googleSignIn = false;
+  world.navigate.mockReset();
   world.auth = undefined;
 });
 afterEach(() => {
@@ -128,5 +148,94 @@ describe('Continue with Microsoft, behind enable-microsoft-signup', () => {
     await waitFor(() =>
       expect(world.auth?.calls()).toContain('sso:microsoft:signup')
     );
+  });
+});
+
+/** The sign-in card's email field, once it is on screen. */
+const emailField = () =>
+  waitFor(() => {
+    const field = document.querySelector('input[type="email"]');
+    expect(field).not.toBeNull();
+    return field;
+  });
+
+const googleButton = () =>
+  screen.queryByRole('button', { name: 'Continue with Google' });
+
+describe('sign-in on a self-hosted instance', () => {
+  beforeEach(() => {
+    world.selfHosted = true;
+  });
+
+  it('asks for an email address straight away: the emailed code is the only way in', async () => {
+    render(() => <Login />);
+
+    await emailField();
+    expect(googleButton()).toBeNull();
+    expect(microsoftButton()).toBeNull();
+    expect(screen.queryByRole('button', { name: /Continue with/ })).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: 'Back to sign in' })
+    ).toBeNull();
+  });
+
+  it('signs up on the same card instead of the slides that lead to Google', async () => {
+    saveSignupDraft({ step: 'work' });
+    render(() => <Login signupMode />);
+
+    await emailField();
+    expect(
+      screen.queryByRole('button', { name: 'Connect work email' })
+    ).toBeNull();
+    expect(googleButton()).toBeNull();
+  });
+
+  it('offers Google once the build turns it on', async () => {
+    world.googleSignIn = true;
+    render(() => <Login />);
+
+    const google = await screen.findByRole('button', {
+      name: 'Continue with Google',
+    });
+    fireEvent.click(google);
+    await waitFor(() =>
+      expect(world.auth?.calls()).toContain('sso:google:login')
+    );
+  });
+
+  it('offers Microsoft once the build turns that on, still without Google', async () => {
+    world.microsoftSignup = true;
+    render(() => <Login />);
+
+    await screen.findByRole('button', { name: 'Continue with Microsoft' });
+    expect(googleButton()).toBeNull();
+    expect(
+      screen.getByRole('button', { name: 'Continue with email' })
+    ).toBeTruthy();
+  });
+
+  it('sends a phone that opens the sign-up page to sign in', () => {
+    render(() => <MobileWebSignup />);
+
+    expect(world.navigate).toHaveBeenCalledWith('/login', { replace: true });
+    expect(screen.queryByRole('button', { name: 'Sign Up' })).toBeNull();
+  });
+});
+
+describe('sign-in on the hosted service', () => {
+  it('offers Google whatever the self-hosted flag says', async () => {
+    world.googleSignIn = false;
+    render(() => <Login />);
+
+    expect(
+      await screen.findByRole('button', { name: 'Continue with Google' })
+    ).toBeTruthy();
+  });
+
+  it('takes an email address on the mobile-web sign-up page', () => {
+    render(() => <MobileWebSignup />);
+
+    expect(screen.getByRole('button', { name: 'Sign Up' })).toBeTruthy();
+    expect(world.navigate).not.toHaveBeenCalled();
   });
 });

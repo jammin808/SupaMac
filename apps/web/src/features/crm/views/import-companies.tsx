@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { fireAndForget } from '@core/util/fireAndForget';
 import UploadIcon from '@icon/system/regular/upload-simple.svg';
 import { Button, Dialog, Panel, Select } from '@ui';
@@ -84,8 +85,8 @@ export function CrmImport(props: {
         <Panel.Body class="flex flex-col gap-4 p-5">
           <Dialog.Description class="text-sm leading-5 text-ink-muted">
             Upload a CSV with a domain column and, optionally, a name or company
-            column, such as a Macro CRM export. Review the companies before
-            importing them into your team CRM.
+            column, such as a {PRODUCT_NAME} CRM export. Review the companies
+            before importing them into your team CRM.
           </Dialog.Description>
           <input
             ref={fileInput}

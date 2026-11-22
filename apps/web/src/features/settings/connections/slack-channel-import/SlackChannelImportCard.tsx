@@ -1,4 +1,5 @@
 import { hideImportPromotion } from '@app/features/connector-import/primitives/promotion';
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { toast } from '@core/component/Toast/Toast';
 import { useUserId } from '@core/context/user';
 import { fireAndForget } from '@core/util/fireAndForget';
@@ -188,7 +189,7 @@ export function SlackChannelImportCard(
   return (
     <SettingsSection
       title="Import channels"
-      description="Recreate Slack channels in Macro with their name and the members who are on your team. Messages are not imported."
+      description={`Recreate Slack channels in ${PRODUCT_NAME} with their name and the members who are on your team. Messages are not imported.`}
     >
       <SettingsCard>
         <div class="flex flex-col gap-4 p-5 touch:p-4">

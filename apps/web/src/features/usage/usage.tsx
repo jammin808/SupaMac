@@ -2,6 +2,7 @@ import { WEB_BASE_PATH } from '@app/constants/routerBase';
 import { useAiUsageLimitState } from '@core/constant/AiUsageLimitState';
 import { DEV_MODE_ENV, LOCAL_ONLY } from '@core/constant/featureFlags';
 import { useSettingsState } from '@core/constant/SettingsState';
+import { SELF_HOSTED } from '@core/constant/servers';
 import { fireAndForget } from '@core/util/fireAndForget';
 import { getWebOrigin } from '@core/util/webOrigin';
 import {
@@ -136,8 +137,9 @@ export function Usage() {
       if (!available()) return;
       window.location.href = url;
     },
+    // A self-hosted instance has no plans page to open.
     openPlans: () => {
-      if (available()) openSettings('Billing');
+      if (available() && !SELF_HOSTED) openSettings('Billing');
     },
     existingUsageBilling: {
       pending: () => overage.isPending,

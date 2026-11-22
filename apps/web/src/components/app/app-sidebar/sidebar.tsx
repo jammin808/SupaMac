@@ -42,6 +42,7 @@ import {
   enableTasksReviews,
   enableWhatsappLinked,
 } from '@core/constant/featureFlags';
+import { SELF_HOSTED } from '@core/constant/servers';
 import { registerHotkey } from '@core/hotkey/hotkeys';
 import { type HotkeyToken, TOKENS } from '@core/hotkey/tokens';
 import type { ValidHotkey } from '@core/hotkey/types';
@@ -259,16 +260,19 @@ export function navigateToSidebarView(args: {
 export const GoToHotkeys = () => {
   const { openWithSplit } = useSplitLayout();
 
-  const inviteHotkey = registerHotkey({
-    scopeId: 'global',
-    hotkeyToken: TOKENS.global.inviteTeam,
-    description: () => t('nav.sendInvites'),
-    keyDownHandler: (e) => {
-      e?.preventDefault();
-      setInviteModalOpen(true);
-      return true;
-    },
-  });
+  // A self-hosted instance has no invitation programme to open.
+  const inviteHotkey = SELF_HOSTED
+    ? undefined
+    : registerHotkey({
+        scopeId: 'global',
+        hotkeyToken: TOKENS.global.inviteTeam,
+        description: () => t('nav.sendInvites'),
+        keyDownHandler: (e) => {
+          e?.preventDefault();
+          setInviteModalOpen(true);
+          return true;
+        },
+      });
 
   const activityFeedEnabled = useActivityFeedFlag();
   const recentViewEnabled = useRecentViewFlag();
@@ -293,7 +297,7 @@ export const GoToHotkeys = () => {
   // Send Invites registers in the 'global' scope, which outlives this
   // component, so dispose it on unmount. The per-link nav hotkeys below are
   // disposed by their own effect cleanup.
-  onCleanup(() => inviteHotkey.dispose());
+  onCleanup(() => inviteHotkey?.dispose());
 
   // Register navigation shortcuts in the global GO_TO command scope.
   // This must be reactive because prod feature flags can add links after the

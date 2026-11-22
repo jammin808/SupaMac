@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import {
   createLoroSeed,
   readLoroGraphicsDocument,
@@ -52,7 +53,7 @@ export function readSharedCanvas(
     typeof file !== 'string'
   )
     throw new Error(
-      'This canvas uses an unsupported shared format. Update Macro to open it.'
+      `This canvas uses an unsupported shared format. Update ${PRODUCT_NAME} to open it.`
     );
   return readCanvasFile({
     ...JSON.parse(file),

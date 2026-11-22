@@ -37,7 +37,7 @@ test.describe('connecting a Google account', () => {
     await page.getByRole('button', { name: 'Connect another account' }).click();
     await refuseMailAccess(page, WORK);
     await expect(notice(page, 'Email access required')).toContainText(
-      "Macro connects an account's email and calendar together, so keep the email permissions checked. The account was not connected."
+      "SupaMac connects an account's email and calendar together, so keep the email permissions checked. The account was not connected."
     );
     saw('STX-030');
 

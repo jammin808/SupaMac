@@ -1,3 +1,5 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
+import { SELF_HOSTED } from '@core/constant/servers';
 import { cn } from '@ui';
 import { type JSX, type ParentProps, Show } from 'solid-js';
 
@@ -31,7 +33,7 @@ export function PublicBookingLayout(
           </div>
           <Show when={!props.embedded}>
             <p class="mt-auto pt-8 text-center text-xs text-ink-muted">
-              Scheduling by Macro
+              Scheduling by {PRODUCT_NAME}
             </p>
           </Show>
         </div>
@@ -40,16 +42,38 @@ export function PublicBookingLayout(
   );
 }
 
+function BrandName() {
+  return (
+    <>
+      {PRODUCT_NAME}{' '}
+      <span class="font-normal text-ink-muted">/ Scheduling</span>
+    </>
+  );
+}
+
+/**
+ * The product's name over a booking page. It links to the product's website,
+ * which a self-hosted instance does not have: there it is plain text.
+ */
 export function PublicBookingBrand(props: { target?: '_blank' }) {
   return (
-    <a
-      href="https://macro.com"
-      aria-label="Macro Scheduling"
-      target={props.target}
-      rel={props.target ? 'noopener noreferrer' : undefined}
-      class="inline-flex items-center gap-2 self-start text-sm font-semibold tracking-tight"
+    <Show
+      when={!SELF_HOSTED}
+      fallback={
+        <p class="inline-flex items-center gap-2 self-start text-sm font-semibold tracking-tight">
+          <BrandName />
+        </p>
+      }
     >
-      Macro <span class="font-normal text-ink-muted">/ Scheduling</span>
-    </a>
+      <a
+        href="https://macro.com"
+        aria-label={`${PRODUCT_NAME} Scheduling`}
+        target={props.target}
+        rel={props.target ? 'noopener noreferrer' : undefined}
+        class="inline-flex items-center gap-2 self-start text-sm font-semibold tracking-tight"
+      >
+        <BrandName />
+      </a>
+    </Show>
   );
 }

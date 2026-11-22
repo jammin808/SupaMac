@@ -6,6 +6,7 @@
  * respondents see, at most once per pause in editing.
  */
 
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { fireAndForget } from '@core/util/fireAndForget';
 import { schema } from '@loro-mirror/core';
 import { createAwareness } from '@macro-inc/collaboration/collab/awareness';
@@ -249,7 +250,7 @@ type DecodedLayout =
   | { kind: 'layout'; layout: WireFormLayout }
   | { kind: 'invalid'; message: string };
 
-const NEWER_VERSION = 'This form was edited by a newer version of Macro.';
+const NEWER_VERSION = `This form was edited by a newer version of ${PRODUCT_NAME}.`;
 const UNREADABLE = 'This form could not be opened.';
 
 type SectionSchema =

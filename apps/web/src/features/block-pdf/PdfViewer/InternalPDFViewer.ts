@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { ENABLE_SCRIPTING } from '@core/constant/featureFlags';
 import { showMessageBoxSync } from '@core/util/dialog';
 import { Telemetry } from '@macro-inc/observability';
@@ -1317,7 +1318,7 @@ export class InternalPDFViewer {
         case 'alert': {
           return showMessageBoxSync({
             type: 'warning',
-            title: 'Macro',
+            title: PRODUCT_NAME,
             message: args[0],
             buttons: ['OK'],
             defaultId: 0,
@@ -1327,7 +1328,7 @@ export class InternalPDFViewer {
           return (
             showMessageBoxSync({
               type: 'question',
-              title: 'Macro',
+              title: PRODUCT_NAME,
               message: args[0],
               buttons: ['OK', 'Cancel'],
               defaultId: 0,

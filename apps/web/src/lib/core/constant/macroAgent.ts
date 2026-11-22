@@ -1,3 +1,5 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
+
 /**
  * Identity for the first-party "Macro" system bot. Mirrors
  * `bot_id::MACRO_AI_BOT_ID` on the backend. Macro is a global system bot
@@ -13,13 +15,13 @@ export const MACRO_AGENT_BOT_ID = '00000000-0000-0000-0000-00000000a1a1';
 export const MACRO_AGENT_PRINCIPAL_ID = `bot|${MACRO_AGENT_BOT_ID}`;
 
 /** Display name for Macro. */
-export const MACRO_AGENT_NAME = 'Macro';
+export const MACRO_AGENT_NAME = PRODUCT_NAME;
 
 /**
  * User-facing name for Macro's built-in harness (`in-memory` / `macro-inmem`).
  * Wire slugs stay as they are; this is only what the UI prints.
  */
-export const MACRO_HARNESS_NAME = 'Macro Agent';
+export const MACRO_HARNESS_NAME = `${PRODUCT_NAME} Agent`;
 
 /** Handle used to find Macro in the mention typeahead (`@macro`). */
 export const MACRO_AGENT_HANDLE = 'macro';

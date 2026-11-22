@@ -749,7 +749,7 @@ test('the inviter hears when the agent is ready: Message Ada, and Connect Claude
   await screenshot(page, testInfo, 'connect-claude-from-notification');
   expect(backend.claudeCalls).toContain('harness-ada claude-sign-in');
   await signIn
-    .getByRole('button', { name: 'Keep using Macro credits' })
+    .getByRole('button', { name: 'Keep using SupaMac credits' })
     .click();
   await expect(signIn).toBeHidden();
   expect(backend.claudeCalls).not.toContain('harness-ada claude-sign-out');
@@ -789,7 +789,7 @@ test("an admin signs the agent's computer in to Claude from its row", async ({
 
   const agentRow = page.locator('[data-member-kind="agent"]');
   const claude = agentRow.locator('[data-agent-claude]');
-  await expect(claude).toContainText('Claude: Macro credits');
+  await expect(claude).toContainText('Claude: SupaMac credits');
   await claude.getByRole('button', { name: 'Connect Claude plan' }).click();
   const dialog = page.getByRole('dialog');
   const open = dialog.getByRole('link', { name: 'Open claude.ai' });
@@ -810,13 +810,15 @@ test("an admin signs the agent's computer in to Claude from its row", async ({
   await expect(claude).toContainText('Claude: your plan');
   await screenshot(page, testInfo, 'row-signed-in');
 
-  await claude.getByRole('button', { name: 'Switch to Macro credits' }).click();
-  const confirm = page.getByRole('dialog');
-  await expect(confirm).toContainText('Switch Ada to Macro credits?');
-  await confirm
-    .getByRole('button', { name: 'Switch to Macro credits' })
+  await claude
+    .getByRole('button', { name: 'Switch to SupaMac credits' })
     .click();
-  await expect(claude).toContainText('Claude: Macro credits');
+  const confirm = page.getByRole('dialog');
+  await expect(confirm).toContainText('Switch Ada to SupaMac credits?');
+  await confirm
+    .getByRole('button', { name: 'Switch to SupaMac credits' })
+    .click();
+  await expect(claude).toContainText('Claude: SupaMac credits');
   expect(backend.claudeCalls).toContain('harness-ada claude-sign-out');
 });
 

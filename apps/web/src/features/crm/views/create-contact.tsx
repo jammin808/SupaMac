@@ -163,10 +163,16 @@ export function CreateContactModal(props: {
             <EntityComposer.Root>
               <EntityComposer.Header>
                 <Dialog.Title class="sr-only">New contact</Dialog.Title>
-                <EntityComposer.Title class="mb-0 min-w-0 flex-1 self-center">
+                <EntityComposer.Title class="mb-0 min-w-0 flex-1 flex-col gap-0.5 self-center rounded-lg py-1 has-focus-visible:ring-2 has-focus-visible:ring-inset has-focus-visible:ring-button-focus">
+                  <label
+                    for="new-contact-name"
+                    class="text-xs font-medium text-ink-muted"
+                  >
+                    Contact name
+                  </label>
                   <input
+                    id="new-contact-name"
                     autofocus
-                    aria-label="Contact name"
                     placeholder="Contact name"
                     autocomplete="off"
                     data-1p-ignore
@@ -195,14 +201,18 @@ export function CreateContactModal(props: {
                 </Button>
               </EntityComposer.Header>
               <EntityComposer.Main class="gap-4">
-                <label class="flex min-w-0 items-center gap-2 px-2 text-sm">
+                <label
+                  for="new-contact-email"
+                  class="flex min-w-0 items-center gap-2 rounded-lg px-2 py-1 text-sm has-focus-visible:ring-2 has-focus-visible:ring-inset has-focus-visible:ring-button-focus"
+                >
                   <EnvelopeIcon
                     aria-hidden="true"
                     class="size-4 shrink-0 text-ink-muted"
                   />
+                  <span class="shrink-0 text-ink-muted">Email</span>
                   <span class="flex min-w-0 items-center">
                     <input
-                      aria-label="Email"
+                      id="new-contact-email"
                       type="email"
                       placeholder="Email (optional), like jane@example.com"
                       autocomplete="off"
@@ -220,7 +230,12 @@ export function CreateContactModal(props: {
                   </span>
                 </label>
                 <Show when={!props.target?.company}>
-                  <EntityComposer.Properties class="px-2">
+                  {/* The bottom padding keeps the picker's focus outline
+                      inside the clipped form body. */}
+                  <EntityComposer.Properties class="px-2 pb-1">
+                    <label for="new-contact-company" class="text-ink-muted">
+                      Company
+                    </label>
                     <ContactCompanySelect
                       mount={dialog()}
                       disabled={createContactMutation.isPending}

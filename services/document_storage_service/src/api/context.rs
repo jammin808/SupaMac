@@ -982,6 +982,8 @@ pub(crate) type DssDictationState = dictation::inbound::axum_router::DictationRo
 
 #[derive(Clone, FromRef)]
 pub(crate) struct ApiContext {
+    /// The browser origins that may open this service's WebSocket routes.
+    pub allowed_origins: Arc<macro_cors::OriginAllowList>,
     pub search_term_matching: Arc<dyn search_service::TermMatchingRollout>,
     /// Each caller's unified search lane, shared by both search mounts.
     pub search_lanes: Arc<search_service::SearchLanes>,

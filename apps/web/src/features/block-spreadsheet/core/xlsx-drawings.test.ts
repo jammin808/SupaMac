@@ -367,7 +367,7 @@ describe('Excel drawings', () => {
     );
     const imported = await decodeXlsx(zipSync(files));
     expect(imported.warnings).toEqual([
-      'Images in formats Macro cannot read, such as TIFF, are not imported.',
+      'Images in formats SupaMac cannot read, such as TIFF, are not imported.',
     ]);
     // The PNG, shared by two pictures, and the EMF, kept for export.
     expect(

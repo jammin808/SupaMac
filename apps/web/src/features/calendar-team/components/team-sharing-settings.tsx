@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { Show } from 'solid-js';
 import { SettingsSelect } from '../../settings/components/settings-select';
 import {
@@ -41,7 +42,7 @@ export function TeamSharingSettings(props: {
   return (
     <SettingsSection
       title="Team sharing"
-      description="What teammates can see in Macro. Sharing in Google Calendar or Outlook stays the same."
+      description={`What teammates can see in ${PRODUCT_NAME}. Sharing in Google Calendar or Outlook stays the same.`}
     >
       <SettingsCard>
         <Show

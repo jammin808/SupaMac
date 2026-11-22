@@ -1,4 +1,5 @@
 import { readEntityAppearance } from '@app/features/entity-appearance/core/appearance';
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import {
   captureTraceParentExchange,
   traceParentExchange,
@@ -781,7 +782,7 @@ export function graphqlDraftQueueBlocked(): boolean {
 export function assertEmailDraftQueueAvailable(): void {
   if (graphqlDraftQueueBlocked()) {
     throw new Error(
-      'Draft sync is unavailable while queued changes are preserved. Retry draft synchronization to resume the queue. If recovery requires an update, update Macro before saving or discarding.'
+      `Draft sync is unavailable while queued changes are preserved. Retry draft synchronization to resume the queue. If recovery requires an update, update ${PRODUCT_NAME} before saving or discarding.`
     );
   }
 }
@@ -961,7 +962,7 @@ export function getGraphqlSoupClient(): Client {
           subtext:
             cacheRecovery.state() === 'unavailable'
               ? 'Drafts remain on this device. Reconnect or retry draft synchronization.'
-              : 'Queued changes are preserved. Update or reload Macro to recover local storage.',
+              : `Queued changes are preserved. Update or reload ${PRODUCT_NAME} to recover local storage.`,
         });
       }
       console.warn(

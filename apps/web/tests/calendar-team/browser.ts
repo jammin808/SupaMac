@@ -330,17 +330,17 @@ try {
     .getByRole('textbox', { name: 'Title', exact: true })
     .fill('Imported point updated');
   await page.getByText('Add meeting link', { exact: true }).click();
-  await page.getByRole('option', { name: 'Macro call', exact: true }).click();
+  await page.getByRole('option', { name: 'SupaMac call', exact: true }).click();
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText(
-    'Give this event a duration before adding a Macro call.'
+    'Give this event a duration before adding a SupaMac call.'
   );
   assert.deepEqual(
     mutations,
     [],
     'Rejected point call must not save calendar changes'
   );
-  await page.getByText('Macro call', { exact: true }).click();
+  await page.getByText('SupaMac call', { exact: true }).click();
   await page
     .getByRole('option', { name: 'No meeting link', exact: true })
     .click();

@@ -6,7 +6,8 @@ import { InputProvider } from '../context';
 import { AttachFilesAction } from '../InputActions';
 
 const platform = vi.hoisted(() => ({ current: 'web' }));
-vi.mock('@core/util/platform', () => ({
+vi.mock('@core/util/platform', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@core/util/platform')>()),
   isPlatform: (target: string | string[]) =>
     Array.isArray(target)
       ? target.includes(platform.current)

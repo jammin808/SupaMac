@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { SERVER_HOSTS } from '@core/constant/servers';
 import { fetchWithToken } from '@core/util/fetchWithToken';
 import { type ErrorResponseHandler, statusError } from '@core/util/safeFetch';
@@ -67,7 +68,7 @@ const sessionError: ErrorResponseHandler<never> = async (response) => {
     code: response.status === 401 ? 'UNAUTHORIZED' : 'HTTP_ERROR',
     message:
       message === 'repository is not available to this user'
-        ? 'Connect GitHub to Macro with access to the selected repository, or choose a repository your Macro account can access.'
+        ? `Connect GitHub to ${PRODUCT_NAME} with access to the selected repository, or choose a repository your ${PRODUCT_NAME} account can access.`
         : message || `Agent request failed (HTTP ${response.status}).`,
   };
 };

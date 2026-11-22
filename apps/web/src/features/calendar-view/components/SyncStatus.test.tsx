@@ -18,7 +18,7 @@ describe('SyncStatus', () => {
     render(() => <SyncStatus syncing />);
 
     expect(status()).toBe(
-      'Syncing your calendar…Events are being imported. This may take a while. You can keep using Macro as normal.'
+      'Syncing your calendar…Events are being imported. This may take a while. You can keep using SupaMac as normal.'
     );
   });
 

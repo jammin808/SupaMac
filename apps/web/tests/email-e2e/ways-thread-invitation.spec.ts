@@ -83,7 +83,7 @@ for (const provider of PROVIDERS) {
       did('AL-184');
       await expect(unavailable).toHaveCount(0);
       await expect(
-        card.getByText('Connect a calendar to respond from Macro.')
+        card.getByText('Connect a calendar to respond from SupaMac.')
       ).toBeVisible();
 
       const opened = context.waitForEvent('page');

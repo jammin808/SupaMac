@@ -13,10 +13,9 @@ use anyhow::Result;
 use axum::{
     Router,
     extract::{
-        FromRef, FromRequestParts, State,
+        State,
         ws::{Message as AxumWebsocketMessage, WebSocket, WebSocketUpgrade},
     },
-    http::{StatusCode, header::ORIGIN, request::Parts},
     response::IntoResponse,
     routing::get,
 };
@@ -26,7 +25,7 @@ use futures::{
     stream::{SplitSink, StreamExt},
 };
 use macro_authorization::{MacroAuthorizationExtractor, UserOrInternal};
-use macro_cors::OriginAllowList;
+use macro_cors::AllowedUpgradeOrigin;
 use macro_user_id::user_id::MacroUserIdStr;
 use messages::handle_websocket_stream;
 use model::user::UserContext;
@@ -40,34 +39,6 @@ mod messages;
 
 pub fn router() -> Router<AppState> {
     Router::new().route("/", get(ws_handler))
-}
-
-/// Extracted only from a request whose `Origin` may open a socket
-/// ([`OriginAllowList::allows_upgrade`]), so a handler that takes it ahead of
-/// its credentials refuses a foreign page before authenticating it.
-pub struct AllowedUpgradeOrigin;
-
-impl<S> FromRequestParts<S> for AllowedUpgradeOrigin
-where
-    S: Send + Sync,
-    Arc<OriginAllowList>: FromRef<S>,
-{
-    type Rejection = (StatusCode, &'static str);
-
-    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
-        let origins = Arc::<OriginAllowList>::from_ref(state);
-        let origin = parts.headers.get(ORIGIN);
-
-        if origins.allows_upgrade(origin) {
-            return Ok(Self);
-        }
-
-        tracing::warn!(
-            ?origin,
-            "refused a websocket upgrade from an origin off the allow-list"
-        );
-        Err((StatusCode::FORBIDDEN, "origin not allowed"))
-    }
 }
 
 /// Handle upgrading the https connection to a websocket connection

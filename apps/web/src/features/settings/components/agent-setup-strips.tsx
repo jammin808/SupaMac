@@ -1,4 +1,5 @@
 import { AGENTS_TOUR } from '@app/features/agents-view/tour';
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import TerminalIcon from '@icon/system/regular/terminal-window.svg';
 import CursorIcon from '@icon/wide-cursor-ide.svg';
 import { useCursorApiKeyStatusQuery } from '@queries/auth/cursor-api-key';
@@ -71,7 +72,7 @@ export function AgentSetupStrips(props: {
             icon={<CursorIcon />}
             title="Connect Cursor"
             subject="Cursor"
-            description="Use your Cursor subscription to run agents in Macro."
+            description={`Use your Cursor subscription to run agents in ${PRODUCT_NAME}.`}
             action="Connect"
             onAction={props.onCursor}
           />

@@ -524,15 +524,8 @@ impl Config {
     /// Which addresses MCP traffic may reach: public ones only, unless a
     /// local environment opted in with `DEV_DANGEROUS_PRIVATE_MCP_ADDRESSES`.
     pub fn mcp_address_policy(&self) -> anyhow::Result<AddressPolicy> {
-        if !self.dev_dangerous_private_mcp_addresses {
-            return Ok(AddressPolicy::PublicOnly);
-        }
-        if !matches!(self.environment, Environment::Local) {
-            anyhow::bail!(
-                "DEV_DANGEROUS_PRIVATE_MCP_ADDRESSES is only allowed when ENVIRONMENT=local"
-            );
-        }
-        Ok(AddressPolicy::AnyAddress)
+        AddressPolicy::for_opt_in(self.environment, self.dev_dangerous_private_mcp_addresses)
+            .map_err(Into::into)
     }
 
     /// The computers rollout allowlist; refused in production.

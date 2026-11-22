@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { formatTimeLabel, getDefaultTimezone } from '@core/util/cron';
 import { SYSTEM_PROPERTY_IDS } from '@property/identifiers';
 import { match } from 'ts-pattern';
@@ -325,8 +326,7 @@ export const routineEvents: {
     value: 'github',
     label: 'Any GitHub event',
     group: 'GitHub',
-    description:
-      'Any event Macro’s GitHub app receives, narrowed by the event names, actions, and payload tests you choose.',
+    description: `Any event ${PRODUCT_NAME}’s GitHub app receives, narrowed by the event names, actions, and payload tests you choose.`,
     preset: github([]),
   },
 ];

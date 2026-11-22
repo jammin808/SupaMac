@@ -1,4 +1,5 @@
 import { WorkspaceTexture } from '@app/components/WorkspaceTexture';
+import { PRODUCT_NAME } from '@app/constants/product';
 import Logo from '@icon/macro-logo.svg';
 import CRM from '@icon/system/regular/buildings.svg';
 import Calendar from '@icon/system/regular/calendar-blank.svg';
@@ -187,7 +188,7 @@ function FeatureConstellation(
           ? 'Features to try first'
           : `${items()
               .map((feature) => feature.label)
-              .join(', ')}, connected in Macro`
+              .join(', ')}, connected in ${PRODUCT_NAME}`
       }
     >
       <div class="feature-flow-light" aria-hidden="true">

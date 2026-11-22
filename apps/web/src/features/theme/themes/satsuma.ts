@@ -43,9 +43,10 @@ export const satsumaTheme = {
     'ink-muted': 'var(--color-content-1)',
     'ink-subtle': 'var(--color-content-2)',
     'ink-disabled': 'var(--color-content-3)',
-    'ink-placeholder': 'var(--color-content-4)',
+    // Placeholder and link text hold 4.5:1 on white and on the page.
+    'ink-placeholder': 'oklch(50% 0.0397 59)',
     link: 'var(--color-blue)',
-    'link-hover': 'oklch(60.37% 0.0934 215.7)',
+    'link-hover': 'var(--color-blue)',
     'link-visited': 'oklch(45.02% 0.1102 215.7)',
     page: 'var(--color-surface-0)',
     panel: 'var(--color-surface-1)',

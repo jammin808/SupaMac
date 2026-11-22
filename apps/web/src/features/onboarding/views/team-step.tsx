@@ -1,3 +1,5 @@
+import { PRODUCT_NAME } from '@app/constants/product';
+import { SELF_HOSTED } from '@core/constant/servers';
 import { isTouchDevice } from '@core/mobile/isTouchDevice';
 import { fireAndForget } from '@core/util/fireAndForget';
 import InfoIcon from '@icon/system/regular/info.svg';
@@ -81,19 +83,25 @@ export function TeamStep(props: {
   // the creator to give them a heads-up.
   const [invited, setInvited] = createSignal(0);
   // A personal address has no team to create; it refers friends instead.
+  // Referrals earn the hosted service's AI credit, so a self-hosted instance
+  // has none: there a personal address gets the team form and a way past it.
   const referring = () => {
+    if (SELF_HOSTED) return false;
     const ready = seed();
     return team.state().t === 'create' && ready !== undefined && ready.personal;
+  };
+  const subtitle = () => {
+    if (referring())
+      return 'Get $10 of AI credit for each person who signs up.';
+    // The default also offers the paid plans, which a self-hosted instance
+    // does not sell.
+    return SELF_HOSTED ? 'Bring your team into one workspace.' : undefined;
   };
 
   return (
     <TeamSetup
       title={referring() ? 'Invite friends.' : undefined}
-      subtitle={
-        referring()
-          ? 'Get $10 of AI credit for each person who signs up.'
-          : undefined
-      }
+      subtitle={subtitle()}
     >
       <Switch>
         <Match when={team.state().t === 'error'}>
@@ -131,7 +139,7 @@ export function TeamStep(props: {
           >
             {(ready) => (
               <Show
-                when={!ready().personal}
+                when={!ready().personal || SELF_HOSTED}
                 fallback={
                   <ReferralForm
                     finishing={props.finishing}
@@ -146,6 +154,7 @@ export function TeamStep(props: {
                   seed={ready()}
                   ownEmail={ownEmail()}
                   onInvited={setInvited}
+                  onSkip={ready().personal ? props.onSkip : undefined}
                 />
               </Show>
             )}
@@ -262,6 +271,8 @@ function TeamForm(props: {
   seed: TeamFormSeed;
   ownEmail: string | undefined;
   onInvited: (count: number) => void;
+  /** Offered where a team is optional: a personal address with no referrals. */
+  onSkip?: () => void;
 }) {
   const context = useOnboardingContext();
   const form = createTeamForm(context, props.seed, {
@@ -275,7 +286,12 @@ function TeamForm(props: {
         name={form.name()}
         emails={form.slots()}
         disabled={form.pending() || props.finishing}
-        hint="Invite teammates now for $10 AI credit each"
+        // The credit is the hosted service's reward for inviting.
+        hint={
+          SELF_HOSTED
+            ? undefined
+            : 'Invite teammates now for $10 AI credit each'
+        }
         onNameChange={form.setName}
         onEmailChange={form.setSlot}
         onRemoveEmail={form.removeSlot}
@@ -299,7 +315,7 @@ function TeamForm(props: {
                 disabled={!form.allowDomainJoin()}
                 onChange={form.setNotifyDomain}
                 infoLabel="About the team email"
-                info={`We'll email your @${domain()} contacts who aren't on Macro yet to let them know the team exists. Needs domain join on.`}
+                info={`We'll email your @${domain()} contacts who aren't on ${PRODUCT_NAME} yet to let them know the team exists. Needs domain join on.`}
               >
                 Notify your team via email
               </RecommendedSwitch>
@@ -320,6 +336,14 @@ function TeamForm(props: {
         disabled={!form.canCreate() || props.finishing}
         onClick={() => fireAndForget(form.create(), 'onboarding')}
       />
+      <Show when={props.onSkip}>
+        {(skip) => (
+          <SkipButton
+            disabled={form.pending() || props.finishing}
+            onClick={skip()}
+          />
+        )}
+      </Show>
     </div>
   );
 }

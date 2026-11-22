@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import type { PermissionId } from '@core/constant/permissions';
 import { thrownResultErrorHasCode } from '@core/util/result';
 import { type UserInfoData, useUserInfoQuery } from '@queries/auth/user-info';
@@ -68,7 +69,7 @@ export const [UserContextProvider, useUserContext] =
     const email = createMemo(() => userInfo()?.email);
     const permissions = createMemo(() => userInfo()?.permissions ?? []);
     const author = createMemo(
-      () => userInfo()?.name || userInfo()?.email || 'Macro User'
+      () => userInfo()?.name || userInfo()?.email || `${PRODUCT_NAME} User`
     );
     const licenseStatus = createMemo(() => userInfo()?.licenseStatus);
     const tutorialCompleted = createMemo(() => userInfo()?.tutorialComplete);

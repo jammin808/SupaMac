@@ -706,7 +706,7 @@ test('links WhatsApp by QR, then adds a shareable WhatsApp chat', async ({
   await groups
     .getByRole('listitem')
     .filter({ hasText: 'Launch War Room' })
-    .getByRole('button', { name: 'Add to Macro' })
+    .getByRole('button', { name: 'Add to SupaMac' })
     .click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(groups.getByText('Launch War Room')).toHaveCount(0);
@@ -783,7 +783,7 @@ for (const mobile of [false, true]) {
         .getByRole('searchbox', { name: 'Search WhatsApp chats' })
         .fill('555 0003');
       await expect(contacts.getByRole('listitem')).toHaveCount(1);
-      await contacts.getByRole('button', { name: 'Add to Macro' }).click();
+      await contacts.getByRole('button', { name: 'Add to SupaMac' }).click();
       await expect(contacts).toHaveCount(0);
       expect(state.additions).toEqual([
         { provider: 'whatsapp', remoteId: phoneJid('5550003'), kind: 'direct' },
@@ -922,7 +922,7 @@ test('a refused add says why, on that group', async ({ page }) => {
     .getByRole('list', { name: 'Groups' })
     .getByRole('listitem')
     .filter({ hasText: 'Launch War Room' });
-  await row.getByRole('button', { name: 'Add to Macro' }).click();
+  await row.getByRole('button', { name: 'Add to SupaMac' }).click();
   await expect(row.getByRole('alert')).toHaveText(
     'Your WhatsApp is disconnected. Reconnect it, then add the chat.'
   );
@@ -936,7 +936,7 @@ test('External lists groups in Macro with unread counts and read-only tags', asy
   state.chats[2].added = { id: 'group-shared', name: 'Launch War Room' };
   const unexpected = await mount(page, state, '?view=in-macro');
   const nav = page.getByRole('navigation', {
-    name: 'WhatsApp chats in Macro',
+    name: 'WhatsApp chats in SupaMac',
   });
   const design = nav.getByRole('button', { name: /design-crit/ });
   await expect(design.getByLabel('2 unread messages')).toBeVisible();
@@ -1007,7 +1007,7 @@ test('chats sort into direct messages, groups and communities on the page and in
   const here = new URL(page.url());
   await page.goto(`${here.origin}${here.pathname}?view=in-macro`);
   const nav = page.getByRole('navigation', {
-    name: 'WhatsApp chats in Macro',
+    name: 'WhatsApp chats in SupaMac',
   });
   await expect(
     nav.getByRole('navigation', { name: 'Groups' }).getByRole('button')
@@ -1092,7 +1092,7 @@ test('a browser hands WhatsApp’s passkey step to Macro desktop by pairing id',
   const dialog = page.getByRole('dialog');
   await expect(dialog.getByText('Confirm on your desktop')).toBeVisible();
   await expect(
-    dialog.getByRole('link', { name: 'Continue in Macro desktop' })
+    dialog.getByRole('link', { name: 'Continue in SupaMac desktop' })
   ).toHaveAttribute('href', 'macro:///external?whatsappPairing=pairing-1');
   expect(state.passkeyAnswers).toEqual([]);
 });
@@ -1796,7 +1796,7 @@ for (const mobile of [false, true]) {
         .poll(() => state.requests)
         .toContain(`DELETE external-chats/${CHAT_ID}`);
       await expect(
-        page.getByText('Syncing stopped. Its history stays in Macro.')
+        page.getByText('Syncing stopped. Its history stays in SupaMac.')
       ).toBeVisible();
       expect(
         await page.evaluate(
@@ -1840,10 +1840,10 @@ test('the owner shares through direct people access without creating a channel',
   await page.getByRole('button', { name: 'Share', exact: true }).click();
   const dialog = page.getByRole('dialog');
   await expect(
-    dialog.getByRole('textbox', { name: 'Macro email address' })
+    dialog.getByRole('textbox', { name: 'SupaMac email address' })
   ).toBeVisible();
   await dialog
-    .getByRole('textbox', { name: 'Macro email address' })
+    .getByRole('textbox', { name: 'SupaMac email address' })
     .fill('ana@example.test');
   await dialog.getByRole('button', { name: 'Add person' }).click();
   await expect
@@ -1999,7 +1999,7 @@ for (const mobile of [false, true]) {
       state.files = { [GROUP_PICTURE]: picture('#2f7d6d') };
       const unexpected = await mount(page, state, '?view=in-macro');
       const nav = page.getByRole('navigation', {
-        name: 'WhatsApp chats in Macro',
+        name: 'WhatsApp chats in SupaMac',
       });
       await expect(
         nav

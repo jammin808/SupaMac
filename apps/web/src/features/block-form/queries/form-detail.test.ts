@@ -282,7 +282,7 @@ describe('the booking step', () => {
     expect(toSubmitOutcome(fromNewerServer)).toEqual({
       kind: 'stopped',
       sectionId: '',
-      message: 'Update Macro to see whether your response was submitted.',
+      message: 'Update SupaMac to see whether your response was submitted.',
     });
   });
 

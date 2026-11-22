@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { parseLocalDate } from '@core/util/local-date';
 import { createMemo, For, Show } from 'solid-js';
 import type { CalendarEvent, CalendarTimeFormat } from '../../calendar/types';
@@ -51,7 +52,7 @@ export function TeamEventDetails(props: {
     >
       <h2 class="select-text text-lg font-semibold">{props.event.title}</h2>
       <p class="select-text text-xs text-ink-muted">{schedule()}</p>
-      <p class="text-xs text-ink-muted">Shared in Macro · Read only</p>
+      <p class="text-xs text-ink-muted">Shared in {PRODUCT_NAME} · Read only</p>
       <Show
         when={
           props.event.teamProjection?.contributesToAvailability !== undefined

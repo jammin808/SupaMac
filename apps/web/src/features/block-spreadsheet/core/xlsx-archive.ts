@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { inflateSync, strFromU8 } from 'fflate';
 import {
   XLSX_MAX_BYTES,
@@ -210,7 +211,7 @@ export function xlsxFeatureWarnings(names: string[]): string[] {
       );
     if (/(^|\/)vbaProject\.bin$/i.test(name))
       warnings.add(
-        'VBA macros are not imported. Cells, formulas and formatting are; the macros do not run in Macro.'
+        `VBA macros are not imported. Cells, formulas and formatting are; the macros do not run in ${PRODUCT_NAME}.`
       );
     if (/^xl\/macrosheets\//i.test(name))
       warnings.add('Excel 4.0 macro sheets are not imported.');

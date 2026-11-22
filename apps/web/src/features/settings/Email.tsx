@@ -2,6 +2,7 @@ import {
   TurnOffCalendarDialog,
   type TurnOffCalendarTarget,
 } from '@app/features/calendar/components/TurnOffCalendarDialog';
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { toast } from '@core/component/Toast/Toast';
 import {
   ENABLE_INBOX_RESYNC,
@@ -266,7 +267,7 @@ export function EmailCard(props: { class?: string } = {}) {
                 ? 'Connect another Google Workspace account'
                 : 'Connect a Google Workspace account'
             }
-            description="Sync a Gmail or Google Workspace inbox into Macro Email."
+            description={`Sync a Gmail or Google Workspace inbox into ${PRODUCT_NAME} Email.`}
           >
             <ConnectAction
               label="Connect"
@@ -281,7 +282,7 @@ export function EmailCard(props: { class?: string } = {}) {
               icon={<OutlookIcon />}
               title="Connect an Outlook account"
               badge={<OutlookBetaBadge />}
-              description="Sync an Outlook.com or Microsoft 365 inbox into Macro Email."
+              description={`Sync an Outlook.com or Microsoft 365 inbox into ${PRODUCT_NAME} Email.`}
             >
               <ConnectAction
                 label="Connect"
@@ -325,8 +326,8 @@ export function EmailCard(props: { class?: string } = {}) {
                 }
               >
                 Remove <span class="text-ink">{removeTarget()?.email}</span>?
-                This clears all of its email data from Macro and cannot be
-                undone.
+                This clears all of its email data from {PRODUCT_NAME} and cannot
+                be undone.
               </Show>
             </Dialog.Description>
             <div class="pt-3 justify-end items-center gap-3 inline-flex">

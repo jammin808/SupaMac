@@ -56,7 +56,8 @@ import { SetupBanner, SetupStatus } from './SetupStatus';
 
 const CONNECT_DESCRIPTION =
   'Connect a Google or Microsoft account to show your calendar events.';
-const GRANT_DESCRIPTION = 'Grant calendar access to show your events in Macro.';
+const GRANT_DESCRIPTION =
+  'Grant calendar access to show your events in SupaMac.';
 
 // The calendar view puts the banner above the grid and the status over it.
 function renderSetup() {
@@ -241,7 +242,9 @@ describe('SetupStatus', () => {
         .getByText('Calendar for stopped@example.com stopped syncing')
     ).toBeTruthy();
     expect(
-      view.aboveGrid().getByText('Reconnect to show its events in Macro again.')
+      view
+        .aboveGrid()
+        .getByText('Reconnect to show its events in SupaMac again.')
     ).toBeTruthy();
     expect(view.grid().queryByRole('button')).toBeNull();
     await user.click(
@@ -310,7 +313,7 @@ describe('SetupStatus', () => {
       screen.getByText('Calendar for stopped@example.com stopped syncing')
     ).toBeTruthy();
     expect(
-      screen.getByText('Reconnect to show its events in Macro again.')
+      screen.getByText('Reconnect to show its events in SupaMac again.')
     ).toBeTruthy();
   });
 

@@ -2,7 +2,7 @@ import { createLazyMemo } from '@solid-primitives/memo';
 import { cleanup, fireEvent, render, screen } from '@solidjs/testing-library';
 import { createSignal } from 'solid-js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { Button } from './Button';
+import { Button, buttonClasses } from './Button';
 import { ButtonGroup } from './ButtonGroup';
 
 afterEach(cleanup);
@@ -86,5 +86,36 @@ describe('Button', () => {
     const independent = screen.getByRole('button', { name: 'Independent' });
     expect(independent.getAttribute('data-variant')).toBe('primary');
     expect(independent.getAttribute('data-size')).toBe('md');
+  });
+
+  // No stylesheet is loaded here, so the recipe stands in for the painted
+  // outline: every face keeps one and none hides it again.
+  it.each([
+    'primary',
+    'accent',
+    'secondary',
+    'outline',
+    'ghost',
+    'danger',
+    'danger-ghost',
+    'success',
+    'link',
+  ] as const)('keeps a keyboard focus outline on the %s variant', (variant) => {
+    for (const appearance of ['default', 'bare'] as const) {
+      const classes = buttonClasses({ variant, appearance }).split(' ');
+
+      expect(classes).toContain('focus-visible:outline-2');
+      expect(classes).toContain('focus-visible:outline-offset-2');
+      expect(classes).toContain('focus-visible:outline-button-focus');
+      expect(classes).not.toContain('focus-visible:outline-hidden');
+      expect(classes).not.toContain('focus-visible:outline-none');
+    }
+  });
+
+  it('keeps the outline when a caller only removes the resting one', () => {
+    const classes = buttonClasses({ class: 'outline-none' }).split(' ');
+
+    expect(classes).toContain('focus-visible:outline-2');
+    expect(classes).toContain('focus-visible:outline-solid');
   });
 });

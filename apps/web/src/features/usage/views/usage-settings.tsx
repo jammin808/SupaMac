@@ -1,3 +1,5 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
+import { SELF_HOSTED } from '@core/constant/servers';
 import { Button, cn } from '@ui';
 import { createSignal, Show } from 'solid-js';
 import {
@@ -106,7 +108,8 @@ export function UsageSettingsView(props: { context: UsageContext }) {
                     percentage={summary().monthlyPercent}
                     periodEnd={summary().periodEnd}
                     unlimited={summary().unlimited}
-                    onInfo={() => setInfoOpen(true)}
+                    // The explanation points at paid plans and credits.
+                    onInfo={SELF_HOSTED ? undefined : () => setInfoOpen(true)}
                     infoButtonRef={(button) => {
                       infoTrigger = button;
                     }}
@@ -124,8 +127,11 @@ export function UsageSettingsView(props: { context: UsageContext }) {
                   </Show>
                 </div>
               </SettingsCard>
+              {/* A self-hosted instance sells no plan and no credits: its
+                  Usage page is the meter alone. */}
               <Show
                 when={
+                  !SELF_HOSTED &&
                   summary().billingAccess === 'free' &&
                   !props.context.autoReload.preview()
                 }
@@ -147,9 +153,10 @@ export function UsageSettingsView(props: { context: UsageContext }) {
               </Show>
               <Show
                 when={
-                  (!summary().unlimited &&
+                  !SELF_HOSTED &&
+                  ((!summary().unlimited &&
                     summary().billingAccess !== 'free') ||
-                  props.context.autoReload.preview()
+                    props.context.autoReload.preview())
                 }
               >
                 <SettingsSection
@@ -164,7 +171,7 @@ export function UsageSettingsView(props: { context: UsageContext }) {
                       ? undefined
                       : summary().creditScope === 'team'
                         ? 'Credits are shared by your entire team.'
-                        : 'Buy credits or turn on automatic reload to continue using Macro AI when you reach usage limits'
+                        : `Buy credits or turn on automatic reload to continue using ${PRODUCT_NAME} AI when you reach usage limits`
                   }
                 >
                   <Show

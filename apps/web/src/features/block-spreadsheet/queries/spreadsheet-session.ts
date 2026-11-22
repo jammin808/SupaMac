@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { fireAndForget } from '@core/util/fireAndForget';
 import { createAwareness } from '@macro-inc/collaboration/collab/awareness';
 import type { Chatter } from '@macro-inc/collaboration/collab/chatter';
@@ -191,7 +192,7 @@ export function createSpreadsheetSession(
     const version = manager.doc.getMap('spreadsheetMeta').get('formatVersion');
     if (version !== undefined && version !== SPREADSHEET_FORMAT_VERSION) {
       setError(
-        'This spreadsheet uses a newer format. Update Macro to open it.'
+        `This spreadsheet uses a newer format. Update ${PRODUCT_NAME} to open it.`
       );
       return;
     }

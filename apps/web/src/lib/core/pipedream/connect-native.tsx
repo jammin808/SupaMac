@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { fireAndForget } from '@core/util/fireAndForget';
 import { getWebOrigin } from '@core/util/webOrigin';
 import { invoke } from '@tauri-apps/api/core';
@@ -47,8 +48,9 @@ export function openNativePipedreamConnectUI(
         <div class="flex flex-col gap-4 p-6 bg-panel text-ink rounded-lg">
           <Dialog.Title>Finish connecting in your browser</Dialog.Title>
           <Dialog.Description>
-            Authorize the connection in your browser, then come back here. If
-            Macro did not pick it up, choose Done and Macro will check for it.
+            Authorize the connection in your browser, then come back here. If{' '}
+            {PRODUCT_NAME} did not pick it up, choose Done and {PRODUCT_NAME}{' '}
+            will check for it.
           </Dialog.Description>
           <Show when={openFailed()}>
             <p role="alert">

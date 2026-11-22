@@ -1,5 +1,4 @@
 import { ListSkeleton } from '@app/components/view-shell/ListSkeleton';
-import { InlineTitleEditor } from '@core/component/InlineTitleEditor';
 import { formatDateAndTime, formatRelativeTimestamp } from '@entity';
 import ContactIcon from '@icon/system/regular/address-book.svg';
 import ClockIcon from '@icon/system/regular/clock.svg';
@@ -10,6 +9,7 @@ import { useCrmContext } from '../context/crm-context';
 import type { CrmContact as CrmContactResponse } from '../core/contact';
 import { ContactCompanyField, ContactEmailField } from './contact-properties';
 import { ContactVisibilityButton } from './contact-visibility-button';
+import { RecordTitle } from './record-title';
 import { useSetContactNameMutation } from './use-crm';
 
 // Renames overwrite `crm_contacts.name`, which is already team-scoped —
@@ -17,19 +17,22 @@ import { useSetContactNameMutation } from './use-crm';
 function TitleEditor(props: { contact: CrmContactResponse }) {
   const renameMutation = useSetContactNameMutation();
   return (
-    <InlineTitleEditor
+    <RecordTitle
+      recordId={props.contact.id}
       // Nameless contacts display their email; committing it unchanged
       // is a no-op rather than a save.
       value={props.contact.name ?? props.contact.email ?? ''}
       placeholder="Contact"
       ariaLabel="Contact name"
-      class="w-full text-2xl"
-      onRename={(name) =>
-        renameMutation.mutate({
-          contactId: props.contact.id,
-          companyId: props.contact.companyId,
-          name,
-        })
+      rename={(name, onError) =>
+        renameMutation.mutate(
+          {
+            contactId: props.contact.id,
+            companyId: props.contact.companyId,
+            name,
+          },
+          { onError }
+        )
       }
     />
   );

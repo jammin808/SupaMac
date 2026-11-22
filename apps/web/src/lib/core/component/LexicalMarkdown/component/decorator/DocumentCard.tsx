@@ -1,6 +1,7 @@
 import { WEB_BASE_PATH } from '@app/constants/routerBase';
 import { pollBodyHeight } from '@app/features/block-form/core/poll-card-layout';
 import { openChatWithAgent } from '@app/features/chat/ChatWithAgentButton';
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { globalSplitManager } from '@app/signal/splitLayout';
 import { URL_PARAMS as CHANNEL_PARAMS } from '@block-channel/constants';
 import { isInBlock, type PreviewState, useMaybeBlockName } from '@core/block';
@@ -637,7 +638,7 @@ function DocumentCardInner(props: DocumentCardDecoratorProps) {
                 <Show when={canOpenInChat()}>
                   <Dropdown.Item onSelect={handleOpenInChat}>
                     <Sparkle class="size-4 shrink-0" />
-                    <span class="flex-1 truncate">Ask Macro</span>
+                    <span class="flex-1 truncate">Ask {PRODUCT_NAME}</span>
                   </Dropdown.Item>
                 </Show>
                 <Dropdown.CopyItem

@@ -1,5 +1,6 @@
 import { VIEW_SHELL_TOUR } from '@app/components/view-shell/tour';
 import { defineViewTour } from '@app/features/tours/core/view-tour';
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 
 export const documentsTour = defineViewTour({
   id: 'documents',
@@ -12,8 +13,7 @@ export const documentsTour = defineViewTour({
       entry: VIEW_SHELL_TOUR.sidebarToggle,
       entryLabel: 'Show the Documents sidebar to continue',
       title: 'A place for your ideas',
-      description:
-        'Create a document or bring your existing files into Macro. Search and filter to find them again.',
+      description: `Create a document or bring your existing files into ${PRODUCT_NAME}. Search and filter to find them again.`,
     },
     {
       target: VIEW_SHELL_TOUR.main,

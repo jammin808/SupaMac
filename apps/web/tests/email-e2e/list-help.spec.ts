@@ -28,11 +28,11 @@ for (const provider of PROVIDERS) {
       const agenda = await mailbox.synced('Agenda');
       const list = page.getByRole('grid', { name: 'Email' });
       const tutorial = list.getByRole('button', {
-        name: /Learn how to use Macro Mail/,
+        name: /Learn how to use SupaMac Mail/,
       });
       const views = page.getByRole('radiogroup', { name: 'Inbox view' });
       const video = page.getByRole('dialog', {
-        name: 'Learn how to use Macro Mail',
+        name: 'Learn how to use SupaMac Mail',
       });
 
       await mailbox.open();
@@ -50,7 +50,9 @@ for (const provider of PROVIDERS) {
       did('AL-101');
       await expect(video).toBeVisible();
       await expect(
-        video.getByRole('button', { name: /^Play Learn how to use Macro Mail/ })
+        video.getByRole('button', {
+          name: /^Play Learn how to use SupaMac Mail/,
+        })
       ).toBeVisible();
       saw('STL-974');
       await video.getByRole('button', { name: 'Close video' }).click();

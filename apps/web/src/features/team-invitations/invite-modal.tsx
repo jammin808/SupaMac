@@ -1,5 +1,7 @@
 import { WEB_BASE_PATH } from '@app/constants/routerBase';
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { toast } from '@core/component/Toast/Toast';
+import { SELF_HOSTED } from '@core/constant/servers';
 import { useReferralCode } from '@core/context/user';
 import { getWebOrigin } from '@core/util/webOrigin';
 import ClipboardIcon from '@icon/system/regular/clipboard.svg';
@@ -21,6 +23,9 @@ const [inviteModalOpen, setInviteModalOpen] = createSignal(false);
 export { setInviteModalOpen };
 
 export const InviteModal = () => {
+  // A self-hosted instance has no referral credit to offer.
+  if (SELF_HOSTED) return null;
+
   const [value, setValue] = createSignal('');
   const [copied, setCopied] = createSignal(false);
   const sendInvites = useSendReferralInvitesMutation();
@@ -75,8 +80,8 @@ export const InviteModal = () => {
 
         <Panel.Body scroll class="p-3 flex flex-col gap-3">
           <p>
-            Invite friends and teammates to Macro. You'll get $10 of AI credit
-            for each person who signs up.
+            Invite friends and teammates to {PRODUCT_NAME}. You'll get $10 of AI
+            credit for each person who signs up.
           </p>
           <div class="flex flex-col gap-2">
             <textarea

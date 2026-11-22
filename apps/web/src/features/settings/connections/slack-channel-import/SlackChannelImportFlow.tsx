@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { SLACK_CONNECT_SLUG } from '@core/pipedream/slugs';
 import { fireAndForget } from '@core/util/fireAndForget';
 import { connectPipedreamApp } from '@queries/pipedream-connectors';
@@ -45,7 +46,7 @@ export function SlackChannelImportFlow(props: {
   return (
     <SettingsPage
       title="Import channels without history"
-      description="Copy public channel names and matching teammates into Macro. Messages stay in Slack; channels do not sync."
+      description={`Copy public channel names and matching teammates into ${PRODUCT_NAME}. Messages stay in Slack; channels do not sync.`}
       onBack={props.onBack}
       backLabel="Connections"
     >

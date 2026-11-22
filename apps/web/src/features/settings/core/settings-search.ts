@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import type { SettingsTab } from '@core/constant/SettingsState';
 import type {
   SettingsTabGroup,
@@ -340,7 +341,7 @@ const SETTINGS: Setting[] = [
   },
   {
     tab: 'Agent',
-    title: 'Connect to the Macro MCP server',
+    title: `Connect to the ${PRODUCT_NAME} MCP server`,
     keywords: 'claude chatgpt external client url setup',
   },
   {

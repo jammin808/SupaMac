@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { match } from 'ts-pattern';
 
 /**
@@ -11,7 +12,7 @@ export function ssoFallbackNotice(error: string | undefined) {
     .with(
       'admin_consent_required',
       () =>
-        'Your organization needs an admin to approve Macro. Continue with your email instead.'
+        `Your organization needs an admin to approve ${PRODUCT_NAME}. Continue with your email instead.`
     )
     .with(
       'cancelled',

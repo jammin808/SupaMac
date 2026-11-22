@@ -125,6 +125,31 @@ describe('Macro calendar call links', () => {
     };
     expect(removeCalendarMacroCall(content, URL)).toEqual(content);
   });
+
+  it('writes the join line under the label the calendar service strips, and clears either wording', () => {
+    const attached = attachCalendarMacroCall(
+      { description: '', location: '' },
+      URL
+    );
+    // The service leaves this paragraph out of shares by its exact label
+    // (JOIN_LINE_LABEL in crates/calendar_events/src/domain/meeting_links.rs).
+    expect(attached.description).toBe(
+      `<p>Join SupaMac call: <a href="${URL}">${URL}</a></p>`
+    );
+    expect(removeCalendarMacroCall(attached, URL).description).toBe('');
+
+    // The hosted product's wording, which stored events carry, is generated
+    // text too.
+    expect(
+      removeCalendarMacroCall(
+        {
+          description: `<p>Notes</p><p>join macro call: ${URL}</p>`,
+          location: '',
+        },
+        URL
+      ).description
+    ).toBe('<p>Notes</p>');
+  });
 });
 
 // A deployment served from its own host and folder shares meeting links under

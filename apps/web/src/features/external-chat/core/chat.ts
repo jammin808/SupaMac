@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import type { ExternalChatProvider } from '@service-storage/generated/schemas/externalChatProvider';
 import type { ExternalChatReplyBlock } from '@service-storage/generated/schemas/externalChatReplyBlock';
 import { match, P } from 'ts-pattern';
@@ -262,8 +263,8 @@ export function disappearingNote(chat: ChatDetail): string | undefined {
   const { label } = chatProvider(chat.provider);
   const timer = disappearingLabel(String(chat.disappearingSeconds));
   return timer
-    ? `Disappearing messages are on in ${label} (${timer}). Macro keeps them.`
-    : `Disappearing messages are on in ${label}. Macro keeps them.`;
+    ? `Disappearing messages are on in ${label} (${timer}). ${PRODUCT_NAME} keeps them.`
+    : `Disappearing messages are on in ${label}. ${PRODUCT_NAME} keeps them.`;
 }
 
 /** Shown above the oldest message once the import stopped at its limit. */

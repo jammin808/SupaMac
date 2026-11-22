@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { canonicalPipedreamSlug } from '@core/pipedream/slugs';
 import { fireAndForget } from '@core/util/fireAndForget';
 import SearchIcon from '@icon/system/regular/magnifying-glass.svg';
@@ -97,7 +98,8 @@ export function ToolsStep(props: { onContinue: () => void }) {
           }
         >
           <p class="py-4 text-center text-sm text-ink-muted">
-            GitHub account linked. Choose repositories to sync with Macro.{' '}
+            GitHub account linked. Choose repositories to sync with{' '}
+            {PRODUCT_NAME}.{' '}
             <button
               type="button"
               class="underline"

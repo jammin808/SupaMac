@@ -152,7 +152,7 @@ describe('message sender normalization', () => {
     expect(getBotDisplayName(message.sender_id, message.sender)).toBe(
       'Claude Code'
     );
-    expect(getBotDisplayName(MACRO_AGENT_PRINCIPAL_ID)).toBe('Macro');
+    expect(getBotDisplayName(MACRO_AGENT_PRINCIPAL_ID)).toBe('SupaMac');
   });
 
   it('uses a generic label rather than exposing an unknown bot UUID', () => {

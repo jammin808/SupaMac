@@ -16,6 +16,7 @@ import { calendarMentionOpen } from '@app/features/calendar-view/mention-open-ta
 import { openCalendarEventSplit } from '@app/features/calendar-view/open-calendar-event';
 import { CALENDAR_VIEW_ID } from '@app/features/calendar-view/types';
 import { openChatWithAgent } from '@app/features/chat/ChatWithAgentButton';
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { globalSplitManager } from '@app/signal/splitLayout';
 import { URL_PARAMS as URL_PARAMS_CANVAS } from '@block-canvas/constants';
 import { URL_PARAMS as CHANNEL_PARAMS } from '@block-channel/constants';
@@ -450,7 +451,7 @@ function CalendarEventPreviewDetails(props: {
                 props.onJoin?.();
               }}
             >
-              Join Macro call
+              Join {PRODUCT_NAME} call
               <ArrowSquareOutIcon class="size-3.5 shrink-0" />
             </Button>
           </MetadataInfo>
@@ -910,7 +911,7 @@ export function DocumentPreviewContent(props: DocumentPreviewContentProps) {
             <Show when={canOpenInChat()}>
               <Dropdown.Item onSelect={handleOpenInChat}>
                 <SparkleIcon class="size-4" />
-                Ask Macro
+                Ask {PRODUCT_NAME}
               </Dropdown.Item>
             </Show>
             <Dropdown.CopyItem

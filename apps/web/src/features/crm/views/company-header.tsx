@@ -1,6 +1,5 @@
 import { ListSkeleton } from '@app/components/view-shell/ListSkeleton';
 import { EntityIcon } from '@core/component/EntityIcon';
-import { InlineTitleEditor } from '@core/component/InlineTitleEditor';
 import {
   type CrmCompanyEntity,
   formatDateAndTime,
@@ -13,6 +12,7 @@ import { Badge, Tooltip } from '@ui';
 import { createEffect, createSignal, For, onMount, Show } from 'solid-js';
 import { AddToPipeline } from '../add-to-pipeline';
 import { CompanyVisibilityButton } from './company-visibility-button';
+import { RecordTitle } from './record-title';
 import { useSetCompanyNameMutation } from './use-crm';
 
 function Description(props: { text: string }) {
@@ -61,13 +61,16 @@ function Description(props: { text: string }) {
 function TitleEditor(props: { company: CrmCompanyEntity }) {
   const renameMutation = useSetCompanyNameMutation();
   return (
-    <InlineTitleEditor
+    <RecordTitle
+      recordId={props.company.id}
       value={props.company.name}
       placeholder="Company"
       ariaLabel="Company name"
-      class="w-full text-2xl"
-      onRename={(name) =>
-        renameMutation.mutate({ companyId: props.company.id, name })
+      rename={(name, onError) =>
+        renameMutation.mutate(
+          { companyId: props.company.id, name },
+          { onError }
+        )
       }
     />
   );
@@ -120,7 +123,7 @@ export function CompanyHeader(props: { company?: CrmCompanyEntity }) {
               {(domain) => (
                 <Badge variant="ghost" size="sm">
                   <GlobeIcon class="size-3" />
-                  {domain.domain}
+                  <span class="select-text">{domain.domain}</span>
                 </Badge>
               )}
             </For>

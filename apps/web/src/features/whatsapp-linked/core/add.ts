@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { match } from 'ts-pattern';
 import { type CannotAdd, cannotAddMessage } from './chat';
 
@@ -31,7 +32,10 @@ export function addFailureMessage(failure: AddRefusal): string {
         "Your WhatsApp isn't allowed to add this chat. Check that you're still in it."
     )
     .with({ reason: 'gone' }, () => 'This chat is no longer on your WhatsApp.')
-    .with({ reason: 'already-added' }, () => 'This chat is already in Macro.')
+    .with(
+      { reason: 'already-added' },
+      () => `This chat is already in ${PRODUCT_NAME}.`
+    )
     .with(
       { reason: 'disconnected' },
       () => 'Your WhatsApp is disconnected. Reconnect it, then add the chat.'
@@ -43,12 +47,13 @@ export function addFailureMessage(failure: AddRefusal): string {
     .with({ reason: 'cannot-add' }, ({ why }) => `${cannotAddMessage(why)}.`)
     .with(
       { reason: 'busy' },
-      () => 'Macro is catching up with your WhatsApp. Try again in a moment.'
+      () =>
+        `${PRODUCT_NAME} is catching up with your WhatsApp. Try again in a moment.`
     )
     .with(
       { reason: 'server-error' },
       () =>
-        'Macro hit an error adding this chat. If it keeps happening, tell us.'
+        `${PRODUCT_NAME} hit an error adding this chat. If it keeps happening, tell us.`
     )
     .with(
       { reason: 'unavailable' },
@@ -60,11 +65,13 @@ export function addFailureMessage(failure: AddRefusal): string {
     )
     .with(
       { reason: 'signed-out' },
-      () => 'Your Macro session expired. Sign in again to add this chat.'
+      () =>
+        `Your ${PRODUCT_NAME} session expired. Sign in again to add this chat.`
     )
     .with(
       { reason: 'unreachable' },
-      () => "Couldn't reach Macro. Check your connection and try again."
+      () =>
+        `Couldn't reach ${PRODUCT_NAME}. Check your connection and try again.`
     )
     .exhaustive();
 }

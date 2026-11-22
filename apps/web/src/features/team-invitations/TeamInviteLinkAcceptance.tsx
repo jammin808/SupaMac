@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { LoadingBlock } from '@core/component/LoadingBlock';
 import { toast } from '@core/component/Toast/Toast';
 import { thrownResultErrorHasCode } from '@core/util/result';
@@ -75,7 +76,7 @@ export function TeamInviteLinkAcceptance(props: { token: string }) {
             </h2>
             <p class="text-sm text-ink-muted">
               You've been invited to join{' '}
-              <span class="text-ink">{teamName()}</span> on Macro.
+              <span class="text-ink">{teamName()}</span> on {PRODUCT_NAME}.
             </p>
           </div>
           <Button

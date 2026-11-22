@@ -45,6 +45,10 @@ Add one `defineFlag` next to its neighbors. Do not add `ENABLE_*_FLAG` /
   invert at the call site (`!isFeatureEnabled(disableX)`).
 - Env-only exports that are used as `if (ENABLE_FOO)` must be the boolean:
   `defineFlag({ env, default }).enabled`. The object is always truthy.
+- Give every new flag its value and a one-line reason in
+  `apps/web/self-hosted-flags.ts`, the feature set of a self-hosted bundle,
+  which has no PostHog project; `apps/web/scripts/self-hosted-flags.test.ts`
+  fails until it has one.
 
 ```ts
 export const enableFoo = defineFlag({

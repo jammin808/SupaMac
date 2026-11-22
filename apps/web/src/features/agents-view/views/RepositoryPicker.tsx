@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { MobileDrawer } from '@components/app/mobile/MobileDrawer';
 import { isTouchDevice } from '@core/mobile/isTouchDevice';
 import CaretDownIcon from '@icon/system/regular/caret-down.svg';
@@ -309,8 +310,8 @@ export function RepositoryPicker(props: {
             </Match>
             <Match when={nothingReachable()}>
               <div class="flex flex-col gap-2 px-2 py-2 text-xs text-ink-muted">
-                No repositories yet. Give Macro's GitHub App access to the
-                repositories your coders should work on.
+                No repositories yet. Give {PRODUCT_NAME}'s GitHub App access to
+                the repositories your coders should work on.
                 <Show when={props.onConnectGitHub}>
                   <Button
                     variant="secondary"

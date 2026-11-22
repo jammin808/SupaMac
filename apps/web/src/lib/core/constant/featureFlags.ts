@@ -464,7 +464,12 @@ export const ENABLE_GRAPHQL_BACKFILL = defineFlag({
   default: true,
 }).enabled;
 
-export const ENABLE_CALLS = true;
+// Calls need a media server beside the backend; a deployment without one
+// builds with VITE_ENABLE_CALLS=false.
+export const ENABLE_CALLS = defineFlag({
+  env: 'ENABLE_CALLS',
+  default: true,
+}).enabled;
 
 // Emergency stop for CRM contact results in @ mentions and Command K/mobile
 // name searches. Companies and Macro users remain searchable. Off until
@@ -562,8 +567,37 @@ export const enableMicrosoftSignup = defineFlag({
   default: onInDev,
 });
 
+// The ways to sign in to a self-hosted instance besides the emailed code. Each
+// needs something its owner sets up first (an OAuth client, an identity
+// provider, an account with a password), so each stays off there until its
+// variable turns it on. Only a self-hosted bundle reads these; every other
+// build offers its sign-in methods whatever they say
+// (`features/auth/sign-in-methods`). Microsoft is `enableMicrosoftSignup`
+// above in every build.
+export const ENABLE_GOOGLE_SIGN_IN = defineFlag({
+  env: 'ENABLE_GOOGLE_SIGN_IN',
+  default: false,
+}).enabled;
+
+export const ENABLE_APPLE_SIGN_IN = defineFlag({
+  env: 'ENABLE_APPLE_SIGN_IN',
+  default: false,
+}).enabled;
+
+export const ENABLE_PASSWORD_SIGN_IN = defineFlag({
+  env: 'ENABLE_PASSWORD_SIGN_IN',
+  default: false,
+}).enabled;
+
+// An address whose domain signs in through its organization's identity provider.
+export const ENABLE_DOMAIN_SSO_SIGN_IN = defineFlag({
+  env: 'ENABLE_DOMAIN_SSO_SIGN_IN',
+  default: false,
+}).enabled;
+
 export const enableSoupGroupBy = defineFlag({
   key: 'enable-soup-group-by',
+  env: 'ENABLE_SOUP_GROUP_BY',
   default: onInDev,
 });
 
@@ -981,6 +1015,18 @@ export const enableInAppTours = defineFlag({
   key: 'enable-in-app-tours',
   env: 'ENABLE_IN_APP_TOURS',
 });
+
+/**
+ * The "Watch tutorial" entries of the app views (`features/video-tutorials`).
+ * Their videos are recordings of the hosted product under its own name,
+ * published beside the bundle in `web-hosted/`. A deployment under another
+ * name, or one published without that folder, builds with
+ * VITE_ENABLE_VIDEO_TUTORIALS=false.
+ */
+export const ENABLE_VIDEO_TUTORIALS = defineFlag({
+  env: 'ENABLE_VIDEO_TUTORIALS',
+  default: true,
+}).enabled;
 
 /**
  * Personal WhatsApp linked devices: the External tab, pairing, adding chats

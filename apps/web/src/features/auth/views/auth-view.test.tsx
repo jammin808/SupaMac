@@ -20,6 +20,9 @@ function setup(
     token?: string;
     ssoFallbackNotice?: string;
     signupJourney?: (slots: SignupJourneySlots) => ReturnType<typeof Journey>;
+    /** Off on a self-hosted instance with no Google sign-in. */
+    showGoogle?: boolean;
+    showMicrosoft?: boolean;
   } = {}
 ) {
   const verified = vi.fn();
@@ -28,6 +31,8 @@ function setup(
     () => (
       <AuthView
         intent={options.intent ?? 'login'}
+        showGoogle={options.showGoogle ?? true}
+        showMicrosoft={options.showMicrosoft}
         showApple={false}
         compact={false}
         initialEmail={options.initialEmail}
@@ -62,6 +67,7 @@ function setupWithTokenSignal(
     () => (
       <AuthView
         intent="login"
+        showGoogle
         showApple={false}
         compact={false}
         token={token()}
@@ -87,6 +93,14 @@ const typeEmail = async (value: string) =>
   fireEvent.input(await screen.findByPlaceholderText('you@company.com'), {
     target: { value },
   });
+/** The sign-in card's email field, once it is on screen. */
+const emailField = () =>
+  waitFor(() => {
+    const field = document.querySelector('input[type="email"]');
+    expect(field).not.toBeNull();
+    return field;
+  });
+
 const typeCode = async (value: string) =>
   fireEvent.input(await screen.findByLabelText(/code/i), {
     target: { value },
@@ -446,6 +460,7 @@ describe('desktop sign-up', () => {
       () => (
         <AuthView
           intent="signup"
+          showGoogle
           showApple={false}
           compact={false}
           signupJourney={(slots) => <Journey {...slots} />}
@@ -463,6 +478,61 @@ describe('desktop sign-up', () => {
     await vi.advanceTimersByTimeAsync(300);
     await screen.findByRole('button', { name: 'Connect work email' });
     expect(screen.queryByTestId('pending')).toBeNull();
+  });
+});
+
+describe('where no Google sign-in is set up', () => {
+  it('offers the other providers and the emailed code, not Google', async () => {
+    const { fake } = setup({ showGoogle: false, showMicrosoft: true });
+
+    expect(
+      screen.queryByRole('button', { name: 'Continue with Google' })
+    ).toBeNull();
+    expect(
+      screen.getByRole('button', { name: 'Continue with email' })
+    ).toBeTruthy();
+
+    click('Continue with Microsoft');
+    await waitFor(() => expect(fake.calls()).toContain('sso:microsoft:login'));
+  });
+
+  it('opens on the email step when the emailed code is the only way in', async () => {
+    const { fake } = setup({ showGoogle: false });
+
+    await typeEmail('returning@example.com');
+    expect(screen.queryByRole('button', { name: /Continue with/ })).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: 'Back to sign in' })
+    ).toBeNull();
+
+    click('Continue');
+    await typeCode('424242');
+    await screen.findByTestId('signed-in');
+    expect(fake.calls()).not.toContain('sso:google:login');
+  });
+
+  it('returns from the code to the email step, which has nowhere further back', async () => {
+    setup({ showGoogle: false });
+
+    await typeEmail('returning@example.com');
+    click('Continue');
+    await screen.findByText('returning@example.com');
+    click('Change email');
+
+    await emailField();
+    expect(
+      screen.queryByRole('button', { name: 'Back to sign in' })
+    ).toBeNull();
+  });
+
+  it('leaves the line about a Google account off the agent signup page', async () => {
+    setup({ intent: 'agent-signup', showGoogle: false });
+
+    await emailField();
+    expect(
+      screen.getByRole('heading', { name: 'Sign up as an agent' })
+    ).toBeTruthy();
+    expect(screen.queryByText(/Google account/)).toBeNull();
   });
 });
 

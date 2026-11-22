@@ -5,6 +5,7 @@ type LoadState = 'loaded' | 'failing' | 'hanging';
 const german = {
   default: {
     common: { cancel: 'Abbrechen' },
+    nav: { updateNativeDescription: 'Macro neu starten' },
     entityActions: {
       toastCopiedCount: {
         one: '{{count}} Element kopiert',
@@ -101,6 +102,21 @@ describe('plural messages', () => {
     expect(i18n.t('entityActions.toastCopiedCount', { count: 1234 })).toBe(
       '1.234 Elemente kopiert'
     );
+  });
+});
+
+describe('the product name', () => {
+  it('stands in for the catalog name, in English and in a translation', async () => {
+    const i18n = await startInBrowser(['en-US']);
+    expect(i18n.t('channelComposer.askMacro')).toBe('Ask SupaMac');
+    expect(i18n.t('settingsMobileApp.appStorePrompt')).toBe(
+      'Download Macro on the App Store'
+    );
+
+    i18n.setInterfaceLanguage('de');
+    await i18n.interfaceLanguageReady(5000);
+    expect(i18n.t('nav.updateNativeDescription')).toBe('SupaMac neu starten');
+    expect(i18n.t('channelComposer.askMacro')).toBe('Ask SupaMac');
   });
 });
 

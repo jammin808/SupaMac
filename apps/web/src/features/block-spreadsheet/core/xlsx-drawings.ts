@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import {
   type ChartGrouping,
   type ChartKind,
@@ -95,7 +96,7 @@ function importImage(
   if (!bytes) key = undefined;
   else if (!type)
     warnings.add(
-      'Images in formats Macro cannot read, such as TIFF, are not imported.'
+      `Images in formats ${PRODUCT_NAME} cannot read, such as TIFF, are not imported.`
     );
   else if (
     bytes.length > MAX_IMAGE_BYTES ||

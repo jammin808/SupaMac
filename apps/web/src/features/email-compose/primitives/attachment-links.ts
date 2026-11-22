@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { getUploadFileSize } from '@core/mobile/nativeStagedUpload';
 import {
   $createDocumentMentionNode,
@@ -101,8 +102,8 @@ export function createAttachmentLinkOffer(options: {
       const confirmed = await options.notices.confirm({
         title: `Attachments exceed ${limitLabel}`,
         body: single
-          ? `"${files[0].name}" won't fit as an attachment. Upload it to Macro and share a view-only link instead?`
-          : `${files.length} files won't fit as attachments. Upload them to Macro and share view-only links instead?`,
+          ? `"${files[0].name}" won't fit as an attachment. Upload it to ${PRODUCT_NAME} and share a view-only link instead?`
+          : `${files.length} files won't fit as attachments. Upload them to ${PRODUCT_NAME} and share view-only links instead?`,
         confirmLabel: single ? 'Share link' : 'Share links',
       });
       span.setAttr('email.attachment_links.confirmed', confirmed);

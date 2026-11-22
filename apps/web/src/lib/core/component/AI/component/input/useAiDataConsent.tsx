@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { useAiDataConsent } from '@core/context/user';
 import CloseIcon from '@icon/system/regular/x.svg';
 import { invalidateUserInfo } from '@queries/auth/user-info';
@@ -57,8 +58,8 @@ export function useAiDataConsentGate() {
             <div class="p-3">
               <p class="text-ink-muted text-sm">
                 AI Chat sends your messages to Anthropic for processing and may
-                access your files in Macro to provide relevant responses. Your
-                data is not retained or used for training.
+                access your files in {PRODUCT_NAME} to provide relevant
+                responses. Your data is not retained or used for training.
               </p>
               <div class="flex justify-end mt-4 gap-2">
                 <Button variant="ghost" onClick={denyConsent}>

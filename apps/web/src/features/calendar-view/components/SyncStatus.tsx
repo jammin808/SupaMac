@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import SpinnerIcon from '@icon/system/regular/spinner-gap.svg';
 import { Show } from 'solid-js';
 
@@ -15,8 +16,8 @@ export function SyncStatus(props: { syncing: boolean }) {
             Syncing your calendar…
           </span>
           <span class="text-xs text-ink-muted">
-            Events are being imported. This may take a while. You can keep using
-            Macro as normal.
+            Events are being imported. This may take a while. You can keep using{' '}
+            {PRODUCT_NAME} as normal.
           </span>
         </div>
       </div>

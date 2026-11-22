@@ -1,5 +1,6 @@
 import { useAgentDmRecipients } from '@app/features/agent-dms/agent-dm-recipients';
 import { selectConversationRecipients } from '@app/features/agent-dms/core/personas';
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { channelListName } from '@channel/group-chat-name';
 import { buildPostMessageRequest, type InputSnapshot } from '@channel/Input';
 import { DraftComposer } from '@channel/Input/DraftComposer';
@@ -258,7 +259,7 @@ export function ChannelCompose() {
               placeholder={
                 ENABLE_AGENT_DMS
                   ? 'To: People, agents, channels, or email addresses'
-                  : 'To: Macro users, channels, or email addresses'
+                  : `To: ${PRODUCT_NAME} users, channels, or email addresses`
               }
               triedToSubmit={triedToSubmit}
               focusOnMount
@@ -267,10 +268,11 @@ export function ChannelCompose() {
             <div class="mt-6 p-3 flex flex-row items-center border border-edge-muted text-ink-placeholder rounded-md">
               <InfoIcon class="shrink-0 size-8 mr-4 fill-edge" />
               <p class="text-xs">
-                Send a Macro message to anyone. Share your files, tasks, emails;
-                you can <code>@mention</code> anything. If your message
-                recipient is not already a Macro user, they will receive an
-                email letting them know they received a message on Macro.
+                Send a {PRODUCT_NAME} message to anyone. Share your files,
+                tasks, emails; you can <code>@mention</code> anything. If your
+                message recipient is not already a {PRODUCT_NAME} user, they
+                will receive an email letting them know they received a message
+                on {PRODUCT_NAME}.
               </p>
             </div>
           </div>

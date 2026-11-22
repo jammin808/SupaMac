@@ -260,7 +260,7 @@ for (const provider of PROVIDERS) {
       ).toBeVisible();
       await expect(
         offer.getByText(
-          '"survey.txt" won\'t fit as an attachment. Upload it to Macro and share a view-only link instead?'
+          '"survey.txt" won\'t fit as an attachment. Upload it to SupaMac and share a view-only link instead?'
         )
       ).toBeVisible();
       await expect(

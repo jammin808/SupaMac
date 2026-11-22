@@ -82,6 +82,7 @@ maybe_env_var! {
         McpCredentialsKeySecretName,
         PosthogApiKey,
         PosthogHost,
+        DevDangerousPrivateMcpAddresses,
     }
 }
 
@@ -176,6 +177,9 @@ pub fn build_cognition_tool_context() -> anyhow::Result<crate::ToolCognitionTool
 /// - `ENABLE_GMAIL_OPS_QUEUE` (if disabled, thread-label updates can't enqueue Gmail sync ops)
 /// - `ENABLE_NOTIFICATION_QUEUE` (if disabled, notification status updates skip push clearing)
 ///
+/// `DEV_DANGEROUS_PRIVATE_MCP_ADDRESSES=true` lets the import selector's MCP
+/// client reach private addresses; it is refused outside the local environment.
+///
 /// `ATTACHMENT_BUCKET` (the email service's draft attachment bucket) is
 /// optional; without it `SendEmail` refuses attachments but still sends.
 ///
@@ -257,6 +261,12 @@ pub async fn build_tool_service_context_from_env(
         .unwrap_or(false);
     let enable_notification_queue = maybe_env
         .enable_notification_queue
+        .as_ref()
+        .and_then(|v| v.value())
+        .and_then(|v| v.parse::<bool>().ok())
+        .unwrap_or(false);
+    let private_mcp_addresses = maybe_env
+        .dev_dangerous_private_mcp_addresses
         .as_ref()
         .and_then(|v| v.value())
         .and_then(|v| v.parse::<bool>().ok())
@@ -664,7 +674,10 @@ pub async fn build_tool_service_context_from_env(
         let mcp_selector = Arc::new(mcp_select::McpToolSelector::new(
             native_servers.clone(),
             mcp_client::outbound::guarded_http::McpHttp::new(
-                mcp_client::outbound::guarded_http::AddressPolicy::for_environment(environment),
+                mcp_client::outbound::guarded_http::AddressPolicy::for_opt_in(
+                    environment,
+                    private_mcp_addresses,
+                )?,
             )?,
             pipedream_connections.clone(),
             Arc::new(pipedream_client.clone()),

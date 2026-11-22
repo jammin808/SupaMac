@@ -78,7 +78,7 @@ function mixColors(
 }
 
 /** Resolve authored expressions without involving the application's DOM. */
-function resolveGraph(tokens: ThemeColorTokens) {
+export function resolveGraph(tokens: ThemeColorTokens) {
   const colors = new Map<string, Color | null>();
   const visiting = new Set<string>();
   const resolve = (token: string): Color | null => {

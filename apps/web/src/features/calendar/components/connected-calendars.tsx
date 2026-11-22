@@ -4,6 +4,7 @@ import {
   SettingsRow,
   SettingsSection,
 } from '@app/features/settings/primitives';
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import PlusIcon from '@icon/system/regular/plus.svg';
 import { Checkbox, ToggleSwitch } from '@ui';
 import { Index, Show } from 'solid-js';
@@ -49,7 +50,7 @@ export function ConnectedCalendars(props: {
   return (
     <SettingsSection
       title="Connected calendars"
-      description="Connect your accounts, choose which calendars appear in Macro, and which ones make you busy."
+      description={`Connect your accounts, choose which calendars appear in ${PRODUCT_NAME}, and which ones make you busy.`}
     >
       <SettingsCard>
         <SettingsRow
@@ -59,7 +60,9 @@ export function ConnectedCalendars(props: {
               when={accountNeedingPermission()}
               fallback="Keep work and personal calendars together."
             >
-              {(account) => `Give Macro access to ${account().email}.`}
+              {(account) =>
+                `Give ${PRODUCT_NAME} access to ${account().email}.`
+              }
             </Show>
           }
         >
@@ -175,7 +178,7 @@ export function ConnectedCalendars(props: {
                 <Show when={!account().calendars.length}>
                   <p class="mt-2 pl-7 text-xs text-ink-muted">
                     {account().needsPermission
-                      ? 'Connect to give Macro access to this calendar.'
+                      ? `Connect to give ${PRODUCT_NAME} access to this calendar.`
                       : 'Your calendars will appear here after syncing.'}
                   </p>
                 </Show>

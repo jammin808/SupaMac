@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { toast } from '@core/component/Toast/Toast';
 import { fireAndForget } from '@core/util/fireAndForget';
 import {
@@ -56,7 +57,7 @@ export function CodingPreferencesSetting() {
         <PreferenceRow
           preference="createTasks"
           label="Create tasks"
-          description="Link each coding session to a Macro task"
+          description={`Link each coding session to a ${PRODUCT_NAME} task`}
         />
         <PreferenceRow
           preference="openPullRequests"

@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { fireAndForget } from '@core/util/fireAndForget';
 import { Button, cn } from '@ui';
 import { createSignal, Show } from 'solid-js';
@@ -210,7 +211,9 @@ export function BookingReceiptView(props: {
           )}
         </Show>
       </div>
-      <p class="mt-7 text-center text-xs text-ink-muted">Scheduling by Macro</p>
+      <p class="mt-7 text-center text-xs text-ink-muted">
+        Scheduling by {PRODUCT_NAME}
+      </p>
     </main>
   );
 }

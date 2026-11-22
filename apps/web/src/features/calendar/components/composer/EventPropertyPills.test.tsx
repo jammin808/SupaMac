@@ -304,13 +304,13 @@ describe('EventComposerConferencePill', () => {
     await user.click(
       screen.getByRole('button', { name: /Video conferencing/ })
     );
-    expect(screen.queryByRole('option', { name: 'Macro call' })).toBeNull();
+    expect(screen.queryByRole('option', { name: 'SupaMac call' })).toBeNull();
     setEnabled(true);
     expect(
-      await screen.findByRole('option', { name: 'Macro call' })
+      await screen.findByRole('option', { name: 'SupaMac call' })
     ).toBeTruthy();
     setEnabled(false);
-    expect(screen.queryByRole('option', { name: 'Macro call' })).toBeNull();
+    expect(screen.queryByRole('option', { name: 'SupaMac call' })).toBeNull();
   });
 
   it('shows the Macro selection and lets users switch to no link or Google Meet inside the composer dialog', async () => {
@@ -333,7 +333,7 @@ describe('EventComposerConferencePill', () => {
     const trigger = screen.getByRole('button', {
       name: /Video conferencing/,
     });
-    expect(trigger.textContent).toContain('Macro call');
+    expect(trigger.textContent).toContain('SupaMac call');
     screen.getByLabelText('Title').focus();
     await user.click(trigger);
     await user.click(screen.getByRole('option', { name: 'No meeting link' }));
@@ -342,8 +342,8 @@ describe('EventComposerConferencePill', () => {
     await user.click(screen.getByRole('option', { name: 'Google Meet' }));
     expect(trigger.textContent).toContain('Google Meet');
     await user.click(trigger);
-    await user.click(screen.getByRole('option', { name: 'Macro call' }));
-    expect(trigger.textContent).toContain('Macro call');
+    await user.click(screen.getByRole('option', { name: 'SupaMac call' }));
+    expect(trigger.textContent).toContain('SupaMac call');
   });
 
   it('keeps its selection to itself while the form around it changes', async () => {
@@ -377,7 +377,7 @@ describe('EventComposerConferencePill', () => {
     await user.click(
       screen.getByRole('button', { name: /Video conferencing/ })
     );
-    expect(screen.queryByRole('option', { name: 'Macro call' })).toBeNull();
+    expect(screen.queryByRole('option', { name: 'SupaMac call' })).toBeNull();
     expect(screen.getByRole('option', { name: 'Google Meet' })).toBeTruthy();
   });
 });
