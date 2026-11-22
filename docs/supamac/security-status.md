@@ -93,7 +93,12 @@ also failed: its check annotation reports that the hosted runner lost
 communication with GitHub. Full logs were unavailable, so the cause is not
 confirmed. CodeQL now has a 4 GiB memory budget and two analysis threads, with
 Cargo limited to two build jobs in static analysis, to leave runner headroom.
-A successful Rust analysis remains a release requirement.
+On the tree merged with upstream `e0ece1d1` the Rust job failed again, with
+full logs: the four-CPU hosted runner received a shutdown signal eleven
+minutes into source extraction, before any query ran. The memory budget
+bounds query evaluation, not the extractor, which loads the whole Cargo
+workspace; running out of memory during extraction is the likely cause, not a
+confirmed one. A successful Rust analysis remains a release requirement.
 
 The two languages are analysed by the jobs `codeql-javascript-typescript` and
 `codeql-rust`, which replaced one `codeql` job over a matrix. After their first
