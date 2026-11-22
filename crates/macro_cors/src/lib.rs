@@ -11,11 +11,15 @@
 #[cfg(test)]
 mod test;
 
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
-use axum::http::{
-    HeaderName, HeaderValue, Method,
-    header::{AUTHORIZATION, CONTENT_TYPE},
+use axum::{
+    extract::{FromRef, FromRequestParts},
+    http::{
+        HeaderName, HeaderValue, Method, StatusCode,
+        header::{AUTHORIZATION, CONTENT_TYPE, ORIGIN},
+        request::Parts,
+    },
 };
 use tower_http::cors::{AllowOrigin, CorsLayer};
 
@@ -110,6 +114,35 @@ impl OriginAllowList {
             Self::BuiltIn => true,
             Self::Exact(_) => origin.to_str().is_ok_and(|origin| self.allows(origin)),
         }
+    }
+}
+
+/// Extracted only from a request whose `Origin` may open a socket
+/// ([`OriginAllowList::allows_upgrade`]), so a handler that takes it ahead of
+/// its credentials refuses a foreign page before authenticating it.
+#[derive(Debug, Clone, Copy)]
+pub struct AllowedUpgradeOrigin;
+
+impl<S> FromRequestParts<S> for AllowedUpgradeOrigin
+where
+    S: Send + Sync,
+    Arc<OriginAllowList>: FromRef<S>,
+{
+    type Rejection = (StatusCode, &'static str);
+
+    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+        let origins = Arc::<OriginAllowList>::from_ref(state);
+        let origin = parts.headers.get(ORIGIN);
+
+        if origins.allows_upgrade(origin) {
+            return Ok(Self);
+        }
+
+        tracing::warn!(
+            ?origin,
+            "refused a websocket upgrade from an origin off the allow-list"
+        );
+        Err((StatusCode::FORBIDDEN, "origin not allowed"))
     }
 }
 

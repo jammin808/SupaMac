@@ -972,6 +972,8 @@ pub(crate) type DssDictationState = dictation::inbound::axum_router::DictationRo
 
 #[derive(Clone, FromRef)]
 pub(crate) struct ApiContext {
+    /// The browser origins that may open this service's WebSocket routes.
+    pub allowed_origins: Arc<macro_cors::OriginAllowList>,
     pub search_term_matching: Arc<dyn search_service::TermMatchingRollout>,
     pub passwords_state: passwords::inbound::router::PasswordRouterState<AuthorizationService>,
     pub passwords_agent_state:

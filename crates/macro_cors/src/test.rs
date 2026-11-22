@@ -207,3 +207,49 @@ async fn preflight_is_cacheable_for_two_hours() {
 
     assert_eq!(response.headers()[header::ACCESS_CONTROL_MAX_AGE], "7200");
 }
+
+async fn upgrade_from(
+    origins: OriginAllowList,
+    origin: Option<&str>,
+) -> Result<AllowedUpgradeOrigin, (StatusCode, &'static str)> {
+    let mut request = axum::http::Request::builder().uri("/ws");
+    if let Some(origin) = origin {
+        request = request.header(ORIGIN, origin);
+    }
+    let (mut parts, ()) = request.body(()).unwrap().into_parts();
+
+    AllowedUpgradeOrigin::from_request_parts(&mut parts, &Arc::new(origins)).await
+}
+
+#[tokio::test]
+async fn upgrade_extractor_admits_only_listed_origins_once_a_list_is_configured() {
+    let configured = || OriginAllowList::Exact(vec!["https://app.example.com".to_owned()]);
+
+    assert!(
+        upgrade_from(configured(), Some("https://app.example.com"))
+            .await
+            .is_ok()
+    );
+    // A request without `Origin` is not a browser page.
+    assert!(upgrade_from(configured(), None).await.is_ok());
+
+    for foreign in [
+        "https://other.example.com",
+        "https://app.example.com.evil.example",
+        "http://app.example.com",
+        "null",
+    ] {
+        let refused = upgrade_from(configured(), Some(foreign)).await.unwrap_err();
+
+        assert_eq!(refused.0, StatusCode::FORBIDDEN, "{foreign}");
+    }
+}
+
+#[tokio::test]
+async fn upgrade_extractor_leaves_upgrades_alone_without_a_configured_list() {
+    assert!(
+        upgrade_from(OriginAllowList::BuiltIn, Some("https://other.example.com"))
+            .await
+            .is_ok()
+    );
+}

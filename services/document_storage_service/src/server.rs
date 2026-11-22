@@ -2593,6 +2593,7 @@ async fn run_server() -> anyhow::Result<()> {
         ),
     ));
     let api_context = ApiContext {
+        allowed_origins: Arc::new(macro_cors::OriginAllowList::from_env()),
         search_term_matching,
         saved_views,
         sync_sessions,
