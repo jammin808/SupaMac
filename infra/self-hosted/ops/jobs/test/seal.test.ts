@@ -33,6 +33,25 @@ function withoutPtrace(): string[] {
   ];
 }
 
+/**
+ * What an unsealed child gets when it opens its parent's memory. Opening
+ * /proc/<pid>/mem asks for attach access, which Yama (ptrace_scope 1 or
+ * more, the default on Ubuntu hosts and GitHub's runners) refuses for a
+ * process that is not the opener's descendant, sealed or not. Reading the
+ * environment asks only for read access, which Yama leaves alone: that line
+ * leaks wherever the seal is missing.
+ */
+function unsealedMemory(): 'opened' | 'error EACCES' {
+  let scope = '0';
+  try {
+    scope = readFileSync('/proc/sys/kernel/yama/ptrace_scope', 'utf8').trim();
+  } catch (error) {
+    // No Yama in this kernel: nothing but the seal refuses the open.
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+  }
+  return Number(scope) >= 1 ? 'error EACCES' : 'opened';
+}
+
 async function runService(
   mode: 'seal' | 'plain'
 ): Promise<{ sealed: string; lines: unknown }> {
@@ -63,7 +82,7 @@ describe('sealProcess', () => {
   test('without the seal the same child reads the secret, so the test can see a leak', async () => {
     expect(await runService('plain')).toEqual({
       sealed: 'not asked',
-      lines: [SECRET, 'opened'],
+      lines: [SECRET, unsealedMemory()],
     });
   });
 
