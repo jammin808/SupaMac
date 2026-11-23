@@ -398,8 +398,10 @@ A way in whose settings are missing is off; the Status row says which.
 ## Operations
 
 - **State**: the `jobs_state` volume holds the Telegram link and offset, the
-  pinned ids, the last table versions, the saved model replies and the
-  attempt counts. It is in the backup and restore scripts. The dedupe keys
+  pinned ids, the last table versions, the saved model replies, the attempt
+  counts, and what the checks need about each detail and source that has no
+  column (its source's own date, whether it came from quoted history, a note
+  or the owner, when the owner decided, the page kind, the day quote). It is in the backup and restore scripts. The dedupe keys
   also live in Sources rows, so they survive in the database backup.
 - **Restarts**: every Processing source resumes from what its rows show;
   details of one source are written in one statement; a Telegram update is
