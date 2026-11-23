@@ -1055,6 +1055,25 @@ function sourceSent(
   return headerDate ?? meta.sent ?? checked;
 }
 
+/** A day's slack for zones and clocks before a source date counts as later than its arrival. */
+const FUTURE_SLACK_MS = 86_400_000;
+
+/**
+ * A source date no later than the source's arrival (and a day), else
+ * undefined: a date in the future would make the source "newer" than every
+ * genuine update after it, so its order is taken as unknown instead.
+ */
+export function boundedDate(
+  date: string | undefined,
+  received: string
+): string | undefined {
+  if (date === undefined) return undefined;
+  const at = Date.parse(date);
+  const arrived = Date.parse(received);
+  if (Number.isNaN(at) || Number.isNaN(arrived)) return date;
+  return at > arrived + FUTURE_SLACK_MS ? undefined : date;
+}
+
 function plannedDetails(
   meta: SourceMeta,
   extracted: Extracted,
@@ -1071,7 +1090,9 @@ function plannedDetails(
         : undefined);
     const page = candidate.page ?? result.page;
     const history = result.pageKind === 'history';
-    const sourceDate = history ? result.historyDate : sent;
+    const sourceDate = history
+      ? boundedDate(result.historyDate, meta.received)
+      : sent;
     return {
       key: `p${i}`,
       field: candidate.field,
@@ -1240,6 +1261,19 @@ export function writtenNames(
   });
 }
 
+/**
+ * The words a proposal gives for a job on file, kept only when the source
+ * writes them; otherwise empty, so no sentence the model made up reaches the
+ * owner as the reason.
+ */
+export function writtenWords(
+  text: Extracted['text'],
+  sourceName: string,
+  words: string
+): string {
+  return writtenNames(text, sourceName, [words.trim()])[0] ?? '';
+}
+
 /** The name a new job takes (see the header); `names` are written ones only. */
 export function newJobName(
   details: readonly Pick<PlannedDetail, 'field' | 'status' | 'value'>[],
@@ -1312,7 +1346,8 @@ async function plan(
   reply: ExtractionReply,
   leftOut: readonly string[]
 ): Promise<SourceMeta> {
-  const sent = sourceSent(meta, extracted, reply);
+  const claimedSent = sourceSent(meta, extracted, reply);
+  const sent = boundedDate(claimedSent, meta.received);
   let planned = plannedDetails(meta, extracted, reply, sent);
   const notes: (string | undefined)[] = [
     ...extracted.notes,
@@ -1323,6 +1358,9 @@ async function plan(
       : undefined,
     reply.problems.length > 0
       ? `Left out of the reply: ${reply.problems.join('; ')}.`
+      : undefined,
+    claimedSent !== undefined && sent === undefined
+      ? 'The source is dated after it arrived, so its date is not used: its values are not taken as newer than any other, and one that differs needs review.'
       : undefined,
   ];
   // The reply's job names, kept only where the source writes them.
@@ -1364,7 +1402,18 @@ async function plan(
       threadIds: extracted.email?.threadIds ?? [],
       attachmentOf: attachmentState(ctx, meta),
       proposals: reply.jobs.flatMap((j) =>
-        j.existing ? [{ jobId: j.existing.jobId, words: j.existing.words }] : []
+        j.existing
+          ? [
+              {
+                jobId: j.existing.jobId,
+                words: writtenWords(
+                  extracted.text,
+                  meta.name,
+                  j.existing.words
+                ),
+              },
+            ]
+          : []
       ),
     };
     const decision = partialGuard(decideFiling(input, facts), partial);
@@ -1436,7 +1485,16 @@ async function plan(
               originalSender: input.originalSender,
               threadIds: [],
               proposals: job.existing
-                ? [{ jobId: job.existing.jobId, words: job.existing.words }]
+                ? [
+                    {
+                      jobId: job.existing.jobId,
+                      words: writtenWords(
+                        extracted.text,
+                        meta.name,
+                        job.existing.words
+                      ),
+                    },
+                  ]
                 : [],
             },
             facts

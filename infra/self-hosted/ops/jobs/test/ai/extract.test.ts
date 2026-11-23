@@ -390,7 +390,7 @@ describe('reading the reply', () => {
     expect(read.value.details[0]?.job).toBeUndefined();
     expect(read.value.details[1]?.job).toBe(1);
     expect(read.value.problems).toEqual([
-      'job 0 names "J9", which is not one of the jobs listed; left out',
+      'job 0 names a job that is not one of those listed; left out',
       'detail 0 names job 5, but the reply describes jobs 0 to 1; index left out',
     ]);
   });

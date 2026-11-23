@@ -117,6 +117,7 @@ import {
   CHANGED_LEAD,
   type Callback,
   connectionMessage,
+  refusalTallyMessage,
   decisionLead,
   editsMessage,
   escapeHtml,
@@ -198,6 +199,16 @@ export interface NotifierOptions {
   readonly timeZone: () => string;
   /** JOBS_TELEGRAM_OWNER_ID, when set. */
   readonly ownerId?: number | undefined;
+  readonly clock?: (() => Date) | undefined;
+}
+
+/** How long one message gathers the mailbox's refusals before a new one is sent. */
+export const REFUSAL_WINDOW_MS = 60 * 60_000;
+
+/** The domain of an address as the sender wrote it, lower case. */
+function domainOf(address: string): string {
+  const at = address.lastIndexOf('@');
+  return (at >= 0 ? address.slice(at + 1) : address).trim().toLowerCase();
 }
 
 /** Whether a Failed source's saved model reply is one that could not be used. */
@@ -212,6 +223,16 @@ export function savedInvalidReply(
 /** Tells the owner on Telegram; throws when no one is linked, the bot halted, or Telegram refused. */
 export class TelegramNotifier implements Notifier {
   private haltedWith: string | undefined;
+  /** The hour's refusal note, edited as more refusals come. */
+  private refusals:
+    | {
+        messageId: number;
+        startedAt: number;
+        count: number;
+        since: string;
+        domains: string[];
+      }
+    | undefined;
 
   constructor(private readonly options: NotifierOptions) {}
 
@@ -286,8 +307,59 @@ export class TelegramNotifier implements Notifier {
     for (const m of messages) await this.send(m);
   }
 
+  /**
+   * Refused mail is told in one message an hour: the first refusal is sent,
+   * and each later one within the hour edits that message (a count, the
+   * sender domains, the last in full), which does not ring the owner's phone
+   * again. An edit that fails sends a new message instead.
+   */
   async refusedMail(note: RefusedMail): Promise<void> {
-    await this.send(refusedMailMessage(note));
+    const chat = this.ownerChat();
+    const now = (this.options.clock ?? (() => new Date()))();
+    const open = this.refusals;
+    if (
+      open !== undefined &&
+      now.getTime() - open.startedAt < REFUSAL_WINDOW_MS
+    ) {
+      const domain = domainOf(note.from);
+      const tally = {
+        count: open.count + 1,
+        since: open.since,
+        domains: open.domains.includes(domain)
+          ? open.domains
+          : [...open.domains, domain],
+        last: note,
+      };
+      const m = refusalTallyMessage(tally, this.options.timeZone());
+      try {
+        await this.options.api.editMessageText(
+          chat,
+          open.messageId,
+          m.parts[0] ?? ''
+        );
+        this.refusals = {
+          ...open,
+          count: tally.count,
+          domains: [...tally.domains],
+        };
+        return;
+      } catch (error) {
+        this.options.logger.warn('refusal note not updated; sending anew', {
+          error,
+        });
+      }
+    }
+    const sent = await this.send(refusedMailMessage(note));
+    this.refusals =
+      sent === undefined
+        ? undefined
+        : {
+            messageId: sent.message_id,
+            startedAt: now.getTime(),
+            count: 1,
+            since: now.toISOString(),
+            domains: [domainOf(note.from)],
+          };
   }
 
   async connection(change: ConnectionChange): Promise<void> {

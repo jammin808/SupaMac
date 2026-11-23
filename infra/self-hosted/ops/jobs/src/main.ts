@@ -33,13 +33,35 @@
 //   carries no secret and no source content.
 // - SIGTERM stops the intakes, then the loops (waiting for a run in
 //   flight), then lets the lane drain, then closes the health server.
-// - `main` makes the process not dumpable (seal.ts) before anything else,
-//   so no extraction child can read the service's secrets; on Linux a seal
-//   that fails stops the start.
-// - Mail and Telegram are added by their units through `Intake`.
+// - `main` makes the process not dumpable (seal.ts) before anything else;
+//   on Linux a seal that fails stops the start. Files are parsed in the
+//   extraction container (JOBS_EXTRACT_URL, text/remote.ts), which holds no
+//   secret; only without that setting (development) in a child of this
+//   process, which the seal keeps from its environment.
+// - Mail and Telegram are added by their units through `Intake`. A caller
+//   that gives neither notifier nor intakes (main, and the test of this
+//   wiring) gets the Telegram bot as the notifier and both ways in; the
+//   Telegram transport and the mailbox's client can be given in their place.
+// - The address the service shares the Jobs database and folders with is
+//   logged at every start (it is no secret), so a mistyped
+//   JOBS_OWNER_EMAIL can be seen in the container's log.
+// - A table, column or option renamed in SupaMac while the service runs is
+//   followed: the edit poll reads the database's names every minute and
+//   verifies the schema again when they changed, and a statement SupaMac
+//   refuses as written (400 or 422) triggers the same check at once; when
+//   the names had changed, that refusal is retryable, so the step is tried
+//   again under the new names instead of failing its source.
+// - The setting checks run at the start, then hourly, and every five
+//   minutes while the mailbox, Telegram or Anthropic is set but its check
+//   fails, so a fix made outside jobs.env (in BotFather, at the mailbox
+//   provider) shows within minutes.
+// - The setup document warns when JOBS_MONTHLY_LIMIT_USD is below what one
+//   source holds back while it is read (the worst case of one extraction):
+//   with such a limit no source can ever be read.
 
 import { serve } from 'bun';
 import { AiClient, createSdkClient, type MessagesClient } from './ai/anthropic';
+import { EXTRACTION_MAX_TOKENS } from './ai/extract';
 import { monthOf } from './ai/spend';
 import {
   type Config,
@@ -49,12 +71,14 @@ import {
   wayOn,
 } from './config';
 import { Logger } from './log';
+import type { ImapClientFactory } from './mail/imap';
 import { mailIntakes } from './mail/index';
 import {
   Lane,
   type Extractor,
   errorText,
   type PipelineContext,
+  PipelineError,
 } from './pipeline/context';
 import { HealthMonitor } from './pipeline/health';
 import type { Intake, SettingCheck } from './pipeline/intake';
@@ -67,19 +91,60 @@ import type { JobsStore } from './pipeline/store';
 import { SupaMacStore } from './pipeline/supamac-store';
 import { sealProcess } from './seal';
 import { telegramIntake } from './telegram';
+import type { TelegramFetch } from './telegram/api';
 import { WATCHED_TABLES } from './supamac/changes';
 import { type FetchLike, SupaMacClient, SupaMacError } from './supamac/client';
 import { webAppBase } from './supamac/documents';
 import {
   ensureJobsSchema,
   type EnsureSchemaResult,
+  type JobsPins,
+  namesChanged,
   SchemaError,
 } from './supamac/schema';
 import type { JobsSchema } from './supamac/tables';
+import { remoteExtractor } from './text/remote';
 import { extractInSandbox } from './text/sandbox';
 
 export const MINUTE_MS = 60_000;
 const DAY_MS = 86_400_000;
+const QUERY_ROUTE = 'POST /databases/query';
+
+/**
+ * Wraps a store so a statement SupaMac refuses as written first checks the
+ * tables' names (`recheck`); when they had changed, the refusal becomes a
+ * retryable PipelineError, so the step runs again under the new names.
+ */
+export function renameAware<T extends object>(
+  store: T,
+  recheck: () => Promise<boolean>
+): T {
+  return new Proxy(store, {
+    get(target, property) {
+      const value: unknown = Reflect.get(target, property, target);
+      if (typeof value !== 'function') return value;
+      return (...args: unknown[]): unknown => {
+        const result: unknown = value.apply(target, args);
+        if (!(result instanceof Promise)) return result;
+        return result.catch(async (error: unknown) => {
+          if (
+            error instanceof SupaMacError &&
+            error.kind === 'invalid' &&
+            error.route === QUERY_ROUTE &&
+            (await recheck().catch(() => false))
+          ) {
+            throw new PipelineError(
+              'retryable',
+              'the Jobs tables were renamed in SupaMac; the step is tried again under their new names',
+              { cause: error }
+            );
+          }
+          throw error;
+        });
+      };
+    },
+  });
+}
 
 /** Runs a task every interval, never two at once; `stop` waits for the run in flight. */
 export class Loop {
@@ -201,6 +266,20 @@ export interface ServiceOptions {
   readonly listen?: boolean | undefined;
   /** The port to listen on in place of JOBS_HEALTH_PORT; 0 picks a free one. */
   readonly port?: number | undefined;
+  /** The Bot API transport in place of `fetch`, for the test of the wiring. */
+  readonly telegramFetch?: TelegramFetch | undefined;
+  /** The mailbox's IMAP clients in place of imapflow's, for the test of the wiring. */
+  readonly mailConnect?: ((logger: Logger) => ImapClientFactory) | undefined;
+  /** The mailbox poll's interval in place of a minute, for tests. */
+  readonly mailPollMs?: number | undefined;
+  /**
+   * Whether the pinned tables' names changed since `schema`; the database
+   * is read unless a test gives this. A test that gives its own schema step
+   * and no check gets none.
+   */
+  readonly namesChanged?:
+    | ((pins: JobsPins, schema: JobsSchema) => Promise<boolean>)
+    | undefined;
 }
 
 export interface Service {
@@ -214,10 +293,33 @@ export interface Service {
   stop(): Promise<void>;
 }
 
+const usd = (n: number): string => `$${n.toFixed(2)}`;
+
+/**
+ * The monthly limit against what one source holds back while it is read:
+ * every attempt the extraction may bill, all of its `max_tokens` as output
+ * (input comes on top).
+ */
+export function limitCheck(ai: AiClient, limitUsd: number): SettingCheck {
+  const hold = ai.worstCase(0, EXTRACTION_MAX_TOKENS);
+  if (limitUsd < hold)
+    return {
+      setting: 'Monthly limit',
+      ok: false,
+      text: `JOBS_MONTHLY_LIMIT_USD is ${usd(limitUsd)}, but reading one source holds back up to ${usd(hold)} (computed, before its input) until it is priced, so no source can be read: set it to at least ${usd(Math.ceil(hold * 4))}`,
+    };
+  return {
+    setting: 'Monthly limit',
+    ok: true,
+    text: `${usd(limitUsd)}; reading one source holds back up to ${usd(hold)} (computed, before its input) until it is priced, so about the last ${usd(hold)} of each month is not used`,
+  };
+}
+
 /** The setup document's checks of the settings that are not a way in's own. */
 async function settingChecks(
   config: Config,
   messages: MessagesClient | undefined,
+  ai: AiClient | undefined,
   intakes: readonly Intake[],
   health: HealthMonitor
 ): Promise<SettingCheck[]> {
@@ -228,6 +330,8 @@ async function settingChecks(
       text: 'the service signed in and found the Jobs database',
     },
   ];
+  if (ai !== undefined && config.ai !== undefined)
+    checks.push(limitCheck(ai, config.ai.monthlyLimitUsd));
   const mail = intakes.find((i) => i.name === 'mail');
   if (config.mail === undefined) {
     checks.push({
@@ -321,7 +425,13 @@ export async function startService(options: ServiceOptions): Promise<Service> {
   // gives its own notifier or intakes (a test) gets neither.
   const bot =
     options.notifier === undefined && options.intakes === undefined
-      ? telegramIntake(config, { state, logger })
+      ? telegramIntake(config, {
+          state,
+          logger,
+          ...(options.telegramFetch !== undefined
+            ? { fetch: options.telegramFetch }
+            : {}),
+        })
       : undefined;
   const notifier = options.notifier ?? bot?.notifier ?? new NullNotifier();
   const client = new SupaMacClient({
@@ -367,7 +477,10 @@ export async function startService(options: ServiceOptions): Promise<Service> {
     clock,
     timeZone: () => state.value.timeZone ?? config.timeZone,
     extract:
-      options.extract ?? ((bytes, hint) => extractInSandbox(bytes, hint)),
+      options.extract ??
+      (config.extractUrl !== undefined
+        ? remoteExtractor(config.extractUrl)
+        : (bytes, hint) => extractInSandbox(bytes, hint)),
     ...(config.webAppUrl !== undefined
       ? { webApp: webAppBase(config.webAppUrl) }
       : {}),
@@ -379,7 +492,12 @@ export async function startService(options: ServiceOptions): Promise<Service> {
   // neither notifier nor intakes (main); a test gives its own.
   const intakes = options.intakes ?? [
     ...(bot !== undefined ? [bot] : []),
-    ...(options.notifier === undefined ? mailIntakes(config, options.env) : []),
+    ...(options.notifier === undefined
+      ? mailIntakes(config, options.env, {
+          connect: options.mailConnect,
+          pollMs: options.mailPollMs,
+        })
+      : []),
   ];
 
   const ensure = options.ensureSchema ?? ensureJobsSchema;
@@ -437,12 +555,23 @@ export async function startService(options: ServiceOptions): Promise<Service> {
     }
   };
 
-  // The settings are checked at the start and then hourly: a check logs in.
+  // The settings are checked at the start, then hourly, and every five
+  // minutes while one fails: a check logs in.
   let checks: SettingCheck[] = [];
   let checkedAt = Number.NEGATIVE_INFINITY;
   const refreshSetup = async (): Promise<void> => {
-    if (clock().getTime() - checkedAt >= 60 * MINUTE_MS) {
-      checks = (await settingChecks(config, messages, intakes, health)).map(
+    // A way in that is set but failing is checked again soon; one that is
+    // simply not set waits for a redeploy like any setting.
+    const failing = checks.some(
+      (c) =>
+        !c.ok &&
+        ((c.setting === 'Mailbox login' && config.mail !== undefined) ||
+          (c.setting === 'Telegram' && config.telegram !== undefined) ||
+          (c.setting === 'Anthropic' && config.ai !== undefined))
+    );
+    const every = failing ? 5 * MINUTE_MS : 60 * MINUTE_MS;
+    if (clock().getTime() - checkedAt >= every) {
+      checks = (await settingChecks(config, messages, ai, intakes, health)).map(
         (c) => ({ ...c, text: mask(c.text) })
       );
       checkedAt = clock().getTime();
@@ -466,7 +595,7 @@ export async function startService(options: ServiceOptions): Promise<Service> {
     await health.persist();
     // The month the AI client counts the spend in: JOBS_TIME_ZONE's.
     const month = monthOf(clock(), config.timeZone);
-    const lastError = state.value.notes.lastError;
+    const lastError = health.lastError();
     const rowId = await store.writeStatus(state.value.statusRowId, {
       Name: 'Jobs service',
       'Last mail check': health.lastSuccess('mail') ?? null,
@@ -491,6 +620,9 @@ export async function startService(options: ServiceOptions): Promise<Service> {
     }
   };
 
+  logger.info('sharing the Jobs database and folders with the owner', {
+    owner: config.ownerEmail,
+  });
   try {
     for (const intake of intakes) {
       const on =
@@ -543,9 +675,36 @@ export async function startService(options: ServiceOptions): Promise<Service> {
       schema: first.schema,
       onWrite,
     });
-    store.resolve(
-      options.store !== undefined ? options.store(first.schema) : supamacStore
-    );
+    // The schema the statements are written under, followed through renames.
+    let schema = first.schema;
+    const checkNames =
+      options.namesChanged ??
+      (options.ensureSchema === undefined
+        ? (pins: JobsPins, current: JobsSchema) =>
+            namesChanged(client, pins, current)
+        : undefined);
+    const verifyAgain = async (): Promise<void> => {
+      const again = await verify();
+      schema = again.schema;
+      supamacStore.setSchema(again.schema);
+    };
+    // One check at a time: statements refused together share it.
+    let checking: Promise<boolean> | undefined;
+    const renamed = (): Promise<boolean> => {
+      checking ??= (async () => {
+        const pins = state.value.pins;
+        if (checkNames === undefined || pins === undefined) return false;
+        if (!(await checkNames(pins, schema))) return false;
+        await verifyAgain();
+        return true;
+      })().finally(() => {
+        checking = undefined;
+      });
+      return checking;
+    };
+    const chosen: JobsStore =
+      options.store !== undefined ? options.store(first.schema) : supamacStore;
+    store.resolve(renameAware(chosen, renamed));
 
     if (options.loops !== false) {
       if (wayOn(config, 'Folder')) {
@@ -567,10 +726,8 @@ export async function startService(options: ServiceOptions): Promise<Service> {
           MINUTE_MS,
           async () => {
             const result = await pipeline.pollEdits();
-            if (result.schemaChanged) {
-              const again = await verify();
-              supamacStore.setSchema(again.schema);
-            }
+            if (result.schemaChanged) await verifyAgain();
+            else await renamed();
           },
           health,
           logger

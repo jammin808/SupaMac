@@ -104,6 +104,7 @@ export type FailureCode =
   | 'quote_not_on_page'
   | 'quote_repeats_differently'
   | 'scan_page'
+  | 'page_unsure'
   | 'no_label'
   | 'label_only_in_value'
   | 'label_names_other_field'
@@ -1926,6 +1927,13 @@ export function checkDetail(
   const results = occurrences.map((occ) => evaluate(ctx, occ));
   const first = results[0] as OccurrenceResult;
   const failed: Failure[] = [];
+  // Text that may not show where it was read is never Found on its own.
+  if (view.page.unsure !== undefined)
+    failed.push({
+      check: 1,
+      code: 'page_unsure',
+      text: `${view.page.unsure}; check the original`,
+    });
   for (const r of results) {
     for (const f of r.failed)
       if (!failed.some((g) => g.code === f.code && g.text === f.text))
@@ -2006,7 +2014,8 @@ export function checkSourceDate(
     text: `Needs review: ${text}`,
   });
   const target = dayParts(claim.date);
-  if (!target) return review(`${quoted(claim.date)} is not a calendar date`);
+  // The claim is the model's own text: its value is never echoed.
+  if (!target) return review('the date given is not a calendar date');
   if (claim.quote.trim() === '') return review('the date has no quote');
   if (hasLineBreak(claim.quote))
     return review('the quote spans more than one line');
@@ -2020,6 +2029,7 @@ export function checkSourceDate(
       : index.pages.find((p) => p.page.page === claim.page);
   if (view === undefined) return review(`the source has no p${claim.page}`);
   if (view.page.kind === 'scan') return review(SCAN_TEXT);
+  if (view.page.unsure !== undefined) return review(view.page.unsure);
   const quoteTerms = termsOf(claim.quote);
   const outcomes: { failed: string[]; completions: string[] }[] = [];
   view.lines.forEach((line) => {

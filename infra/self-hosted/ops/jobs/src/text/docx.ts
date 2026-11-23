@@ -9,6 +9,12 @@
 //   are deleted and moved-away tracked changes (w:del, w:moveFrom), field
 //   instructions (w:instrText) and the fallback copy of alternate content.
 //   Inserted tracked changes (w:ins, w:moveTo) are kept, as Word shows them.
+// - Text that is there but cannot be seen is dropped too: a run under two
+//   points (w:sz under 4 half-points) and a run coloured white or near it
+//   (w:color with every channel at least F0, or the theme's background1 or
+//   light1), unless the run, its paragraph or its table cell is shaded with
+//   a fill that is not white, as a heading on a coloured band is. Only the
+//   run's own formatting is read for this, not its styles'.
 // - A paragraph is a line; a line break inside it (w:br, w:cr) starts a new
 //   line. Text boxes inside a paragraph are lines of their own after it.
 // - Tables follow table.ts. A table has a header row only when its first row
@@ -33,6 +39,8 @@ interface Context {
   /** The default paragraph style's id (w:type="paragraph" w:default="1"). */
   readonly defaultParagraph?: string | undefined;
   readonly defaultHidden: boolean;
+  /** Inside a paragraph or table cell shaded with a fill other than white. */
+  readonly shaded?: boolean | undefined;
 }
 
 function onOff(node: XNode | undefined): boolean | undefined {
@@ -185,13 +193,51 @@ function runHidden(
   return paragraphHidden ?? ctx.defaultHidden;
 }
 
+/** Whether a w:shd fills with a colour other than white (or none). */
+function shadedFill(shd: XNode | undefined): boolean {
+  if (!shd) return false;
+  const fill = (attr(shd, 'w:fill') ?? '').toLowerCase();
+  const theme = (attr(shd, 'w:themeFill') ?? '').toLowerCase();
+  if (theme !== '' && theme !== 'background1' && theme !== 'light1')
+    return true;
+  return fill !== '' && fill !== 'auto' && !whiteHex(fill);
+}
+
+function whiteHex(hex: string): boolean {
+  const m = /^([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
+  if (!m) return false;
+  return [m[1], m[2], m[3]].every((c) => Number.parseInt(c ?? '0', 16) >= 0xf0);
+}
+
+/** Whether a run's own formatting makes it too small or too pale to see. */
+function runFaint(run: XNode, shaded: boolean): boolean {
+  const rPr = child(run, 'w:rPr');
+  if (!rPr) return false;
+  const sz = child(rPr, 'w:sz');
+  const half = sz ? Number(attr(sz, 'w:val')) : Number.NaN;
+  if (Number.isFinite(half) && half < 4) return true;
+  if (shaded || shadedFill(child(rPr, 'w:shd'))) return false;
+  const color = child(rPr, 'w:color');
+  if (!color) return false;
+  const theme = (attr(color, 'w:themeColor') ?? '').toLowerCase();
+  if (theme === 'background1' || theme === 'light1') return true;
+  return whiteHex(attr(color, 'w:val') ?? '');
+}
+
+/** Whether a paragraph or a table cell is shaded with a fill other than white. */
+function shadedBlock(node: XNode, propsName: 'w:pPr' | 'w:tcPr'): boolean {
+  const props = child(node, propsName);
+  return shadedFill(props ? child(props, 'w:shd') : undefined);
+}
+
 function walkRun(
   ctx: Context,
   run: XNode,
   out: LineBuilder,
   paragraphHidden: boolean | undefined
 ): void {
-  const hidden = runHidden(ctx, run, paragraphHidden);
+  const hidden =
+    runHidden(ctx, run, paragraphHidden) || runFaint(run, ctx.shaded === true);
   for (const node of elements(run)) {
     switch (node.name) {
       case 'w:t':
@@ -296,7 +342,8 @@ function walkInline(
 
 function paragraphLines(ctx: Context, p: XNode): string[] {
   const out = new LineBuilder();
-  walkInline(ctx, p, out, paragraphStyleHidden(ctx, p));
+  const inner = shadedBlock(p, 'w:pPr') ? { ...ctx, shaded: true } : ctx;
+  walkInline(inner, p, out, paragraphStyleHidden(ctx, p));
   return out.finish();
 }
 
@@ -354,7 +401,10 @@ function tableLinesOf(ctx: Context, table: XNode): string[] {
     let column = 0;
     for (const tc of cellsOf(tr)) {
       const merge = vMerge(tc);
-      let content: TableCell = { lines: blockLines(ctx, tc) };
+      const cellCtx = shadedBlock(tc, 'w:tcPr')
+        ? { ...ctx, shaded: true }
+        : ctx;
+      let content: TableCell = { lines: blockLines(cellCtx, tc) };
       if (merge === 'continue' && content.lines.length === 0) {
         content = above.get(column) ?? content;
       }

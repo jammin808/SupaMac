@@ -156,6 +156,8 @@ interface Parsed {
   readonly segments: Segment[];
   /** HTML nested deeper than the limit was left out. */
   readonly cut: boolean;
+  /** Why some of the body's text may not show as read (html.ts). */
+  readonly unsure?: string | undefined;
 }
 
 /**
@@ -199,6 +201,7 @@ async function parse(bytes: Uint8Array, limits: Limits): Promise<Parsed> {
   }
   let body: string[] = [];
   let cut = false;
+  let unsure: string | undefined;
   const html = email.html;
   const readable =
     html !== undefined &&
@@ -208,6 +211,7 @@ async function parse(bytes: Uint8Array, limits: Limits): Promise<Parsed> {
     const read = htmlLines(html, limits.xmlDepth, limits.htmlChars);
     body = read.lines;
     cut = read.cut;
+    unsure = read.unsure;
   }
   // The plain part stands in for an HTML part that is too big to read or
   // shows no text (an image alone, a part left empty).
@@ -215,10 +219,11 @@ async function parse(bytes: Uint8Array, limits: Limits): Promise<Parsed> {
   if (body.length === 0 && plain !== undefined) {
     body = textLines(plain);
     cut = false;
+    unsure = undefined;
   } else if (!readable && html !== undefined) {
     throw new ExtractError('too_large', 'The email body is too long to read.');
   }
-  return { email, segments: splitHistory(body), cut };
+  return { email, segments: splitHistory(body), cut, unsure };
 }
 
 interface MessagePages {
@@ -235,18 +240,26 @@ async function messagePages(
   limits: Limits,
   depth: number
 ): Promise<MessagePages & { email: Email }> {
-  const { email, segments, cut } = await parse(bytes, limits);
+  const { email, segments, cut, unsure } = await parse(bytes, limits);
   let anyCut = cut;
   const date = messageDate(email);
   const [own, ...history] = segments;
   const pages: Omit<TextPage, 'page'>[] = [];
+  // Every page of a body whose text may not show as read is unsure.
+  const marked = unsure !== undefined ? { unsure } : {};
   if (own && own.lines.length > 0)
-    pages.push({ kind: 'text', date, lines: own.lines });
+    pages.push({ kind: 'text', date, ...marked, lines: own.lines });
 
   const forwardSubject = FORWARD_SUBJECT.test(email.subject ?? '');
   let forwarded: ForwardedHeader | undefined;
   for (const s of history) {
-    pages.push({ kind: 'history', date: s.date, from: s.from, lines: s.lines });
+    pages.push({
+      kind: 'history',
+      date: s.date,
+      from: s.from,
+      ...marked,
+      lines: s.lines,
+    });
     if (
       forwarded === undefined &&
       (s.forward || (s.headed && forwardSubject))

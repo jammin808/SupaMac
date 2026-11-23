@@ -18,7 +18,7 @@ import type { Extractor, PipelineContext } from '../../src/pipeline/context';
 import type { Intake, IntakeContext } from '../../src/pipeline/intake';
 import { RecordingNotifier } from '../../src/pipeline/notify';
 import { Pipeline } from '../../src/pipeline/pipeline';
-import { filingFacts, sha256 } from '../../src/pipeline/process';
+import { boundedDate, filingFacts, sha256 } from '../../src/pipeline/process';
 import { StateStore } from '../../src/pipeline/state';
 import { SupaMacError } from '../../src/supamac/client';
 import {
@@ -233,6 +233,8 @@ function plainEmail(subject: string, date: string, body: string[]): Uint8Array {
 describe('hand-offs from text/ and ai/', () => {
   test('Sources.Sent is the email’s own date with its written offset, not converted', async () => {
     const w = await world([{ marker: 'S1: "Offset check"', reply: NOT_A_JOB }]);
+    // Received after the date it carries.
+    w.now = Date.parse('2027-04-01T12:00:00Z');
     const result = await w.pipeline.processEmail({
       raw: plainEmail('Offset check', 'Thu, 1 Apr 2027 10:30:00 +0100', [
         'Crew call 07:00 on Fri 12 March 2027.',
@@ -243,6 +245,29 @@ describe('hand-offs from text/ and ai/', () => {
     const row = sourceRow(w, result.sourceId);
     expect(row.Status).toBe('Not a job');
     expect(row.Sent).toBe('2027-04-01T10:30:00+01:00');
+  });
+
+  test('a source dated after it arrived has no Sent date and says why, so it never outranks a later update', async () => {
+    const w = await world([
+      { marker: 'S1: "From the future"', reply: NOT_A_JOB },
+    ]);
+    const result = await w.pipeline.processEmail({
+      raw: plainEmail('From the future', 'Fri, 1 Jan 2099 10:30:00 +0000', [
+        'Venue: Acme Arena.',
+      ]),
+      from: OWNER_EMAIL,
+    });
+    expect(result.kind).toBe('finished');
+    const row = sourceRow(w, result.sourceId);
+    expect(row.Sent).toBeNull();
+    expect(String(row.Note)).toContain('dated after it arrived');
+    expect(boundedDate('2099-01-01', '2027-03-05T10:00:00Z')).toBeUndefined();
+    expect(boundedDate('2027-03-06', '2027-03-05T10:00:00Z')).toBe(
+      '2027-03-06'
+    );
+    expect(boundedDate('2027-03-04', '2027-03-05T10:00:00Z')).toBe(
+      '2027-03-04'
+    );
   });
 
   test('a refusal takes REFUSAL_STATUS: a deterministic one is Skipped, a sandbox failure is Failed with Retry', async () => {

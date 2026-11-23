@@ -1236,6 +1236,12 @@ export interface TextPage {
   readonly date?: string | undefined;
   /** A history page's own sender, as its header writes it. */
   readonly from?: string | undefined;
+  /**
+   * Why some of the page's text may not show where it was read (white text
+   * with no background the service can see, a stylesheet that hides text in
+   * ways it cannot follow): every detail from the page needs review.
+   */
+  readonly unsure?: string | undefined;
   /** Extracted lines in reading order; a table cell is a line of its own. */
   readonly lines: readonly string[];
 }

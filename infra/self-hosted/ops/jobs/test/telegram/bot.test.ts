@@ -199,6 +199,7 @@ async function setup(
     state,
     logger,
     timeZone: () => 'Europe/London',
+    clock,
   });
   const pipeline = new FakePipeline();
   const health = new FakeHealth();
@@ -1069,5 +1070,47 @@ describe('a stop, a halt and a press repeated', () => {
     expect(s.fake.documents).toEqual([]);
     expect(s.fake.last().text).toContain('open it in SupaMac');
     expect(s.fake.last().text).not.toContain('could not be taken');
+  });
+});
+
+describe('refused mail on Telegram', () => {
+  test('the hour’s refusals are one message, edited as they come; a later hour starts a new one', async () => {
+    const s = await setup();
+    const refuse = (from: string) =>
+      s.notifier.refusedMail({
+        from,
+        check: 'the sender is not on the allowed list',
+      });
+    await refuse('a@spam.example.com');
+    s.world.now += 60_000;
+    await refuse('b@pay-crew.example.com');
+    s.world.now += 60_000;
+    await refuse('c@spam.example.com');
+    expect(s.fake.sent).toHaveLength(1);
+    const first = s.fake.sent[0];
+    expect(first?.edits).toBe(2);
+    expect(first?.text).toContain('3 emails to the jobs mailbox were refused');
+    expect(first?.text).toContain(
+      '<code>spam.example.com</code>, <code>pay-crew.example.com</code>'
+    );
+    expect(first?.text).toContain('<code>c@spam.example.com</code>');
+
+    s.world.now += 60 * 60_000;
+    await refuse('d@spam.example.com');
+    expect(s.fake.sent).toHaveLength(2);
+    expect(s.fake.sent[1]?.text).toContain(
+      'From: <code>d@spam.example.com</code>'
+    );
+  });
+
+  test('an edit Telegram refuses sends a new message instead', async () => {
+    const s = await setup();
+    await s.notifier.refusedMail({ from: 'a@spam.example.com', check: 'no' });
+    s.fake.fail('editMessageText', {
+      status: 400,
+      body: { ok: false, error_code: 400, description: 'Bad Request' },
+    });
+    await s.notifier.refusedMail({ from: 'b@spam.example.com', check: 'no' });
+    expect(s.fake.sent).toHaveLength(2);
   });
 });

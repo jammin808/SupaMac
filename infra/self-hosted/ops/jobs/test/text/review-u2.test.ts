@@ -1200,7 +1200,7 @@ describe('Markdown documents', () => {
     });
     const body = doc
       .split('\n')
-      .slice(4)
+      .slice(6)
       .filter((l) => l !== '');
     expect(body).toHaveLength(HOSTILE.length);
     for (const l of body) {

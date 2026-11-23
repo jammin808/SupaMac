@@ -172,12 +172,21 @@ export class MailIntake implements Intake {
 }
 
 /** The mail intake when its settings are all there; none otherwise. */
-export function mailIntakes(config: Config, env: Env): Intake[] {
+export function mailIntakes(
+  config: Config,
+  env: Env,
+  seams: {
+    readonly connect?: MailIntakeOptions['connect'];
+    readonly pollMs?: number | undefined;
+  } = {}
+): Intake[] {
   if (config.mail === undefined) return [];
   return [
     new MailIntake({
       settings: config.mail,
       proxy: egressProxy(env, config.mail.host),
+      ...(seams.connect !== undefined ? { connect: seams.connect } : {}),
+      ...(seams.pollMs !== undefined ? { pollMs: seams.pollMs } : {}),
     }),
   ];
 }

@@ -607,8 +607,14 @@ export function decideFiling(
     for (const j of threadJobs) propose(j.jobId, 'its thread is filed there');
   }
 
+  // `words` are the source's own (process.ts keeps no others), quoted as such.
   for (const p of input.proposals)
-    propose(p.jobId, `the model suggests it: ${p.words}`);
+    propose(
+      p.jobId,
+      p.words.trim() === ''
+        ? 'the model suggests it'
+        : `the model suggests it, from the source’s words "${p.words.trim()}"`
+    );
   const foundDays = new Set(found.flatMap((d) => datesNamed(d).dates));
   for (const j of jobs) {
     const shared = j.dates.filter((d) => foundDays.has(d));

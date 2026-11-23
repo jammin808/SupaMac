@@ -31,6 +31,12 @@
 //   leaves out, so it is never read). A scan page with invisible text has no
 //   lines (its text layer is not what it shows); a page that is a scan only
 //   for having little text keeps the lines it shows.
+// - Glyphs filled in white or near white (each channel at least `WHITE_MIN`
+//   of 255) count as shown, since nothing is rendered to see what is behind
+//   them, but they make the page unsure (`WHITE_TEXT`): white text on a
+//   coloured banner is ordinary, white text on a white page is hidden, and
+//   only the page itself tells them apart, so every detail from such a page
+//   needs review.
 // - Glyphs drawn by annotations (form-field appearances) are not counted:
 //   their text is not part of the page's text content, so it is never read.
 // - A page PDF.js cannot read (it rejects under `stopAtErrors`) is a scan
@@ -42,7 +48,8 @@
 // Not handled: form-field values (widget annotations) are not read, so a
 // filled form with little other text is a scan for the model; text drawn in
 // the colour of what is behind it (white on white, under an image) is taken
-// as shown, because nothing is rendered; a clip path is taken as its bounding
+// as shown (white makes its page unsure, see above), because nothing is
+// rendered; a clip path is taken as its bounding
 // box, so text inside the box but outside a curved clip counts as shown;
 // columns closer than `COLUMN_GAP` font sizes are read as one line;
 // right-to-left scripts are ordered left to right.
@@ -65,6 +72,22 @@ const STROKE_MODES = new Set([1, 2, 5, 6]);
 /** An opacity at or below this paints nothing a reader can see. */
 export const ALPHA_MIN = 0.05;
 
+/** A fill whose every channel is at least this (of 255) is white or near it. */
+export const WHITE_MIN = 0xf0;
+
+export const WHITE_TEXT =
+  'the page has white text, which may not show on the page';
+
+/** Whether a PDF.js fill colour (`#rrggbb`) is white or near it. */
+export function nearWhite(hex: unknown): boolean {
+  if (typeof hex !== 'string') return false;
+  const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
+  if (!m) return false;
+  return [m[1], m[2], m[3]].every(
+    (c) => Number.parseInt(c ?? '0', 16) >= WHITE_MIN
+  );
+}
+
 /**
  * A gap between two items wider than this many font sizes (the larger of the
  * two) ends a line. One tab to the next default stop (1.27 cm) leaves at most
@@ -83,6 +106,7 @@ export interface OpCodes {
   readonly transform: number;
   readonly setGState: number;
   readonly setTextRenderingMode: number;
+  readonly setFillRGBColor?: number | undefined;
   readonly setFont: number;
   readonly setCharSpacing: number;
   readonly setWordSpacing: number;
@@ -115,6 +139,8 @@ export interface OpCodes {
 export interface GlyphCounts {
   readonly visible: number;
   readonly invisible: number;
+  /** Shown glyphs filled in white or near it. */
+  readonly white?: number | undefined;
 }
 
 /** An affine matrix [a b c d e f], as PDF.js writes one. */
@@ -268,6 +294,8 @@ interface GraphicsState {
   mode: number;
   fillAlpha: number;
   strokeAlpha: number;
+  /** The fill colour is white or near it. */
+  fillWhite: boolean;
   fontSize: number;
   charSpacing: number;
   wordSpacing: number;
@@ -331,6 +359,7 @@ export function countGlyphs(
     mode: 0,
     fillAlpha: 1,
     strokeAlpha: 1,
+    fillWhite: false,
     fontSize: 0,
     charSpacing: 0,
     wordSpacing: 0,
@@ -349,6 +378,7 @@ export function countGlyphs(
   let tlm: Matrix = IDENTITY;
   let visible = 0;
   let invisible = 0;
+  let white = 0;
 
   const push = (): void => {
     if (saved.length < MAX_STACK) saved.push({ ...gs });
@@ -384,8 +414,10 @@ export function countGlyphs(
             (strokes && gs.strokeAlpha > ALPHA_MIN)
           : gs.fillAlpha > ALPHA_MIN;
       const clipped = gs.clip !== undefined && !touches(gs.clip, box);
-      if (paints && hiddenLevels === 0 && !clipped) visible += run.glyphs;
-      else invisible += run.glyphs;
+      if (paints && hiddenLevels === 0 && !clipped) {
+        visible += run.glyphs;
+        if (fills && gs.fillWhite) white += run.glyphs;
+      } else invisible += run.glyphs;
     }
     tm = multiply([1, 0, 0, 1, run.advance, 0], tm);
   };
@@ -462,6 +494,9 @@ export function countGlyphs(
         if (mode !== undefined) gs.mode = mode;
         break;
       }
+      case ops.setFillRGBColor:
+        gs.fillWhite = nearWhite(argList(args)[0]);
+        break;
       case ops.setFont: {
         const size = numberArg(args, 1);
         if (size !== undefined) gs.fontSize = size;
@@ -545,7 +580,7 @@ export function countGlyphs(
         break;
     }
   }
-  return { visible, invisible };
+  return { visible, invisible, ...(white > 0 ? { white } : {}) };
 }
 
 /** A text item's text and place, as PDF.js gives them. */
@@ -702,6 +737,8 @@ export function pageFromText(
   if (invisible) return { page, kind: 'scan', lines: [] };
   if (text.visibleChars < minChars)
     return { page, kind: 'scan', lines: text.lines };
+  if ((glyphs.white ?? 0) > 0)
+    return { page, kind: 'text', unsure: WHITE_TEXT, lines: text.lines };
   return { page, kind: 'text', lines: text.lines };
 }
 
@@ -736,6 +773,7 @@ function opCodes(pdfjs: Pdfjs): OpCodes {
     transform: OPS.transform,
     setGState: OPS.setGState,
     setTextRenderingMode: OPS.setTextRenderingMode,
+    setFillRGBColor: OPS.setFillRGBColor,
     setFont: OPS.setFont,
     setCharSpacing: OPS.setCharSpacing,
     setWordSpacing: OPS.setWordSpacing,

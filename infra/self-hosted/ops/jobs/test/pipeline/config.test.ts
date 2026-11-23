@@ -73,7 +73,7 @@ describe('loadConfig', () => {
     expect(config.timeZone).toBe('Europe/London');
     expect(config.stateDir).toBe('/var/lib/supamac-jobs');
     expect(config.healthPort).toBe(8080);
-    expect(config.supamacBaseUrl).toBe('http://gateway:8081/dss');
+    expect(config.supamacBaseUrl).toBe('http://jobs-gateway:8081/dss');
     expect(config.ai).toMatchObject({
       model: 'claude-opus-5-5',
       monthlyLimitUsd: 20,
@@ -99,8 +99,33 @@ describe('loadConfig', () => {
     expect(wayOn(config, 'Telegram')).toBe(false);
     expect(wayOn(config, 'Folder')).toBe(true);
     expect(offText(config)).toBe(
-      'Email: JOBS_MAIL_AUTHSERV_ID is not set; Telegram: JOBS_TELEGRAM_BOT_TOKEN is not set'
+      'Email: JOBS_MAIL_AUTHSERV_ID is not set in jobs.env; Telegram: JOBS_TELEGRAM_BOT_TOKEN is not set'
     );
+  });
+
+  test('a missing mailbox host names the deploy variable the owner sets, not the name compose passes on', () => {
+    const { JOBS_MAIL_HOST: _h, JOBS_MAIL_USER: _u, ...env } = FULL;
+    const config = loadConfig({ ...env, JOBS_MAIL_HOST: '' });
+    expect(config.off.find((o) => o.way === 'Email')?.why).toBe(
+      'SUPAMAC_JOBS_MAIL_HOST is not set in the deploy tool; JOBS_MAIL_USER is not set in jobs.env'
+    );
+  });
+
+  test('takes the extraction container’s URL, and refuses one that is not plain http', () => {
+    expect(
+      loadConfig({ ...FULL, JOBS_EXTRACT_URL: 'http://jobs-extract:8090/' })
+        .extractUrl
+    ).toBe('http://jobs-extract:8090');
+    expect(loadConfig(FULL).extractUrl).toBeUndefined();
+    for (const bad of [
+      'jobs-extract:8090',
+      'https://user:pw@jobs-extract:8090',
+      'http://jobs-extract:8090/?a=1',
+    ]) {
+      expect(() => loadConfig({ ...FULL, JOBS_EXTRACT_URL: bad })).toThrow(
+        'JOBS_EXTRACT_URL must be an http URL'
+      );
+    }
   });
 
   test('without the AI’s key or a spend limit every way in is off: the model is never called without a limit', () => {

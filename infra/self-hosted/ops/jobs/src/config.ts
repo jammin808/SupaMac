@@ -20,7 +20,7 @@
 // - `JOBS_STATE_DIR` (default /var/lib/supamac-jobs), `JOBS_HEALTH_PORT`
 //   (default 8080), `JOBS_WEB_APP_URL` (links into SupaMac; none without it),
 //   `JOBS_SUPAMAC_URL` (the gateway's storage base, default
-//   http://gateway:8081/dss), `JOBS_AI_PRICES` (JSON: model id to
+//   http://jobs-gateway:8081/dss), `JOBS_AI_PRICES` (JSON: model id to
 //   `{ input, output, cacheRead, cacheWrite, cacheWrite1h? }` in USD per
 //   million tokens; the defaults of ai/spend.ts otherwise),
 //   `JOBS_AI_FALLBACKS` (`on` or `off`: the server-side fallbacks on refusal;
@@ -30,6 +30,13 @@
 //   monthly limit per request.
 // - `JOBS_MAIL_PORT` defaults to 993 (IMAP over TLS) when the other mailbox
 //   settings are given.
+// - `JOBS_EXTRACT_URL`: the extraction container (text/extract-server.ts),
+//   such as http://jobs-extract:8090, which compose sets. Without it the
+//   service parses files in a child of its own (development only: that child
+//   shares the service's user, network and state volume).
+// - The mailbox's host is the deploy tool's SUPAMAC_JOBS_MAIL_HOST, which
+//   compose hands over as JOBS_MAIL_HOST: a way-off reason names the deploy
+//   variable, the one the owner can set.
 
 import { z } from 'zod';
 import { DEFAULT_MODEL } from './ai/anthropic';
@@ -90,6 +97,8 @@ export interface Config {
   readonly stateDir: string;
   readonly healthPort: number;
   readonly webAppUrl?: string | undefined;
+  /** The extraction container; the service parses in its own child without it. */
+  readonly extractUrl?: string | undefined;
   readonly ai?: AiSettings | undefined;
   /** Why the AI is off, when it is. */
   readonly aiOff?: string | undefined;
@@ -233,6 +242,23 @@ export function loadConfig(env: Env): Config {
       throw invalid('JOBS_WEB_APP_URL', 'an http or https URL');
     }
   }
+  const extractUrl = value(env, 'JOBS_EXTRACT_URL');
+  if (extractUrl !== undefined) {
+    let url: URL;
+    try {
+      url = new URL(extractUrl);
+    } catch {
+      throw invalid('JOBS_EXTRACT_URL', 'an http URL');
+    }
+    if (
+      url.protocol !== 'http:' ||
+      url.username !== '' ||
+      url.password !== '' ||
+      url.search !== '' ||
+      url.hash !== ''
+    )
+      throw invalid('JOBS_EXTRACT_URL', 'an http URL');
+  }
   const timeZone = value(env, 'JOBS_TIME_ZONE') ?? 'Europe/London';
   if (!isTimeZone(timeZone))
     throw invalid('JOBS_TIME_ZONE', 'an IANA time zone such as Europe/London');
@@ -309,10 +335,19 @@ export function loadConfig(env: Env): Config {
   const mailPort = wholeNumber(env, 'JOBS_MAIL_PORT', 1, 65535) ?? 993;
   let mail: MailSettings | undefined;
   if (mailMissing.length > 0) {
-    off.push({
-      way: 'Email',
-      why: `${mailMissing.join(', ')} ${mailMissing.length === 1 ? 'is' : 'are'} not set`,
-    });
+    // The host is the deploy tool's, under the name the owner can set there.
+    const inFile = mailMissing.filter((n) => n !== 'JOBS_MAIL_HOST');
+    const why = [
+      ...(mailMissing.includes('JOBS_MAIL_HOST')
+        ? ['SUPAMAC_JOBS_MAIL_HOST is not set in the deploy tool']
+        : []),
+      ...(inFile.length > 0
+        ? [
+            `${inFile.join(', ')} ${inFile.length === 1 ? 'is' : 'are'} not set in jobs.env`,
+          ]
+        : []),
+    ].join('; ');
+    off.push({ way: 'Email', why });
   } else {
     const host = required(env, 'JOBS_MAIL_HOST');
     if (!/^[A-Za-z0-9.-]+$/.test(host))
@@ -379,6 +414,9 @@ export function loadConfig(env: Env): Config {
     stateDir,
     healthPort,
     ...(webAppUrl !== undefined ? { webAppUrl } : {}),
+    ...(extractUrl !== undefined
+      ? { extractUrl: extractUrl.replace(/\/+$/, '') }
+      : {}),
     ...(ai !== undefined ? { ai } : {}),
     ...(aiOff !== undefined ? { aiOff } : {}),
     ...(mail !== undefined ? { mail } : {}),

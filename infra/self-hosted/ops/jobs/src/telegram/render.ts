@@ -114,6 +114,21 @@ export function safe(text: string): string {
   return escapeHtml(oneLine(text));
 }
 
+/**
+ * Free text a document or the model may have shaped (a reason, a note, a
+ * name, a sender), on one line, escaped, with every link left out: only a
+ * detail's own value and quote are shown with their links, beside their
+ * status.
+ */
+export function prose(text: string): string {
+  return safe(dropLinks(oneLine(text)).text);
+}
+
+/** Text shown as code, which Telegram never makes into a link. */
+export function inert(text: string): string {
+  return `<code>${safe(text)}</code>`;
+}
+
 /** `one` escaped, cut between characters to at most `limit` characters of HTML. */
 function escapedWithin(
   one: string,
@@ -527,7 +542,8 @@ export function statusWords(
         : `found in ${where}, not confirmed by you`;
     case 'Needs review': {
       const reason = oneLine(card.check.replace(/^Needs review:\s*/u, ''));
-      const why = reason !== '' ? `: ${cut(reason, limit)}` : '';
+      const why =
+        reason !== '' ? `: ${cut(dropLinks(reason).text, limit)}` : '';
       return scan
         ? `${safe(card.imageNote ?? '')} (${where}); needs your review${why}; not confirmed by you`
         : `in ${where}; needs your review${why}; not confirmed by you`;
@@ -605,17 +621,17 @@ export function summaryMessage(
   }
   if (summary.notes.length > 0) {
     lines.push('Notes:');
-    for (const n of summary.notes) lines.push(`• ${safe(n)}`);
+    for (const n of summary.notes) lines.push(`• ${prose(n)}`);
   }
   if (summary.sourceNote !== undefined && summary.sourceNote.trim() !== '')
-    lines.push(`Note on the source: ${safe(summary.sourceNote)}`);
+    lines.push(`Note on the source: ${prose(summary.sourceNote)}`);
   if (summary.decidedInSupamac.length > 0) {
     lines.push(
       'Confirmed or rejected in SupaMac since the last summary. SupaMac records code run for you as you, so check that each was yours:'
     );
     for (const d of summary.decidedInSupamac)
       lines.push(
-        `• ${safe(d.name)}: ${safe(d.status)} in SupaMac, ${escapeHtml(instantText(d.at, timeZone))}`
+        `• ${prose(d.name)}: ${safe(d.status)} in SupaMac, ${escapeHtml(instantText(d.at, timeZone))}`
       );
   }
   const links: string[] = [];
@@ -811,15 +827,15 @@ export function filingMessages(question: FilingQuestion): OutMessage[] {
         `It names: ${part.names.map((n) => `"${nameHtml(n)}"`).join(', ')}`
       );
     if (part.reason.trim() !== '')
-      lines.push(`Not filed by itself: ${safe(part.reason)}`);
+      lines.push(`Not filed by itself: ${prose(part.reason)}`);
     if (part.candidates.length === 1) {
       const c = part
         .candidates[0] as FilingQuestion['parts'][number]['candidates'][number];
-      lines.push(`File under ${jobName(c.name)}? ${safe(c.why)}`);
+      lines.push(`File under ${jobName(c.name)}? ${prose(c.why)}`);
     } else if (part.candidates.length > 1) {
       lines.push('It may be one of these:');
       for (const c of part.candidates)
-        lines.push(`• ${jobName(c.name)}: ${safe(c.why)}`);
+        lines.push(`• ${jobName(c.name)}: ${prose(c.why)}`);
     } else {
       lines.push('No job on file matches it.');
     }
@@ -855,11 +871,38 @@ export function filingMessages(question: FilingQuestion): OutMessage[] {
 export function refusedMailMessage(note: RefusedMail): OutMessage {
   return message([
     '<b>An email to the jobs mailbox was refused and not read.</b>',
-    `From: ${safe(note.from)}`,
+    `From: ${inert(note.from)}`,
     note.subject !== undefined
       ? `Subject: ${nameHtml(note.subject)}`
       : undefined,
-    `The check that failed: ${safe(note.check)}`,
+    `The check that failed: ${prose(note.check)}`,
+  ]);
+}
+
+/** The most senders a running refusal note lists by domain. */
+export const REFUSAL_DOMAINS_SHOWN = 10;
+
+/** Refusals since the first of a running note, kept up to date in one message. */
+export interface RefusalTally {
+  readonly count: number;
+  readonly since: string;
+  readonly domains: readonly string[];
+  readonly last: RefusedMail;
+}
+
+/** One message for every refusal of the hour: the count, the sender domains, the last one in full. */
+export function refusalTallyMessage(
+  tally: RefusalTally,
+  timeZone: string
+): OutMessage {
+  if (tally.count === 1) return refusedMailMessage(tally.last);
+  const shown = tally.domains.slice(0, REFUSAL_DOMAINS_SHOWN);
+  const more = tally.domains.length - shown.length;
+  return message([
+    `<b>${tally.count} emails to the jobs mailbox were refused and not read since ${escapeHtml(instantText(tally.since, timeZone))}.</b>`,
+    `Sender domains: ${shown.map(inert).join(', ')}${more > 0 ? ` and ${more} more` : ''}`,
+    `The last, from ${inert(tally.last.from)}: ${prose(tally.last.check)}`,
+    'Each is in the mailbox’s Refused folder, and the service’s log has a line for each.',
   ]);
 }
 
@@ -881,7 +924,7 @@ export function connectionMessage(
   return message([
     change.up
       ? `${name} is answering again (since ${since}).`
-      : `${name} is not answering (since ${since})${change.detail ? `: ${safe(change.detail)}` : '.'}`,
+      : `${name} is not answering (since ${since})${change.detail ? `: ${prose(change.detail)}` : '.'}`,
   ]);
 }
 
@@ -893,7 +936,7 @@ const NOTE_HEADINGS: Readonly<Record<ServiceNote['kind'], string>> = {
 };
 
 export function noteMessage(note: ServiceNote): OutMessage {
-  return message([`<b>${NOTE_HEADINGS[note.kind]}</b>`, safe(note.text)]);
+  return message([`<b>${NOTE_HEADINGS[note.kind]}</b>`, prose(note.text)]);
 }
 
 export function failureMessage(
@@ -902,7 +945,7 @@ export function failureMessage(
 ): OutMessage {
   const lines = [
     `<b>${nameHtml(failure.name) || 'A source'} failed.</b>`,
-    `Why: ${safe(failure.reason)}`,
+    `Why: ${prose(failure.reason)}`,
     failure.attempts > 0 ? `Attempts: ${failure.attempts}.` : undefined,
     options.freshReading
       ? 'The model’s reply could not be used. Read again asks the model for a fresh reading, at the model’s cost.'
@@ -950,7 +993,7 @@ export function editsMessage(report: EditReport): OutMessage | undefined {
           ? ` (by ${safe(a.actingBot)})`
           : '';
       lines.push(
-        `• ${TABLE_NAMES[a.table]} "${safe(a.name)}": ${safe(a.what)}; ${EDIT_ACTIONS[a.action]}${by}`
+        `• ${TABLE_NAMES[a.table]} "${prose(a.name)}": ${prose(a.what)}; ${EDIT_ACTIONS[a.action]}${by}`
       );
     }
   }
@@ -1012,7 +1055,7 @@ export function jobsListMessage(
   lines.push(`<b>Jobs from ${safe(formatDay(today))} on</b>`);
   for (const job of sorted.slice(0, JOBS_LIST_LIMIT)) {
     const when = jobWhen(job);
-    const client = job.client !== undefined ? ` (${safe(job.client)})` : '';
+    const client = job.client !== undefined ? ` (${prose(job.client)})` : '';
     lines.push(`• ${jobName(job.name)}${client}${when ? `: ${when}` : ''}`);
   }
   if (sorted.length > JOBS_LIST_LIMIT)

@@ -289,7 +289,7 @@ describe('filing (design §5)', () => {
     expect(d.action === 'ask' && d.candidates).toEqual([
       {
         jobId: BETA_ID,
-        why: 'the model suggests it: Beta Hall Birmingham; it shares Sat 10 Apr 2027',
+        why: 'the model suggests it, from the source’s words "Beta Hall Birmingham"; it shares Sat 10 Apr 2027',
       },
     ]);
   });

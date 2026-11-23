@@ -15,6 +15,9 @@
 //   Status tick.
 // - A connection's detail and the last error are kept and told with every
 //   secret the logger knows masked.
+// - The Status row's last error is the newest of what was recorded
+//   (`recordError`) and every loop's last failure, the ways in included: a
+//   refused mailbox login or Telegram token shows there with its reason.
 // - `/health` is healthy while every loop that is on has succeeded within
 //   its allowance (five intervals); a loop that has not run yet counts from
 //   the service's start.
@@ -90,6 +93,27 @@ export class HealthMonitor {
 
   lastSuccess(name: string): string | undefined {
     return this.loops.get(name)?.lastSuccess;
+  }
+
+  /** The newest error: recorded, or a loop's last failure named by its loop. */
+  lastError(): { readonly text: string; readonly at: string } | undefined {
+    let newest = this.state.value.notes.lastError;
+    for (const [name, loop] of this.loops) {
+      if (loop.lastError === undefined || loop.lastErrorAt === undefined)
+        continue;
+      if (
+        newest === undefined ||
+        Date.parse(loop.lastErrorAt) > Date.parse(newest.at)
+      ) {
+        const text =
+          this.logger?.secrets.mask(loop.lastError) ?? loop.lastError;
+        newest = {
+          text: `${name}: ${text}`.slice(0, 500),
+          at: loop.lastErrorAt,
+        };
+      }
+    }
+    return newest;
   }
 
   /** Records the last error for the Status row, with every secret masked. */

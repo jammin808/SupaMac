@@ -14,9 +14,12 @@
 //   forms too). Possessives count ("tomorrow's"). "May" counts only when
 //   capitalised inside a sentence.
 // - A link is a URL with a scheme, a `www.` or `mailto:` address, a domain
-//   name (with or without a path), a Telegram @mention or a bot /command: all
-//   of what Telegram makes clickable. A name whose last label is a file
-//   extension ("call sheet v2.pdf") is not a domain.
+//   name (with or without a path, its labels in any script), an IPv4 address
+//   with a port or a path, a Telegram @mention or a bot /command: all of what
+//   Telegram makes clickable. Text is read after NFKC, with the ideographic
+//   and halfwidth full stops read as dots, so a full-width dot does not hide
+//   a domain. A name whose last label is a file extension ("call sheet
+//   v2.pdf") is not a domain.
 // - A link is kept only when it is, whole, one of the links a cited detail's
 //   value or quote writes; any other is replaced by "[link left out]".
 // - Connecting words are vouched for only when every word in them, links
@@ -250,8 +253,14 @@ const LINK = new RegExp(
     String.raw`\b(?:[a-z][a-z0-9+.-]*:\/\/|www\.|mailto:)[^\s<>"'` +
       '`' +
       String.raw`]+`,
-    // A domain name, with an optional port and path.
-    String.raw`\b(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}(?::\d+)?(?:\/[^\s<>"'` +
+    // An IPv4 address with a port or a path.
+    String.raw`(?<![\p{L}\p{N}_.])(?:\d{1,3}\.){3}\d{1,3}(?::\d+(?:\/[^\s<>"'` +
+      '`' +
+      String.raw`]*)?|\/[^\s<>"'` +
+      '`' +
+      String.raw`]*)`,
+    // A domain name in any script, with an optional port and path.
+    String.raw`(?<![\p{L}\p{N}_-])(?:[\p{L}\p{N}](?:[\p{L}\p{N}-]*[\p{L}\p{N}])?\.)+(?:\p{L}{2,}|xn--[a-z0-9-]+)(?::\d+)?(?:\/[^\s<>"'` +
       '`' +
       String.raw`]*)?`,
     // A Telegram @mention (not the @ of an email address).
@@ -307,10 +316,15 @@ function isFileName(match: string): boolean {
   return FILE_EXTENSIONS.has(last.toLowerCase());
 }
 
+/** Text as links are read in it: NFKC, with every full-stop form a dot. */
+export function linkView(text: string): string {
+  return text.normalize('NFKC').replace(/[\u3002\uFF0E\uFF61]/gu, '.');
+}
+
 /** The links a text writes, without trailing punctuation. */
 export function linksIn(text: string): string[] {
   const out: string[] = [];
-  for (const m of text.matchAll(LINK)) {
+  for (const m of linkView(text).matchAll(LINK)) {
     const link = m[0].replace(TRAILING, '');
     if (link !== '' && !isFileName(link)) out.push(link);
   }
@@ -337,7 +351,7 @@ export function keepCitedLinks(
     cited.flatMap((d) => [...linksIn(d.value), ...linksIn(d.quote)])
   );
   let dropped = 0;
-  const out = text.replace(LINK, (match) => {
+  const out = linkView(text).replace(LINK, (match) => {
     const link = match.replace(TRAILING, '');
     const tail = match.slice(link.length);
     if (link === '' || isFileName(link) || allowed.has(link)) return match;

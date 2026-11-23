@@ -4,7 +4,7 @@
 //
 // Invariants:
 // - Every request goes to the configured gateway base (default
-//   `http://gateway:8081/dss`, the gateway's door for this service) and
+//   `http://jobs-gateway:8081/dss`, this service's own gateway) and
 //   carries the key only in the `x-macro-user-api-key` header. Redirects are
 //   refused, so the key never follows a redirect to another host, and an
 //   object download (a presigned URL) is sent without it.
@@ -28,7 +28,7 @@
 import { z } from 'zod';
 import { type Logger, maskSecrets } from '../log';
 
-export const DEFAULT_SUPAMAC_BASE_URL = 'http://gateway:8081/dss';
+export const DEFAULT_SUPAMAC_BASE_URL = 'http://jobs-gateway:8081/dss';
 export const API_KEY_HEADER = 'x-macro-user-api-key';
 export const DEFAULT_TIMEOUT_MS = 30_000;
 /** Most bytes of an error body the client reads. */

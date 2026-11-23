@@ -11,8 +11,17 @@
 //   inside it that sets a readable size again is read, as a block of its own
 //   (the font-size:0 layout of many email templates); em, rem and % sizes are
 //   taken against a 16-pixel font. Images, SVG, templates, frames and objects
-//   are dropped; <head>, <style> and <script> carry no text. Hiding by a
-//   stylesheet class is not seen and its text is kept.
+//   are dropped; <head>, <style> and <script> carry no text.
+// - Text hidden in other ways is dropped too: an inline colour equal to the
+//   element's own background or `transparent`, a text-indent or an absolute
+//   or fixed position of `OFF_SCREEN_PX` or more off the page, and every
+//   element carrying a class that a top-level rule of the email's own
+//   stylesheet hides by any of these means (`.name` or `tag.name`).
+// - What cannot be told from the HTML alone makes the body unsure, so every
+//   detail from it needs review: text coloured white or near it (inline, or
+//   by a stylesheet rule) with no background of another colour set on it or
+//   around it, and a stylesheet rule that hides text through a selector
+//   other than a plain class, or only inside an at-rule (a screen size).
 // - Links stay as text: the link's words, then its address in brackets when
 //   the address differs from the words ("mailto:" removed).
 // - Nothing is wrapped and no letter's case is changed (headings and table
@@ -40,6 +49,18 @@ import { cell, type TableCell, type TableRow, tableLines } from './table';
 const OPACITY_MIN = 0.05;
 /** Text in a smaller font, in CSS pixels, cannot be read. */
 const FONT_MIN_PX = 2;
+/** Text moved this far off the page (a negative indent or position) is not shown. */
+const OFF_SCREEN_PX = 500;
+
+export const WHITE_HTML =
+  'the email has white text, which may not show against its background';
+export const STYLESHEET_HIDES =
+  'the email’s stylesheet hides some of its text in ways the service cannot follow';
+
+/** Classes the email being read hides with a plain top-level rule. */
+let hiddenClasses: ReadonlySet<string> = new Set();
+/** Why the email being read may not show as read; set while it is walked. */
+let unsureWhy: string | undefined;
 
 const BLOCK_TAGS = new Set([
   'address',
@@ -289,18 +310,160 @@ function opacityOf(value: string | undefined): number | undefined {
   return m[2] === '%' ? n / 100 : n;
 }
 
-/** Whether an element is hidden, with everything inside it, by its own attributes. */
-export function isHidden(elem: DomNode): boolean {
-  if (attribute(elem, 'hidden') !== undefined) return true;
-  const style = attribute(elem, 'style');
-  if (style === undefined) return false;
-  const css = declarations(style);
+/** A CSS colour as `#rrggbb` where it can be read; otherwise its text. */
+export function colourOf(value: string | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  const v = value.trim().toLowerCase();
+  if (v === 'white') return '#ffffff';
+  if (v === 'black') return '#000000';
+  const short = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/.exec(v);
+  if (short)
+    return `#${short[1]}${short[1]}${short[2]}${short[2]}${short[3]}${short[3]}`;
+  if (/^#[0-9a-f]{6}$/.test(v)) return v;
+  const rgb =
+    /^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*(?:,\s*[\d.]+\s*)?\)$/.exec(
+      v
+    );
+  if (rgb)
+    return `#${[rgb[1], rgb[2], rgb[3]]
+      .map((c) => Math.min(255, Number(c)).toString(16).padStart(2, '0'))
+      .join('')}`;
+  return v;
+}
+
+/** Whether a colour is white or near it (each channel at least F0). */
+export function whiteColour(value: string | undefined): boolean {
+  const c = colourOf(value);
+  if (c === undefined || !/^#[0-9a-f]{6}$/.test(c)) return false;
+  return [c.slice(1, 3), c.slice(3, 5), c.slice(5, 7)].every(
+    (h) => Number.parseInt(h, 16) >= 0xf0
+  );
+}
+
+/** The background colour a declaration block sets, if any. */
+function backgroundOf(css: ReadonlyMap<string, string>): string | undefined {
+  const bg = css.get('background-color') ?? css.get('background');
+  if (bg === undefined) return undefined;
+  const first = bg.split(/\s+(?![^(]*\))/)[0];
+  return colourOf(first);
+}
+
+/** A signed CSS length in pixels, or undefined. */
+function signedPx(value: string | undefined): number | undefined {
+  if (value === undefined) return undefined;
+  const v = value.trim();
+  const negative = v.startsWith('-');
+  const px = lengthPx(negative ? v.slice(1) : v);
+  return px === undefined ? undefined : negative ? -px : px;
+}
+
+/** Whether declarations hide what they apply to (see the header). */
+function cssHides(css: ReadonlyMap<string, string>, fonts: boolean): boolean {
   if (css.get('display') === 'none') return true;
   const visibility = css.get('visibility');
   if (visibility === 'hidden' || visibility === 'collapse') return true;
   if (css.get('mso-hide') === 'all') return true;
   const opacity = opacityOf(css.get('opacity'));
   if (opacity !== undefined && opacity <= OPACITY_MIN) return true;
+  const color = colourOf(css.get('color'));
+  if (color === 'transparent') return true;
+  const background = backgroundOf(css);
+  if (color !== undefined && background !== undefined && color === background)
+    return true;
+  const indent = signedPx(css.get('text-indent'));
+  if (indent !== undefined && indent <= -OFF_SCREEN_PX) return true;
+  const position = css.get('position');
+  if (
+    (position === 'absolute' || position === 'fixed') &&
+    ['left', 'top', 'right', 'bottom'].some((side) => {
+      const at = signedPx(css.get(side));
+      return at !== undefined && at <= -OFF_SCREEN_PX;
+    })
+  )
+    return true;
+  if (fonts) {
+    const size = lengthPx(css.get('font-size') ?? '');
+    if (size !== undefined && size < FONT_MIN_PX) return true;
+  }
+  return false;
+}
+
+/** Whether a background of a colour other than white is set on an element or around it. */
+function backgroundBehind(elem: DomNode): boolean {
+  let node: unknown = elem;
+  for (let i = 0; i < 200 && typeof node === 'object' && node !== null; i++) {
+    const tag = node as DomNode;
+    const style = attribute(tag, 'style');
+    const bg =
+      (style !== undefined ? backgroundOf(declarations(style)) : undefined) ??
+      colourOf(attribute(tag, 'bgcolor'));
+    if (bg !== undefined && bg !== 'transparent' && !whiteColour(bg))
+      return true;
+    node = Reflect.get(tag, 'parent');
+  }
+  return false;
+}
+
+/** The classes a stylesheet hides with plain top-level rules, and whether it hides by others. */
+export function stylesheetHiding(html: string): {
+  readonly classes: Set<string>;
+  readonly unsure?: string | undefined;
+} {
+  const classes = new Set<string>();
+  let unsure: string | undefined;
+  for (const m of html.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style\s*>/gi)) {
+    const css = (m[1] ?? '').replace(/\/\*[\s\S]*?\*\//g, '');
+    const preludes: string[] = [];
+    let from = 0;
+    for (let k = 0; k < css.length; k++) {
+      const ch = css[k];
+      if (ch === '{') {
+        preludes.push(css.slice(from, k).trim());
+        from = k + 1;
+      } else if (ch === '}') {
+        const prelude = preludes.pop();
+        if (prelude !== undefined && !prelude.startsWith('@')) {
+          const decl = declarations(css.slice(from, k));
+          const inAtRule = preludes.length > 0;
+          if (cssHides(decl, true)) {
+            for (const selector of prelude.split(',')) {
+              const plain = /^(?:[a-z][a-z0-9]*)?\.([a-z0-9_-]+)$/i.exec(
+                selector.trim()
+              );
+              if (plain?.[1] !== undefined && !inAtRule)
+                classes.add(plain[1].toLowerCase());
+              else unsure ??= STYLESHEET_HIDES;
+            }
+          } else if (whiteColour(decl.get('color'))) {
+            const bg = backgroundOf(decl);
+            if (bg === undefined || whiteColour(bg)) unsure = WHITE_HTML;
+          }
+        }
+        from = k + 1;
+      }
+    }
+  }
+  return { classes, ...(unsure !== undefined ? { unsure } : {}) };
+}
+
+/** Whether an element is hidden, with everything inside it, by its own attributes. */
+export function isHidden(elem: DomNode): boolean {
+  if (attribute(elem, 'hidden') !== undefined) return true;
+  const classAttr = attribute(elem, 'class');
+  if (
+    classAttr !== undefined &&
+    hiddenClasses.size > 0 &&
+    classAttr
+      .split(/\s+/)
+      .some((c) => c !== '' && hiddenClasses.has(c.toLowerCase()))
+  )
+    return true;
+  const style = attribute(elem, 'style');
+  if (style === undefined) return false;
+  const css = declarations(style);
+  if (cssHides(css, false)) return true;
+  if (whiteColour(css.get('color')) && !backgroundBehind(elem))
+    unsureWhy = WHITE_HTML;
   const overflow = [
     css.get('overflow'),
     css.get('overflow-y'),
@@ -503,6 +666,8 @@ export interface HtmlText {
   readonly lines: string[];
   /** Whether content nested deeper than the limit was left out. */
   readonly cut: boolean;
+  /** Why some of the text may not show as read (see the header). */
+  readonly unsure?: string | undefined;
 }
 
 /** The lines of an HTML body, blank lines removed. */
@@ -511,7 +676,30 @@ export function htmlLines(
   maxDepth: number,
   maxChars: number
 ): HtmlText {
-  const text = htmlToText(html, {
+  const sheet = stylesheetHiding(html);
+  hiddenClasses = sheet.classes;
+  unsureWhy = sheet.unsure;
+  let text: string;
+  try {
+    text = readHtml(html, maxDepth, maxChars);
+  } finally {
+    hiddenClasses = new Set();
+  }
+  const unsure = unsureWhy;
+  unsureWhy = undefined;
+  const lines = text
+    .split('\n')
+    .map((l) => l.replaceAll(CUT, '').replace(/\s+$/u, ''))
+    .filter((l) => l.replace(/^[>\s]+/, '') !== '');
+  return {
+    lines,
+    cut: text.includes(CUT),
+    ...(unsure !== undefined ? { unsure } : {}),
+  };
+}
+
+function readHtml(html: string, maxDepth: number, maxChars: number): string {
+  return htmlToText(html, {
     wordwrap: false,
     preserveNewlines: false,
     decodeEntities: true,
@@ -526,11 +714,7 @@ export function htmlLines(
       ...SKIPPED_TAGS.map((selector) => ({ selector, format: 'skip' })),
       { selector: '[hidden]', format: 'jobsHidden' },
       { selector: '[style]', format: 'jobsHidden' },
+      { selector: '[class]', format: 'jobsHidden' },
     ],
   });
-  const lines = text
-    .split('\n')
-    .map((l) => l.replaceAll(CUT, '').replace(/\s+$/u, ''))
-    .filter((l) => l.replace(/^[>\s]+/, '') !== '');
-  return { lines, cut: text.includes(CUT) };
 }

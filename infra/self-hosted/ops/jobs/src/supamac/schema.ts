@@ -396,6 +396,41 @@ export function resolveTables(
   };
 }
 
+/**
+ * Whether the pinned tables now go by other names than `schema` writes them
+ * under: a table, column or option renamed in SupaMac since it was resolved.
+ * One read of the database; a table or column that no longer resolves counts
+ * as changed, so the caller verifies again and learns why.
+ */
+export async function namesChanged(
+  client: SupaMacClient,
+  pins: JobsPins,
+  schema: JobsSchema
+): Promise<boolean> {
+  const detail = await client.send(getDatabaseRequest(pins.databaseId));
+  let fresh: JobsSchema['tables'];
+  try {
+    fresh = resolveTables(pins, detail);
+  } catch {
+    return true;
+  }
+  for (const key of TABLE_ORDER) {
+    const was = schema.tables[key];
+    const now = fresh[key];
+    if (was.id !== now.id || was.name !== now.name) return true;
+    const wasColumns = was.columns as Readonly<Record<string, ResolvedColumn>>;
+    const nowColumns = now.columns as Readonly<Record<string, ResolvedColumn>>;
+    for (const [columnKey, column] of Object.entries(wasColumns)) {
+      const current = nowColumns[columnKey];
+      if (current === undefined || current.name !== column.name) return true;
+      for (const [label, option] of column.options) {
+        if (current.options.get(label)?.label !== option.label) return true;
+      }
+    }
+  }
+  return false;
+}
+
 /** The whole schema: tables, the views still there, and the folders. */
 export function resolveSchema(
   pins: JobsPins,

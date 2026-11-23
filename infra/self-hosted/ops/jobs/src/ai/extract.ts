@@ -652,8 +652,10 @@ export function mapExtractionReply(
     const index = context.existingJobs.findIndex((_, k) => jobKey(k) === key);
     const listed = index >= 0 ? context.existingJobs[index] : undefined;
     if (listed === undefined) {
+      // The model's own text is never echoed to the owner: only what kind
+      // of problem it was.
       problems.push(
-        `job ${i} names ${JSON.stringify(claim.job)}, which is not one of the jobs listed; left out`
+        `job ${i} names a job that is not one of those listed; left out`
       );
       return base;
     }
