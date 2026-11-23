@@ -379,6 +379,8 @@ Confirmed unconfirmed. **These answers are not checked by the service.**
 | `ANTHROPIC_API_KEY` | An Anthropic key for this service |
 | `JOBS_AI_MODEL` | `claude-opus-5-5` unless set |
 | `JOBS_MONTHLY_LIMIT_USD` | The AI spend at which the service stops |
+| `JOBS_AI_FALLBACKS` | `on` unless set: a request the model declines is answered by a fallback model |
+| `JOBS_AI_FALLBACK_MODELS` | The fallback models the spending check counts (each one can bill); fewer hold back less of the limit |
 | `JOBS_TELEGRAM_BOT_TOKEN` | From BotFather |
 | `JOBS_TELEGRAM_OWNER_ID` | Optional: the owner's numeric Telegram id, instead of the link code |
 | `JOBS_MAIL_HOST`, `JOBS_MAIL_PORT`, `JOBS_MAIL_USER`, `JOBS_MAIL_PASSWORD` | The jobs mailbox |
