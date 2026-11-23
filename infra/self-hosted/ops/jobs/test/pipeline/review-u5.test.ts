@@ -1112,7 +1112,7 @@ describe('the Job intake folder', () => {
 
 const BOT = '123456789:AAEexampleexampleexampleexample00'; // secret-scan: fixture
 const ENV = {
-  JOBS_SUPAMAC_API_KEY: 'smk_0123456789abcdefABCDEF', // secret-scan: fixture
+  JOBS_SUPAMAC_API_KEY: 'test-api-key-not-real', // secret-scan: fixture
   JOBS_OWNER_EMAIL: OWNER_EMAIL,
   ANTHROPIC_API_KEY: 'sk-ant-api03-example-key', // secret-scan: fixture
   JOBS_MONTHLY_LIMIT_USD: '20',

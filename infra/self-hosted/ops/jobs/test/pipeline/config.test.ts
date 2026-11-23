@@ -8,7 +8,7 @@ import {
 } from '../../src/config';
 import { Logger } from '../../src/log';
 
-const KEY = 'smk_0123456789abcdefABCDEF'; // secret-scan: fixture
+const KEY = 'test-api-key-not-real'; // secret-scan: fixture
 const BOT = '123456789:AAEexampleexampleexampleexample00'; // secret-scan: fixture
 const ANTHROPIC = 'sk-ant-api03-example-key'; // secret-scan: fixture
 
