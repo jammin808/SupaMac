@@ -33,6 +33,9 @@
 //   carries no secret and no source content.
 // - SIGTERM stops the intakes, then the loops (waiting for a run in
 //   flight), then lets the lane drain, then closes the health server.
+// - `main` makes the process not dumpable (seal.ts) before anything else,
+//   so no extraction child can read the service's secrets; on Linux a seal
+//   that fails stops the start.
 // - Mail and Telegram are added by their units through `Intake`.
 
 import { serve } from 'bun';
@@ -62,6 +65,7 @@ import { setupMarkdown, writeSetupDocument } from './pipeline/setup';
 import { StateLedger, StateStore } from './pipeline/state';
 import type { JobsStore } from './pipeline/store';
 import { SupaMacStore } from './pipeline/supamac-store';
+import { sealProcess } from './seal';
 import { telegramIntake } from './telegram';
 import { WATCHED_TABLES } from './supamac/changes';
 import { type FetchLike, SupaMacClient, SupaMacError } from './supamac/client';
@@ -639,6 +643,8 @@ export async function main(): Promise<void> {
   const logger = new Logger({ fields: { service: 'jobs' } });
   let service: Service;
   try {
+    if (sealProcess() === 'not_linux')
+      logger.warn('not sealed: only Linux keeps the environment from children');
     service = await startService({ env: process.env, logger });
   } catch (error) {
     logger.error('jobs service did not start', { error });

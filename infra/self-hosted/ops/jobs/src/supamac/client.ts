@@ -4,10 +4,10 @@
 //
 // Invariants:
 // - Every request goes to the configured gateway base (default
-//   `http://gateway:8080/dss`) and carries the key only in the
-//   `x-macro-user-api-key` header. Redirects are refused, so the key never
-//   follows a redirect to another host, and an object download (a presigned
-//   URL) is sent without it.
+//   `http://gateway:8081/dss`, the gateway's door for this service) and
+//   carries the key only in the `x-macro-user-api-key` header. Redirects are
+//   refused, so the key never follows a redirect to another host, and an
+//   object download (a presigned URL) is sent without it.
 // - The key is never written to a log line, an error message or an error's
 //   fields: it is registered with the logger as a secret and masked out of
 //   every server message an error carries. The client's errors never carry
@@ -28,7 +28,7 @@
 import { z } from 'zod';
 import { type Logger, maskSecrets } from '../log';
 
-export const DEFAULT_SUPAMAC_BASE_URL = 'http://gateway:8080/dss';
+export const DEFAULT_SUPAMAC_BASE_URL = 'http://gateway:8081/dss';
 export const API_KEY_HEADER = 'x-macro-user-api-key';
 export const DEFAULT_TIMEOUT_MS = 30_000;
 /** Most bytes of an error body the client reads. */

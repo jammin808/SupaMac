@@ -7,6 +7,10 @@
 //   environment (so none of the service's secrets), no .env loading, no
 //   package auto-install, and its working directory beside the worker. It
 //   gets the bytes on stdin and the hint and limits as JSON in its arguments.
+// - The child runs as the service's own user, so the service's environment
+//   is out of its reach through /proc only because the service has made
+//   itself not dumpable (seal.ts, in main). It still shares the service's
+//   network and state volume.
 // - The child is killed (SIGKILL) when it runs past `timeoutMs`, when its
 //   resident memory passes `memoryLimitBytes` (read from /proc every
 //   `pollMs`), or when its stdout grows past four times the input plus 16 MiB.

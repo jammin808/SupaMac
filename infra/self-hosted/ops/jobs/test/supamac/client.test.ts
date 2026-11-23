@@ -78,7 +78,7 @@ describe('requests', () => {
     expect(await client.send(PING)).toEqual({ ok: true });
     const call = f.calls[0] as Call;
     expect(call.url).toBe(
-      'http://gateway:8080/dss/databases/0190d5a8-0000-7000-8000-000000000001'
+      'http://gateway:8081/dss/databases/0190d5a8-0000-7000-8000-000000000001'
     );
     expect(call.init.method).toBe('GET');
     expect(call.init.headers[API_KEY_HEADER]).toBe(KEY);
@@ -409,7 +409,7 @@ describe('object downloads', () => {
     expect([...bytes]).toEqual([1, 2, 3]);
     const call = f.calls[0] as Call;
     expect(call.url).toBe(
-      'http://gateway:8080/local-storage/doc-storage/abc.pdf?X-Amz-Signature=sig&X-Amz-Expires=300'
+      'http://gateway:8081/local-storage/doc-storage/abc.pdf?X-Amz-Signature=sig&X-Amz-Expires=300'
     );
     expect(call.init.headers[API_KEY_HEADER]).toBeUndefined();
     expect(call.init.redirect).toBe('error');

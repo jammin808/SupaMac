@@ -73,7 +73,7 @@ describe('loadConfig', () => {
     expect(config.timeZone).toBe('Europe/London');
     expect(config.stateDir).toBe('/var/lib/supamac-jobs');
     expect(config.healthPort).toBe(8080);
-    expect(config.supamacBaseUrl).toBe('http://gateway:8080/dss');
+    expect(config.supamacBaseUrl).toBe('http://gateway:8081/dss');
     expect(config.ai).toMatchObject({
       model: 'claude-opus-5-5',
       monthlyLimitUsd: 20,

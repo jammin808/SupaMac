@@ -20,7 +20,7 @@
 // - `JOBS_STATE_DIR` (default /var/lib/supamac-jobs), `JOBS_HEALTH_PORT`
 //   (default 8080), `JOBS_WEB_APP_URL` (links into SupaMac; none without it),
 //   `JOBS_SUPAMAC_URL` (the gateway's storage base, default
-//   http://gateway:8080/dss), `JOBS_AI_PRICES` (JSON: model id to
+//   http://gateway:8081/dss), `JOBS_AI_PRICES` (JSON: model id to
 //   `{ input, output, cacheRead, cacheWrite, cacheWrite1h? }` in USD per
 //   million tokens; the defaults of ai/spend.ts otherwise),
 //   `JOBS_AI_FALLBACKS` (`on` or `off`: the server-side fallbacks on refusal;

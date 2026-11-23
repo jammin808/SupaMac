@@ -18,14 +18,13 @@
 //   a tag), JSON or a contact card (BEGIN:VCARD) is refused whatever it is
 //   called. Text bytes under a binary type's name (a .pdf that is text) are
 //   read as the text they are.
-// - Plain text is read as written, though the design's list does not name
-//   it: it is how a forwarded message's text arrives, and it is the same text
-//   the CSV and email readers take.
-// - HEIC and HEIF photos are refused with a reason (the service cannot
-//   convert them: the design asks for conversion, which needs an image
-//   decoder this service does not have); GIF images, Word 97–2003 and Excel
-//   97–2003 files, other Office files, other archives and every other type are
-//   refused as unsupported, never parsed.
+// - Plain text is read as written: it is how a forwarded message's text
+//   arrives, and it is the same text the CSV and email readers take.
+// - HEIC and HEIF photos are refused with a reason that asks for a JPEG or
+//   a screenshot: converting them needs an image decoder this service does
+//   not have. GIF images, Word 97–2003 and Excel 97–2003 files, other
+//   Office files, other archives and every other type are refused as
+//   unsupported, never parsed.
 // - Over `maxBytes` is refused; over `pageTextOnlyBytes` a source is read
 //   from its page text only, and the result says so.
 // - `extract` never throws for a file's content: a refusal is a value, and
