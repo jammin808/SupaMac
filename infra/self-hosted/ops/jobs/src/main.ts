@@ -46,6 +46,7 @@ import {
   wayOn,
 } from './config';
 import { Logger } from './log';
+import { mailIntakes } from './mail/index';
 import {
   Lane,
   type Extractor,
@@ -61,6 +62,7 @@ import { setupMarkdown, writeSetupDocument } from './pipeline/setup';
 import { StateLedger, StateStore } from './pipeline/state';
 import type { JobsStore } from './pipeline/store';
 import { SupaMacStore } from './pipeline/supamac-store';
+import { telegramIntake } from './telegram';
 import { WATCHED_TABLES } from './supamac/changes';
 import { type FetchLike, SupaMacClient, SupaMacError } from './supamac/client';
 import { webAppBase } from './supamac/documents';
@@ -311,7 +313,13 @@ export async function startService(options: ServiceOptions): Promise<Service> {
   const mask = (text: string): string => logger.secrets.mask(text);
   const clock = options.clock ?? (() => new Date());
   const state = await StateStore.open(config.stateDir, { clock, logger });
-  const notifier = options.notifier ?? new NullNotifier();
+  // The Telegram bot is the owner's notifier and a way in; a caller that
+  // gives its own notifier or intakes (a test) gets neither.
+  const bot =
+    options.notifier === undefined && options.intakes === undefined
+      ? telegramIntake(config, { state, logger })
+      : undefined;
+  const notifier = options.notifier ?? bot?.notifier ?? new NullNotifier();
   const client = new SupaMacClient({
     apiKey: config.supamacApiKey,
     baseUrl: config.supamacBaseUrl,
@@ -363,7 +371,12 @@ export async function startService(options: ServiceOptions): Promise<Service> {
     lane: new Lane(),
   };
   const pipeline = new Pipeline(ctx);
-  const intakes = options.intakes ?? [];
+  // The mailbox, like the bot, is a way in only for a caller that gives
+  // neither notifier nor intakes (main); a test gives its own.
+  const intakes = options.intakes ?? [
+    ...(bot !== undefined ? [bot] : []),
+    ...(options.notifier === undefined ? mailIntakes(config, options.env) : []),
+  ];
 
   const ensure = options.ensureSchema ?? ensureJobsSchema;
   const verify = async (): Promise<EnsureSchemaResult> => {
