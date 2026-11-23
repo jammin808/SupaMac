@@ -92,7 +92,13 @@ export class SecretRegistry {
     }
     this.values.add(value);
     const encoded = encodeURIComponent(value);
-    if (encoded !== value) this.values.add(encoded);
+    if (encoded !== value) {
+      this.values.add(encoded);
+      // Percent-encoding may be written in either case (%2F or %2f).
+      this.values.add(
+        encoded.replace(/%[0-9A-F]{2}/g, (octet) => octet.toLowerCase())
+      );
+    }
   }
 
   /** Masks registered values and the known key and token shapes in a string. */

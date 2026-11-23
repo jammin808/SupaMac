@@ -1119,7 +1119,7 @@ describe('checkDetails', () => {
         candidate({
           field: 'Hotel',
           value: 'Example Hotel Leeds',
-          quote: 'Hotel: Example Hotel Leeds, 1 Sample Street, Leeds ZZ2 2ZZ',
+          quote: 'Hotel: Example Hotel Leeds, 1 Sample Mews, Leeds ZZ2 2ZZ',
         }),
         candidate({
           field: 'Check-out',
@@ -1216,10 +1216,10 @@ describe('labels that name the field alone', () => {
     const r = run(
       candidate({
         field: 'Hotel address',
-        value: '1 Sample Street, Leeds',
-        quote: 'Address: 1 Sample Street, Leeds',
+        value: '1 Sample Mews, Leeds',
+        quote: 'Address: 1 Sample Mews, Leeds',
       }),
-      one('Address: 1 Sample Street, Leeds')
+      one('Address: 1 Sample Mews, Leeds')
     );
     expectReview(r, 'label_names_other_field');
     expect(r.text).toContain("'address' is a label for Venue address too");
@@ -1238,10 +1238,10 @@ describe('labels that name the field alone', () => {
       run(
         candidate({
           field: 'Venue address',
-          value: '1 Sample Street, Leeds',
-          quote: 'Venue address: 1 Sample Street, Leeds',
+          value: '1 Sample Mews, Leeds',
+          quote: 'Venue address: 1 Sample Mews, Leeds',
         }),
-        one('Venue address: 1 Sample Street, Leeds')
+        one('Venue address: 1 Sample Mews, Leeds')
       )
     );
   });

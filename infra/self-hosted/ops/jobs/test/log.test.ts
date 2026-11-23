@@ -236,3 +236,13 @@ describe('maskSecrets', () => {
     );
   });
 });
+
+test('masks a registered secret in lower-case percent-encoding too', () => {
+  const lines: string[] = [];
+  const logger = new Logger({ sink: (line) => lines.push(line) });
+  logger.addSecret('p@ss/word+1');
+  logger.info('login', {
+    url: 'imap://user:p%40ss%2fword%2b1@mail.example.com',
+  });
+  expect(lines.join('\n')).not.toContain('p%40ss%2fword%2b1');
+});

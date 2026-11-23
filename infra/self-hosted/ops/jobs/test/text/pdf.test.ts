@@ -74,7 +74,7 @@ describe('PDF text', () => {
       {
         x: 72,
         y: 760,
-        text: 'Hotel: Example Hotel Leeds, 1 Sample Street, Leeds ZZ2 2ZZ',
+        text: 'Hotel: Example Hotel Leeds, 1 Sample Mews, Leeds ZZ2 2ZZ',
       },
     ]);
     const value = await pdfPages(pdf([page1, page2]));
@@ -93,7 +93,7 @@ describe('PDF text', () => {
       {
         page: 2,
         kind: 'text',
-        lines: ['Hotel: Example Hotel Leeds, 1 Sample Street, Leeds ZZ2 2ZZ'],
+        lines: ['Hotel: Example Hotel Leeds, 1 Sample Mews, Leeds ZZ2 2ZZ'],
       },
     ]);
   });

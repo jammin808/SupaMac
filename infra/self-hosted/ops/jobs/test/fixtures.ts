@@ -72,7 +72,7 @@ export const HOTEL: SourceText = {
       'Example Hotel Leeds - Booking confirmation',
       'Booking reference: MAL-77821',
       'Guest: Sam Price',
-      'Hotel: Example Hotel Leeds, 1 Sample Street, Leeds ZZ2 2ZZ',
+      'Hotel: Example Hotel Leeds, 1 Sample Mews, Leeds ZZ2 2ZZ',
       'Check-in: Fri 12 March 2027 from 15:00',
       'Check-out: Sun 14 March 2027 by 11:00',
       'Arrival 12/03/2027',

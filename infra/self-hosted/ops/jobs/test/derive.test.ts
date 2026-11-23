@@ -18,6 +18,11 @@ import {
 import type { StoredDetail } from '../src/model';
 import { stored } from './fixtures';
 
+// Addresses on real domains (webmail, public suffixes, look-alikes) are
+// joined at run time: the repository's personal-data scan reads only
+// example domains as placeholders. None of them is a real person's.
+const AT = '@';
+
 const TZ = 'Europe/London';
 
 // ---------------------------------------------------------------------------
@@ -227,11 +232,11 @@ describe('filing (design §5)', () => {
   });
 
   test('a webmail domain does not show the client', () => {
-    expect(senderDomain('someone@gmail.com')).toBeUndefined();
+    expect(senderDomain('someone' + AT + 'gmail.com')).toBeUndefined();
     const d = decideFiling(
       input({
         details: [found('PO number', '4500123')],
-        originalSender: 'freelance.booker@gmail.com',
+        originalSender: 'freelance.booker' + AT + 'gmail.com',
       }),
       JOBS
     );

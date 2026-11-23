@@ -81,7 +81,7 @@ export const CALL_SHEET_PDF = pdfOf([
 export const HOTEL_PDF = pdfOf([
   'Example Hotel Leeds - Booking confirmation',
   'Booking reference: MAL-77821',
-  'Hotel: Example Hotel Leeds, 1 Sample Street, Leeds ZZ2 2ZZ',
+  'Hotel: Example Hotel Leeds, 1 Sample Mews, Leeds ZZ2 2ZZ',
   'Check-in: Fri 12 March 2027',
   'Check-out: Sun 14 March 2027',
 ]);
@@ -242,8 +242,8 @@ export const HOTEL_REPLY: ExtractionReplyWire = {
     {
       field: 'Hotel',
       label: 'Hotel',
-      value: 'Example Hotel Leeds, 1 Sample Street, Leeds ZZ2 2ZZ',
-      quote: 'Hotel: Example Hotel Leeds, 1 Sample Street, Leeds ZZ2 2ZZ',
+      value: 'Example Hotel Leeds, 1 Sample Mews, Leeds ZZ2 2ZZ',
+      quote: 'Hotel: Example Hotel Leeds, 1 Sample Mews, Leeds ZZ2 2ZZ',
       page: 1,
     },
     {

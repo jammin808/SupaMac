@@ -104,8 +104,8 @@ const DETAILS: AnswerDetail[] = [
   detail({
     id: 'd-hotel',
     field: 'Hotel',
-    value: 'Example Hotel Leeds, 1 Sample Street, Leeds ZZ2 2ZZ',
-    quote: 'Hotel: Example Hotel Leeds, 1 Sample Street, Leeds ZZ2 2ZZ',
+    value: 'Example Hotel Leeds, 1 Sample Mews, Leeds ZZ2 2ZZ',
+    quote: 'Hotel: Example Hotel Leeds, 1 Sample Mews, Leeds ZZ2 2ZZ',
     source: HOTEL,
   }),
   detail({
@@ -700,7 +700,7 @@ describe('the question loop', () => {
       out.rendered.lines.filter((l) => l.startsWith('• Hotel:'))
     ).toHaveLength(2);
     expect(out.rendered.lines[1]).toStartWith(
-      '• Hotel: Example Hotel Leeds, 1 Sample Street'
+      '• Hotel: Example Hotel Leeds, 1 Sample Mews'
     );
   });
 
@@ -873,7 +873,7 @@ describe('the renderer', () => {
       `Call time, Fri 12 Mar 2027 (today): 07:00 (the call sheet "Leeds call sheet v2.pdf", p1, says 'Crew call 07:00, performers 09:00'; confirmed by you)`
     );
     expect(renderDetail(hotel, days)).toBe(
-      `Hotel: Example Hotel Leeds, 1 Sample Street, Leeds ZZ2 2ZZ (the accommodation confirmation "Example Hotel booking confirmation" says 'Hotel: Example Hotel Leeds, 1 Sample Street, Leeds ZZ2 2ZZ'; not confirmed by you)`
+      `Hotel: Example Hotel Leeds, 1 Sample Mews, Leeds ZZ2 2ZZ (the accommodation confirmation "Example Hotel booking confirmation" says 'Hotel: Example Hotel Leeds, 1 Sample Mews, Leeds ZZ2 2ZZ'; not confirmed by you)`
     );
     expect(renderDetail({ ...sat, status: 'Rejected' }, days)).toBe(
       `Call time, Sat 13 Mar 2027 (tomorrow): was '07:30' (rejected by you; the call sheet "Leeds call sheet v2.pdf", p1)`

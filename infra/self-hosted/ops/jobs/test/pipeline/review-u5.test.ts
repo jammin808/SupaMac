@@ -481,7 +481,7 @@ describe('state file corruption or loss', () => {
 
   test('a state restored from an older backup still marks every Found value of the Jobs row as not confirmed', async () => {
     const INVOICE = new TextEncoder().encode(
-      'PO: 4500123\nClient: Example Arts Trust\nInvoice to: Acme Productions Ltd, 1 Example Road, Leeds ZZ3 3ZZ\n'
+      'PO: 4500123\nClient: Example Arts Trust\nInvoice to: Acme Productions Ltd, 1 Example Row, Leeds ZZ3 3ZZ\n'
     );
     const INVOICE_REPLY: ExtractionReplyWire = {
       source_kind: 'Purchase order',
@@ -504,9 +504,9 @@ describe('state file corruption or loss', () => {
         {
           field: 'Invoice to',
           label: 'Invoice to',
-          value: 'Acme Productions Ltd, 1 Example Road, Leeds ZZ3 3ZZ',
+          value: 'Acme Productions Ltd, 1 Example Row, Leeds ZZ3 3ZZ',
           quote:
-            'Invoice to: Acme Productions Ltd, 1 Example Road, Leeds ZZ3 3ZZ',
+            'Invoice to: Acme Productions Ltd, 1 Example Row, Leeds ZZ3 3ZZ',
         },
       ],
     };
@@ -534,7 +534,7 @@ describe('state file corruption or loss', () => {
     const job = onlyJob(w);
     expect(detailOf(w, 'invoice-to.txt', 'Invoice to').Status).toBe('Found');
     expect(job['Invoice to']).toBe(
-      'Acme Productions Ltd, 1 Example Road, Leeds ZZ3 3ZZ'
+      'Acme Productions Ltd, 1 Example Row, Leeds ZZ3 3ZZ'
     );
     // Rule zero: the Jobs row marks which of its values are not confirmed.
     expect(job['Not confirmed']).toContain('Invoice to');
