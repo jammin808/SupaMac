@@ -312,7 +312,7 @@ fn make_invite() -> InviteToMacro {
 }
 
 #[test]
-fn invitation_logos_keep_the_png_aspect_ratio() {
+fn invitation_headers_show_the_web_apps_logo_and_no_upstream_contacts() {
     let team_invite = InviteToTeamMetadata {
         team_name: "Acme".to_string(),
         team_id: Uuid::nil(),
@@ -322,9 +322,14 @@ fn invitation_logos_keep_the_png_aspect_ratio() {
         sender_profile_picture_url: None,
         invitee_plan: InviteePlan::Free,
         reminder: false,
-        is_agent: false,
+        is_agent: true,
         inviter_name: None,
     };
+    let header = format!(
+        r#"<a href="{}" style="text-decoration: none" ><img src="{}" width="36" height="36""#,
+        web_app_url(),
+        email_logo_url()
+    );
     for email in [
         make_invite().format_email(),
         make_channel_invite().format_email(),
@@ -332,10 +337,28 @@ fn invitation_logos_keep_the_png_aspect_ratio() {
         make_colleague_joined().format_email(),
     ] {
         let body = email.body.split_whitespace().collect::<Vec<_>>().join(" ");
-        assert!(body.contains(
-            r#"src="https://static-file-service.macro.com/file/b911aba9-94a6-435c-aa16-8404739f13b0" width="54" height="36""#
-        ));
+        assert!(body.contains(&header), "{body}");
+        assert!(!body.contains("static-file-service"));
+        assert!(!body.contains("mailto:"));
+        assert!(!body.contains("sdk."));
     }
+}
+
+#[test]
+fn the_email_logo_is_a_file_of_the_web_app() {
+    let root = web_app_root(
+        Environment::Local,
+        Some("https://example.com/supamac/"),
+        "https://example.com",
+    );
+    assert_eq!(
+        web_app_link(&root, &["macro-email-logo.png"]).as_str(),
+        "https://example.com/supamac/macro-email-logo.png"
+    );
+    assert_eq!(
+        email_logo_url().as_str(),
+        format!("{}macro-email-logo.png", web_app_url())
+    );
 }
 
 #[test]
@@ -345,19 +368,109 @@ fn referral_url_does_not_panic() {
 }
 
 #[test]
-fn get_url_all_environments() {
-    let code = ReferralCode("CODE".to_string());
-    let cases = [
-        (Environment::Production, "macro.com"),
-        (Environment::Develop, "dev.macro.com"),
-        (Environment::Local, "localhost"),
-    ];
-    for (env, expected_host) in cases {
-        let url = get_url(env, &code);
-        assert_eq!(url.host_str().unwrap(), expected_host);
-        assert!(url.as_str().contains("referral_code=CODE"));
-        assert_eq!(url.path(), "/app/signup");
+fn a_deployment_without_a_frontend_origin_links_below_the_app_service_url() {
+    for env in [
+        Environment::Production,
+        Environment::Develop,
+        Environment::Local,
+    ] {
+        let app_service_url = AppServiceUrl::default_for_environment(env);
+        let root = web_app_root(env, None, &app_service_url);
+        assert_eq!(root.as_str(), format!("{app_service_url}/app/"));
     }
+}
+
+#[test]
+fn a_named_frontend_origin_wins_in_every_environment() {
+    for env in [
+        Environment::Production,
+        Environment::Develop,
+        Environment::Local,
+    ] {
+        let app_service_url = AppServiceUrl::default_for_environment(env);
+        let root = web_app_root(env, Some("https://example.com/supamac/"), &app_service_url);
+        assert_eq!(root.as_str(), "https://example.com/supamac/");
+    }
+}
+
+#[test]
+fn a_local_stack_links_to_its_frontend_origin() {
+    let cases = [
+        // A self-hosted stack names the folder its bundle is served from.
+        (
+            "https://example.com/supamac/",
+            "https://example.com/supamac/",
+        ),
+        (
+            "https://example.com/supamac",
+            "https://example.com/supamac/",
+        ),
+        (
+            "https://example.com/team/app/?x=1#y",
+            "https://example.com/team/app/",
+        ),
+        // A developer stack names a bare origin that serves the app at /app.
+        ("https://localhost:8443", "https://localhost:8443/app/"),
+        ("https://localhost:8443/", "https://localhost:8443/app/"),
+    ];
+    for (frontend_origin, expected) in cases {
+        let root = web_app_root(
+            Environment::Local,
+            Some(frontend_origin),
+            "https://app.example.org",
+        );
+        assert_eq!(root.as_str(), expected);
+    }
+}
+
+#[test]
+fn a_local_stack_without_a_usable_frontend_origin_links_below_the_app_service_url() {
+    let cases = [
+        (
+            None,
+            "https://app.example.org",
+            "https://app.example.org/app/",
+        ),
+        (
+            Some("not a url"),
+            "https://app.example.org",
+            "https://app.example.org/app/",
+        ),
+        (
+            Some("mailto:someone@example.com"),
+            "https://app.example.org",
+            "https://app.example.org/app/",
+        ),
+        (None, "not a url", "http://localhost:3000/app/"),
+    ];
+    for (frontend_origin, app_service_url, expected) in cases {
+        let root = web_app_root(Environment::Local, frontend_origin, app_service_url);
+        assert_eq!(root.as_str(), expected);
+    }
+}
+
+#[test]
+fn invitation_links_stay_below_the_web_apps_folder() {
+    let root = web_app_root(
+        Environment::Local,
+        Some("https://example.com/supamac/"),
+        "https://example.com",
+    );
+    let code = ReferralCode("CODE".to_string());
+
+    assert_eq!(
+        get_url(&root, &code).as_str(),
+        "https://example.com/supamac/signup?referral_code=CODE"
+    );
+    assert_eq!(
+        web_app_link(&root, &["signup", "agent"]).as_str(),
+        "https://example.com/supamac/signup/agent"
+    );
+    // A value from a payload stays one segment below the folder.
+    assert_eq!(
+        web_app_link(&root, &["meet", "join", "../a/b?c#d"]).as_str(),
+        "https://example.com/supamac/meet/join/..%2Fa%2Fb%3Fc%23d"
+    );
 }
 
 #[test]

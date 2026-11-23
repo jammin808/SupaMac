@@ -18,7 +18,6 @@ use http::{HeaderValue, Method};
 use http_body_util::BodyExt;
 use http_body_util::Full;
 use http_body_util::combinators::UnsyncBoxBody;
-use macro_user_id::email::ReadEmailParts;
 use macro_user_id::user_id::MacroUserIdStr;
 use rand::RngCore;
 use sha2::{Digest, Sha256};
@@ -208,20 +207,6 @@ impl fmt::Debug for UpstreamCredential {
             Self::Anonymous => f.write_str("Anonymous"),
         }
     }
-}
-
-/// The email domain Macro staff live under.
-const STAFF_EMAIL_DOMAIN: &str = "macro.com";
-
-/// Whether a user belongs to the Macro staff domain.
-///
-/// The proxy is staff-only for now: every credential it stamps spends real
-/// upstream access on the owner's behalf, and until that has earned broader
-/// trust, "owned by somebody @macro.com" is the whole admission policy. In
-/// the domain rather than deployment configuration so it cannot be switched
-/// off by an unset env var.
-pub fn is_macro_staff(user: &MacroUserIdStr<'_>) -> bool {
-    user.email_part().domain_part() == STAFF_EMAIL_DOMAIN
 }
 
 /// What a verified session token entitles its holder to.

@@ -372,6 +372,14 @@ pub trait PresignedUploadUrlPort: Send + Sync + 'static {
         content_type: ContentType,
     ) -> impl Future<Output = anyhow::Result<String>> + Send;
 
+    /// Generate an expiring presigned URL for downloading an object of the
+    /// document storage bucket, addressed where a browser reaches the store.
+    fn get_document_storage_presigned_url(
+        &self,
+        key: &str,
+        expires_in_seconds: u64,
+    ) -> impl Future<Output = anyhow::Result<String>> + Send;
+
     /// Copy a document object from source key to destination key within the storage bucket.
     fn copy_object(
         &self,

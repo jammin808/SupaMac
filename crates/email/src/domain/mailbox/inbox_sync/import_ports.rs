@@ -262,12 +262,13 @@ pub trait InboxSyncUploads: Send + Sync + 'static {
     ) -> BoxFuture<'a, Result<String, InboxSyncUploadError>>;
 }
 
-/// Contact connection publication without exposing transport request types.
+/// Contact publication without exposing transport request types.
 pub trait InboxSyncContacts: Send + Sync + 'static {
-    /// Publish the already selected valid contacts for this owner.
+    /// Record the already selected valid contacts as known to the owner
+    /// through this inbox.
     fn connect<'a>(
         &'a self,
-        owner: &'a MacroUserIdStr<'static>,
+        link: &'a service::link::Link,
         contacts: Vec<MacroUserIdStr<'static>>,
     ) -> BoxFuture<'a, anyhow::Result<()>>;
 }
@@ -287,11 +288,11 @@ pub struct InboxSyncNotification {
     pub snippet: String,
     /// Parsed sender identity, when available.
     pub sender_id: Option<MacroUserIdStr<'static>>,
-    /// Owner and valid delegated recipients in this partition.
+    /// Owner and valid delegated recipients.
     pub recipients: std::collections::HashSet<MacroUserIdStr<'static>>,
     /// Send the realtime notification for a Signal message.
     pub realtime: bool,
-    /// Enable APNS for the staff Signal partition.
+    /// Also send an APNS push. Inbox sync never does.
     pub apns: bool,
 }
 

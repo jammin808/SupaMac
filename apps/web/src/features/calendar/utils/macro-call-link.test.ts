@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   attachCalendarMacroCall,
   calendarMacroCallUrl,
@@ -124,5 +124,117 @@ describe('Macro calendar call links', () => {
       location: 'Room 2',
     };
     expect(removeCalendarMacroCall(content, URL)).toEqual(content);
+  });
+
+  it('writes the join line under the label the calendar service strips, and clears either wording', () => {
+    const attached = attachCalendarMacroCall(
+      { description: '', location: '' },
+      URL
+    );
+    // The service leaves this paragraph out of shares by its exact label
+    // (JOIN_LINE_LABEL in crates/calendar_events/src/domain/meeting_links.rs).
+    expect(attached.description).toBe(
+      `<p>Join SupaMac call: <a href="${URL}">${URL}</a></p>`
+    );
+    expect(removeCalendarMacroCall(attached, URL).description).toBe('');
+
+    // The hosted product's wording, which stored events carry, is generated
+    // text too.
+    expect(
+      removeCalendarMacroCall(
+        {
+          description: `<p>Notes</p><p>join macro call: ${URL}</p>`,
+          location: '',
+        },
+        URL
+      ).description
+    ).toBe('<p>Notes</p>');
+  });
+});
+
+// A deployment served from its own host and folder shares meeting links under
+// both, so an event must recognize exactly those as its Macro call.
+describe('Macro calendar call links under another base path', () => {
+  afterEach(() => {
+    vi.doUnmock('@core/util/webOrigin');
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
+  it('recognizes the links the deployment shares, on its own origin and base only', async () => {
+    vi.stubEnv('__APP_BASE_PATH__', '/workspace');
+    vi.doMock('@core/util/webOrigin', () => ({
+      getWebOrigin: () => 'https://example.com',
+    }));
+    vi.resetModules();
+    const { getMeetingUrl } = await import('@channel/Call/call-link');
+    const { macroCallUrl } = await import('./macro-call-link');
+
+    const shared = getMeetingUrl('8m8mGwzHqxzYjeIN5-nJRquRbzyTEhGF');
+
+    expect(shared).toBe(
+      'https://example.com/workspace/meet/join/8m8mGwzHqxzYjeIN5-nJRquRbzyTEhGF'
+    );
+    expect(macroCallUrl(shared)).toBe(shared);
+    expect(
+      macroCallUrl(shared.replace('example.com', 'other.example'))
+    ).toBeUndefined();
+    expect(macroCallUrl(shared.replace('/workspace', '/app'))).toBeUndefined();
+  });
+});
+
+// A self-hosted instance's calls are its own: an invitation from the hosted
+// product is not a way into one of them.
+describe('Macro calendar call links on a self-hosted instance', () => {
+  afterEach(() => {
+    vi.doUnmock('@core/constant/servers');
+    vi.doUnmock('@core/util/webOrigin');
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
+  it('recognizes its own and local links, and none of the hosted product', async () => {
+    vi.stubEnv('__APP_BASE_PATH__', '/supamac');
+    vi.doMock('@core/constant/servers', async (importOriginal) => ({
+      ...(await importOriginal<typeof import('@core/constant/servers')>()),
+      SELF_HOSTED: true,
+    }));
+    vi.doMock('@core/util/webOrigin', () => ({
+      getWebOrigin: () => 'https://ui.example.org',
+    }));
+    vi.resetModules();
+    const { calendarMacroCallUrl, macroCallUrl, removeCalendarMacroCall } =
+      await import('./macro-call-link');
+
+    const own =
+      'https://ui.example.org/supamac/meet/join/8m8mGwzHqxzYjeIN5-nJRquRbzyTEhGF';
+    expect(macroCallUrl(own)).toBe(own);
+    expect(
+      macroCallUrl(
+        'http://localhost:3003/supamac/meet/8m8mGwzHqxzYjeIN5-nJRquRbzyTEhGF'
+      )
+    ).toBe(
+      'http://localhost:3003/supamac/meet/8m8mGwzHqxzYjeIN5-nJRquRbzyTEhGF'
+    );
+    for (const hosted of [
+      URL,
+      SETUP_URL,
+      URL.replace('https://macro.com/app', 'https://macro.com/supamac'),
+      URL.replace('https://macro.com/app', 'https://dev.macro.com/supamac'),
+    ]) {
+      expect(macroCallUrl(hosted)).toBeUndefined();
+      expect(calendarMacroCallUrl({ location: hosted })).toBeUndefined();
+    }
+
+    // The hosted product's wording still marks a generated paragraph.
+    expect(
+      removeCalendarMacroCall(
+        {
+          description: `<p>Notes</p><p>Join Macro call: <a href="${own}">${own}</a></p>`,
+          location: '',
+        },
+        own
+      ).description
+    ).toBe('<p>Notes</p>');
   });
 });

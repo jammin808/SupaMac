@@ -155,6 +155,9 @@ fn emits_required_keys() {
         "META_PIXEL_ID",
         "META_ACCESS_TOKEN",
         "DEV_DANGEROUS_LOCAL_CONTAINERS",
+        "DEV_DANGEROUS_PRIVATE_MCP_ADDRESSES",
+        "DEV_DANGEROUS_PRIVATE_WEBHOOK_ENDPOINTS",
+        "DEV_DANGEROUS_CROSS_SITE_COOKIES",
         "LOCAL_CONTAINER_IMAGE",
         "LOCAL_CONTAINER_NETWORK",
         "DAYTONA_API_KEY",
@@ -470,6 +473,25 @@ fn the_agent_harness_uses_local_containers_and_wipes_daytona() {
         env.get("CODEX_OAUTH_KMS_KEY_ID").map(String::as_str),
         Some(resources::CODEX_OAUTH_KMS_ALIAS)
     );
+}
+
+/// Services default to what an internet-facing instance needs, so the stack
+/// has to ask for each developer relaxation it relies on: in-network http
+/// MCP and preview services, http webhook receivers on the compose network,
+/// and cross-site session cookies.
+#[test]
+fn the_stack_opts_in_to_the_developer_relaxations() {
+    let env = local_env();
+
+    for key in [
+        "DEV_DANGEROUS_PRIVATE_MCP_ADDRESSES",
+        "DEV_DANGEROUS_PRIVATE_WEBHOOK_ENDPOINTS",
+        "DEV_DANGEROUS_CROSS_SITE_COOKIES",
+    ] {
+        assert_eq!(env.get(key).map(String::as_str), Some("true"), "{key}");
+    }
+    // Each service refuses its opt-in outside a local environment.
+    assert_eq!(env.get("ENVIRONMENT").map(String::as_str), Some("local"));
 }
 
 #[test]

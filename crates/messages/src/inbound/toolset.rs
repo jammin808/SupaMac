@@ -212,11 +212,11 @@ pub fn message_toolset<ESvc: EntityAccessService>() -> AsyncToolCollection<Messa
 #[serde(rename_all = "snake_case")]
 pub enum DiscussionParentType {
     /// A document of any type, including tasks, PDFs and uploaded files: the
-    /// id in a macro.com/app/<block>/<id> link such as /app/md/<id>,
-    /// /app/task/<id> or /app/pdf/<id>.
+    /// id in an /app/<block>/<id> link such as /app/md/<id>, /app/task/<id> or
+    /// /app/pdf/<id>.
     Document,
-    /// A Tasks project, which the API calls an initiative: the id in a
-    /// macro.com/app/tasks/projects/<id> link, the kind ReadInitiative reads.
+    /// A Tasks project, which the API calls an initiative: the id in an
+    /// /app/tasks/projects/<id> link, the kind ReadInitiative reads.
     /// Not a folder: folders (ReadProject) have no Discussion.
     Initiative,
     /// A CRM company, the kind GetCompany reads.

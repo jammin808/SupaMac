@@ -13,9 +13,10 @@ use crate::outbound::repo_directories::{RepoDirectories, git_command};
 
 /// Branch every repo starts on.
 const INITIAL_BRANCH: &str = "main";
-/// Author of the initial commit.
+/// Author of the commits the server writes. They carry no address (`Macro <>`):
+/// the server has no mailbox of its own to give them.
 const INITIAL_AUTHOR_NAME: &str = "Macro";
-const INITIAL_AUTHOR_EMAIL: &str = "agents@macro.com";
+const INITIAL_AUTHOR_EMAIL: &str = "";
 const INITIAL_COMMIT_MESSAGE: &str = "Initial workspace";
 
 /// Errors from [`BareRepoStore`].
@@ -219,14 +220,14 @@ impl RepoStore for BareRepoStore {
         &self,
         agent_user_id: &MacroUserIdStr<'_>,
         files: &[RenderedFile],
-    ) -> Result<(), BareRepoStoreError> {
+    ) -> Result<bool, BareRepoStoreError> {
         let repo_path = self.directories.repo_path(agent_user_id);
 
         if tokio::fs::try_exists(&repo_path)
             .await
             .map_err(io_error("check repo", &repo_path))?
         {
-            return Ok(());
+            return Ok(false);
         }
 
         // Build under a scratch name and rename into place, so a half-built
@@ -258,9 +259,9 @@ impl RepoStore for BareRepoStore {
             commit_template(&git_dir, &work_tree, files).await?;
 
             match tokio::fs::rename(&git_dir, &repo_path).await {
-                Ok(()) => Ok(()),
+                Ok(()) => Ok(true),
                 // A concurrent create won the rename; its repo stands.
-                Err(_) if tokio::fs::try_exists(&repo_path).await.unwrap_or(false) => Ok(()),
+                Err(_) if tokio::fs::try_exists(&repo_path).await.unwrap_or(false) => Ok(false),
                 Err(source) => Err(BareRepoStoreError::Io {
                     action: "move repo into place",
                     path: repo_path.clone(),
@@ -274,8 +275,9 @@ impl RepoStore for BareRepoStore {
             .await
             .map_err(io_error("remove staging directory", &staging));
 
-        built?;
-        cleaned
+        let created = built?;
+        cleaned?;
+        Ok(created)
     }
 
     #[tracing::instrument(skip_all, err)]

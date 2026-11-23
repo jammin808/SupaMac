@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { readEntityAppearance } from '../../entity-appearance/core/appearance';
 /** The forms service's wire shapes, projected into the feature's vocabulary and back. */
 
@@ -292,7 +293,7 @@ export function toSubmitOutcome(outcome: SubmissionOutcome): SubmitOutcome {
     .exhaustive(() => ({
       kind: 'stopped',
       sectionId: '',
-      message: 'Update Macro to see whether your response was submitted.',
+      message: `Update ${PRODUCT_NAME} to see whether your response was submitted.`,
     }));
 }
 

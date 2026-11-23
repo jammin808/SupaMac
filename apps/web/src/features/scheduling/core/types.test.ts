@@ -38,7 +38,7 @@ describe('scheduling form validation', () => {
     const event = newEventType('schedule', ['host'], false);
     expect(event.macroCall).toBe(true);
     expect(event.googleMeet).toBe(false);
-    expect(meetingPlaceLabel(event)).toBe('Macro call');
+    expect(meetingPlaceLabel(event)).toBe('SupaMac call');
     expect(
       meetingPlaceLabel({ ...event, macroCall: false, googleMeet: true })
     ).toBe('Video meeting');

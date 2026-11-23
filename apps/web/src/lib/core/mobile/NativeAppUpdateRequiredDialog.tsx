@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { fireAndForget } from '@core/util/fireAndForget';
 import { getNativeMobilePlatform } from '@core/util/platform';
 import { Button, Dialog, Surface } from '@ui';
@@ -19,9 +20,8 @@ export function NativeAppUpdateRequiredDialog(props: {
     setLinkFailed(!(await openNativeUpdateLink(platform)));
     setOpening(false);
   }
-  const title = 'Update Macro App required';
-  const description =
-    'There is a new version of Macro App available. Please update your app. You may experience degraded service until the app is updated.';
+  const title = `Update ${PRODUCT_NAME} App required`;
+  const description = `There is a new version of ${PRODUCT_NAME} App available. Please update your app. You may experience degraded service until the app is updated.`;
 
   return (
     <Dialog

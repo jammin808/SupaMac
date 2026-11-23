@@ -1,15 +1,29 @@
+//! The browser-origin policy the HTTP services share: the origin allow-list,
+//! the CORS layer that enforces it, and its answer for WebSocket upgrades,
+//! which CORS does not cover.
+//!
+//! `ALLOWED_ORIGINS` (comma-separated, each entry as a browser sends it in
+//! `Origin`: `scheme://host[:port]`, no path or trailing slash) makes the
+//! allow-list exactly those origins. Unset or blank, the built-in policy
+//! applies: upstream's hosts, its preview deployments, and loopback
+//! development ports.
+
 #[cfg(test)]
 mod test;
 
-use std::{borrow::Cow, time::Duration};
+use std::{sync::Arc, time::Duration};
 
-use axum::http::{
-    HeaderName, HeaderValue, Method,
-    header::{AUTHORIZATION, CONTENT_TYPE},
+use axum::{
+    extract::{FromRef, FromRequestParts},
+    http::{
+        HeaderName, HeaderValue, Method, StatusCode,
+        header::{AUTHORIZATION, CONTENT_TYPE, ORIGIN},
+        request::Parts,
+    },
 };
 use tower_http::cors::{AllowOrigin, CorsLayer};
 
-static ALLOWED_ORIGINS: [&str; 11] = [
+static BUILT_IN_ORIGINS: [&str; 11] = [
     "http://localhost:5173",
     "https://dashboarddev.macro.com",
     "https://dashboard.macro.com",
@@ -34,30 +48,106 @@ static EXTRA_HEADERS: [&str; 4] = [
 /// five seconds, so any API call after a short idle pays an extra round trip.
 const PREFLIGHT_MAX_AGE: Duration = Duration::from_secs(2 * 60 * 60);
 
-fn get_allowed_origins() -> Vec<Cow<'static, str>> {
-    #[allow(
-        clippy::disallowed_methods,
-        reason = "Used to override ALLOWED_ORIGINS when running locally"
-    )]
-    match std::env::var("ALLOWED_ORIGINS") {
-        Ok(origins) => origins
+macro_env_var::maybe_env_var! {
+    struct AllowedOrigins;
+}
+
+/// Which browser origins may make credentialed cross-origin requests.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum OriginAllowList {
+    /// `ALLOWED_ORIGINS` names no origin: the built-in origins, preview
+    /// deployments, and loopback development ports.
+    BuiltIn,
+    /// `ALLOWED_ORIGINS` names these origins: they are allowed, compared
+    /// exactly, and nothing else is.
+    Exact(Vec<String>),
+}
+
+impl OriginAllowList {
+    /// Reads the allow-list from `ALLOWED_ORIGINS`.
+    pub fn from_env() -> Self {
+        let configured = AllowedOrigins::new();
+
+        Self::parse(configured.as_ref().and_then(AllowedOrigins::value))
+    }
+
+    fn parse(configured: Option<&str>) -> Self {
+        let origins: Vec<String> = configured
+            .unwrap_or_default()
             .split(',')
-            .map(|origin| origin.trim().to_string())
-            .map(Cow::Owned)
-            .collect(),
-        Err(_) => ALLOWED_ORIGINS.into_iter().map(Cow::Borrowed).collect(),
+            .map(str::trim)
+            .filter(|origin| !origin.is_empty())
+            .map(str::to_owned)
+            .collect();
+
+        if origins.is_empty() {
+            Self::BuiltIn
+        } else {
+            Self::Exact(origins)
+        }
+    }
+
+    /// Whether `origin`, the value of an `Origin` header, is on the list.
+    pub fn allows(&self, origin: &str) -> bool {
+        match self {
+            Self::BuiltIn => is_built_in_origin(origin),
+            Self::Exact(origins) => origins.iter().any(|allowed| allowed == origin),
+        }
+    }
+
+    /// Whether a WebSocket upgrade that carries `origin` may proceed.
+    ///
+    /// A browser attaches the visitor's cookies to an upgrade from any page,
+    /// and CORS does not apply to it, so `Origin` is all that tells the app's
+    /// own page from someone else's. Browsers always send it; a request
+    /// without one comes from a native shell or a server-side caller, which
+    /// no foreign page can steer.
+    ///
+    /// The built-in list does not decide upgrades: it serves stacks whose
+    /// local proxies and development servers present origins it cannot name.
+    pub fn allows_upgrade(&self, origin: Option<&HeaderValue>) -> bool {
+        let Some(origin) = origin else {
+            return true;
+        };
+
+        match self {
+            Self::BuiltIn => true,
+            Self::Exact(_) => origin.to_str().is_ok_and(|origin| self.allows(origin)),
+        }
     }
 }
 
-/// Generates the Cors layer which can be used in the `ServiceBuilder::layer` method.
-pub fn cors_layer() -> CorsLayer {
-    cors_layer_with_headers(vec![])
+/// Extracted only from a request whose `Origin` may open a socket
+/// ([`OriginAllowList::allows_upgrade`]), so a handler that takes it ahead of
+/// its credentials refuses a foreign page before authenticating it.
+#[derive(Debug, Clone, Copy)]
+pub struct AllowedUpgradeOrigin;
+
+impl<S> FromRequestParts<S> for AllowedUpgradeOrigin
+where
+    S: Send + Sync,
+    Arc<OriginAllowList>: FromRef<S>,
+{
+    type Rejection = (StatusCode, &'static str);
+
+    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+        let origins = Arc::<OriginAllowList>::from_ref(state);
+        let origin = parts.headers.get(ORIGIN);
+
+        if origins.allows_upgrade(origin) {
+            return Ok(Self);
+        }
+
+        tracing::warn!(
+            ?origin,
+            "refused a websocket upgrade from an origin off the allow-list"
+        );
+        Err((StatusCode::FORBIDDEN, "origin not allowed"))
+    }
 }
 
-fn is_allowed_origin(origin: &str) -> bool {
-    let allowed_origins = get_allowed_origins();
-    // Check static origins first
-    if allowed_origins.contains(&Cow::Borrowed(origin)) {
+fn is_built_in_origin(origin: &str) -> bool {
+    if BUILT_IN_ORIGINS.contains(&origin) {
         return true;
     }
 
@@ -79,8 +169,17 @@ fn is_allowed_origin(origin: &str) -> bool {
     false
 }
 
+/// Generates the Cors layer which can be used in the `ServiceBuilder::layer` method.
+pub fn cors_layer() -> CorsLayer {
+    cors_layer_with_headers(vec![])
+}
+
 /// Generates the Cors layer with additional headers which can be used in the `ServiceBuilder::layer` method.
 pub fn cors_layer_with_headers(additional_headers: Vec<HeaderName>) -> CorsLayer {
+    cors_layer_for(OriginAllowList::from_env(), additional_headers)
+}
+
+fn cors_layer_for(origins: OriginAllowList, additional_headers: Vec<HeaderName>) -> CorsLayer {
     let mut headers = vec![AUTHORIZATION, CONTENT_TYPE];
     headers.extend(additional_headers);
     headers.extend(
@@ -89,6 +188,9 @@ pub fn cors_layer_with_headers(additional_headers: Vec<HeaderName>) -> CorsLayer
             .map(|header| HeaderName::from_static(header)),
     );
 
+    // The layer answers with the request's own origin only when the
+    // predicate accepts it, so an origin off the list never receives
+    // `Access-Control-Allow-Origin` and the browser withholds the response.
     CorsLayer::new()
         .max_age(PREFLIGHT_MAX_AGE)
         .allow_credentials(true)
@@ -102,8 +204,8 @@ pub fn cors_layer_with_headers(additional_headers: Vec<HeaderName>) -> CorsLayer
             Method::OPTIONS,
         ])
         .allow_origin(AllowOrigin::predicate(
-            |origin: &HeaderValue, _request_parts| {
-                origin.to_str().map(is_allowed_origin).unwrap_or(false)
+            move |origin: &HeaderValue, _request_parts| {
+                origin.to_str().is_ok_and(|origin| origins.allows(origin))
             },
         ))
 }

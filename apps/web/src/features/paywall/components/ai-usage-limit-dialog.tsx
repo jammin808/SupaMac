@@ -47,6 +47,8 @@ export type AiUsageLimitDialogProps = {
   /** When the monthly allowance resets. */
   resetsAt?: string;
   offer?: PurchaseOffer;
+  /** Nothing is sold here: the dialog names the limit and only dismisses. */
+  noticeOnly?: boolean;
   previewNotice?: string;
   onClose: () => void;
   onOpenSettings: () => void;
@@ -154,9 +156,11 @@ export function AiUsageLimitDialogView(props: AiUsageLimitDialogProps) {
             <Dialog.Title class="text-lg font-semibold text-ink">
               {TITLES[props.code ?? 'ai_allowance_exhausted']}
             </Dialog.Title>
-            <Dialog.Description class="text-sm text-ink-muted">
-              {description()}
-            </Dialog.Description>
+            <Show when={!props.noticeOnly}>
+              <Dialog.Description class="text-sm text-ink-muted">
+                {description()}
+              </Dialog.Description>
+            </Show>
             <Show when={props.previewNotice}>
               <p class="text-xs text-ink-extra-muted" role="status">
                 {props.previewNotice}
@@ -290,15 +294,17 @@ export function AiUsageLimitDialogView(props: AiUsageLimitDialogProps) {
               <Button variant="ghost" onClick={props.onClose}>
                 Dismiss
               </Button>
-              <Button
-                variant="primary"
-                disabled={
-                  props.offer?.pending || (limitReached() && !fixCard())
-                }
-                onClick={onPrimary}
-              >
-                {primaryLabel()}
-              </Button>
+              <Show when={!props.noticeOnly}>
+                <Button
+                  variant="primary"
+                  disabled={
+                    props.offer?.pending || (limitReached() && !fixCard())
+                  }
+                  onClick={onPrimary}
+                >
+                  {primaryLabel()}
+                </Button>
+              </Show>
             </div>
           </footer>
         </section>

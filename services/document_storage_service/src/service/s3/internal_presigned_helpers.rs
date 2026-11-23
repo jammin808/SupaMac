@@ -3,7 +3,7 @@ use std::time::Duration;
 use aws_sdk_s3 as s3;
 use aws_sdk_s3::presigning::PresigningConfig;
 
-const EXPIRY: Duration = Duration::from_secs(5 * 60);
+pub(in crate::service::s3) const EXPIRY: Duration = Duration::from_secs(5 * 60);
 
 /// Generates a presigned PUT URL for service-to-service uploads of opaque
 /// blobs (e.g. CRDT snapshots). Unlike
@@ -32,14 +32,16 @@ pub(in crate::service::s3) async fn put_internal_presigned_url(
     ))
 }
 
-/// Generates a presigned GET URL for the browser to fetch an opaque blob
-/// directly from S3 (e.g. CRDT snapshots used for optimistic seeds).
+/// Generates a presigned GET URL, valid for `expires_in`, for the browser to
+/// fetch an object directly from S3 (e.g. CRDT snapshots used for optimistic
+/// seeds, or a document under local AWS).
 /// Browser-facing transform — the user's browser resolves the URL via the
 /// host-mapped LocalStack port in local dev.
 pub(in crate::service::s3) async fn get_presigned_url(
     client: &s3::Client,
     bucket: &str,
     key: &str,
+    expires_in: Duration,
 ) -> anyhow::Result<String> {
     if cfg!(feature = "local") {
         return Ok("fake".to_string());
@@ -48,7 +50,7 @@ pub(in crate::service::s3) async fn get_presigned_url(
         .get_object()
         .bucket(bucket)
         .key(key)
-        .presigned(PresigningConfig::expires_in(EXPIRY)?)
+        .presigned(PresigningConfig::expires_in(expires_in)?)
         .await?;
     Ok(macro_aws_config::transform_aws_url(presigned.uri()))
 }

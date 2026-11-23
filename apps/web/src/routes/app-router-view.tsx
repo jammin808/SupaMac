@@ -7,7 +7,6 @@ import { ChannelsViewSkeleton } from '@app/features/channels-view/channels-view-
 import { DriveViewSkeleton } from '@app/features/drive-view/drive-view-skeleton';
 import { EmailViewSkeleton } from '@app/features/email-view/email-view-skeleton';
 import { ExternalViewSkeleton } from '@app/features/external-view/external-view-skeleton';
-import { InviteLinksPortal } from '@app/features/gtm-invite/InviteLinksPortal';
 import { InviteWelcome } from '@app/features/gtm-invite/InviteWelcome';
 import {
   HomeCalendarRouteView,
@@ -30,6 +29,7 @@ import {
   splitContentFromLocation,
   upgradeLegacyPath,
 } from '@components/app/split-layout/split-router/legacy-route';
+import { SELF_HOSTED } from '@core/constant/servers';
 import { isMobile } from '@core/mobile/isMobile';
 import { isNativeMobilePlatform } from '@core/mobile/isNativeMobilePlatform';
 import { isTouchDevice } from '@core/mobile/isTouchDevice';
@@ -64,6 +64,7 @@ import {
   HomeEntityDetailRouteView,
   MailRouteView,
   MeetingRouter,
+  NewHomeRouteView,
   NotFound,
   NotificationsCalendarRouteView,
   NotificationsRouteView,
@@ -158,6 +159,7 @@ import {
   loginRoute,
   meetRoute,
   mobileEmailSignupRoute,
+  newHomeRoute,
   notFoundRoute,
   notificationsCalendarRoute,
   notificationsRoute,
@@ -208,10 +210,6 @@ const { Router, Route } = SplitRouter;
 
 // Views under appRoute load lazily (lazy-route-views.ts); auth and booking
 // pages render outside it and load with the app.
-const SystemStatusDashboard = lazyNamed(
-  () => import('@app/features/system-status/views/SystemStatusDashboard'),
-  'SystemStatusDashboard'
-);
 
 /** Debug views stay behind the registry's lazy import. */
 function debugView(componentId: string) {
@@ -223,6 +221,28 @@ function debugView(componentId: string) {
   });
 }
 
+/** The hosted service's staff pages. */
+function staffRoutes(): JSX.Element[] {
+  const InviteLinksPortal = lazyNamed(
+    () => import('@app/features/gtm-invite/InviteLinksPortal'),
+    'InviteLinksPortal'
+  );
+  const SystemStatusDashboard = lazyNamed(
+    () => import('@app/features/system-status/views/SystemStatusDashboard'),
+    'SystemStatusDashboard'
+  );
+  return [
+    <Route
+      definition={internalInviteLinksRoute}
+      component={InviteLinksPortal}
+    />,
+    <Route
+      definition={internalSystemStatusRoute}
+      component={SystemStatusDashboard}
+    />,
+  ];
+}
+
 /**
  * The app's routes, as `<SplitRouter.Route>` elements; read once by the
  * router, and by tests that need the real route table.
@@ -231,6 +251,9 @@ export function appRouteElements(): JSX.Element {
   const debugRouteElements = debugRoutes.map(({ componentId, route }) => (
     <Route definition={route} component={debugView(componentId)} />
   ));
+  // Pages for the hosted service's staff, who are no one's staff on a
+  // self-hosted instance; there the call folds away with their modules.
+  const staffRouteElements = SELF_HOSTED ? [] : staffRoutes();
 
   return (
     <>
@@ -286,14 +309,7 @@ export function appRouteElements(): JSX.Element {
         />
         <Route definition={onboardingRoute} component={OnboardingPage} />
         <Route definition={inviteRoute} component={InviteWelcome} />
-        <Route
-          definition={internalInviteLinksRoute}
-          component={InviteLinksPortal}
-        />
-        <Route
-          definition={internalSystemStatusRoute}
-          component={SystemStatusDashboard}
-        />
+        {staffRouteElements}
         <Route definition={teamInviteRoute} component={TeamInviteAcceptance} />
         <Route
           definition={channelInviteRoute}
@@ -375,6 +391,7 @@ export function appRouteElements(): JSX.Element {
             component={HomeDetailRouteView}
           />
         </Route>
+        <Route definition={newHomeRoute} component={NewHomeRouteView} />
         <Route definition={recentRoute} component={RecentRouteView} />
         <Route definition={forYouRoute} component={ForYouRouteView} />
         <Route definition={activityRoute} component={ActivityRouteView} />

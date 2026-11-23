@@ -183,6 +183,13 @@ mod tests {
     }
 
     #[test]
+    fn code_mode_forbids_guessing_the_sdk() {
+        let code_mode = CODE_MODE_SESSION_TOOL_USE_PROMPT.to_string();
+        assert!(code_mode.contains("Never guess a method"));
+        assert!(code_mode.contains("to find out whether it exists"));
+    }
+
+    #[test]
     fn code_mode_presents_views_unasked_and_mentions_leave_what_they_show_unmentioned() {
         let code_mode = CODE_MODE_SESSION_TOOL_USE_PROMPT.to_string();
         assert!(
@@ -348,6 +355,28 @@ mod tests {
         }
         assert!(in_app.contains("non-Markdown documents"));
         assert!(in_app.contains("apply to your own conversational replies only"));
+    }
+
+    #[test]
+    fn static_prompts_send_the_model_to_no_documentation_site() {
+        // Item links come from the deployment's base url; nothing static names
+        // a host the model could fetch or hand to a user.
+        for (name, prompt) in [
+            ("tool use", TOOL_USE_PROMPT.to_string()),
+            ("direct tool use", DIRECT_TOOL_USE_PROMPT.to_string()),
+            ("session", SESSION_TOOL_USE_PROMPT.to_string()),
+            ("code mode", CODE_MODE_SESSION_TOOL_USE_PROMPT.to_string()),
+            ("mcp", MCP_STATIC_INSTRUCTIONS.to_string()),
+            (
+                "database read-only",
+                DATABASE_READ_ONLY_TOOL_USE_PROMPT.to_string(),
+            ),
+        ] {
+            assert!(
+                !prompt.contains("macro.com"),
+                "{name} prompt names macro.com"
+            );
+        }
     }
 }
 

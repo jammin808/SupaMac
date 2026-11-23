@@ -5,6 +5,7 @@ import type {
 import { type RichMessage, type SimpleMention, toBody } from '../../mentions';
 import { unwrap } from '../../utils';
 import type { MacroClient } from '../../utils/client';
+import { webAppLink } from '../../utils/web-app';
 import { FavoritableEntity } from '../entity';
 import { User } from '../users/user';
 import { Channel } from './channel';
@@ -144,7 +145,10 @@ export class Message extends FavoritableEntity<MessageRecord> {
    */
   webUrl(): string {
     const query = new URLSearchParams({ channel_message_id: this.id });
-    return `${this.client.webAppUrl}/app/channel/${this.channelId}?${query}`;
+    return webAppLink(
+      this.client.webAppUrl,
+      `/channel/${this.channelId}?${query}`,
+    );
   }
 
   /** Identity, loaded detail and {@link webUrl}, so serialized handles carry their link. */

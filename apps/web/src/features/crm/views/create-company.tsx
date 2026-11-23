@@ -102,10 +102,16 @@ export function CreateCompanyModal(props: {
             <EntityComposer.Root>
               <EntityComposer.Header>
                 <Dialog.Title class="sr-only">New company</Dialog.Title>
-                <EntityComposer.Title class="mb-0 min-w-0 flex-1 self-center">
+                <EntityComposer.Title class="mb-0 min-w-0 flex-1 flex-col gap-0.5 self-center rounded-lg py-1 has-focus-visible:ring-2 has-focus-visible:ring-inset has-focus-visible:ring-button-focus">
+                  <label
+                    for="new-company-name"
+                    class="text-xs font-medium text-ink-muted"
+                  >
+                    Company name
+                  </label>
                   <input
+                    id="new-company-name"
                     autofocus
-                    aria-label="Company name"
                     placeholder="Company name"
                     autocomplete="off"
                     data-1p-ignore
@@ -132,13 +138,17 @@ export function CreateCompanyModal(props: {
                 </Button>
               </EntityComposer.Header>
               <EntityComposer.Main class="gap-4">
-                <label class="flex min-w-0 items-center gap-2 px-2 text-sm">
+                <label
+                  for="new-company-domain"
+                  class="flex min-w-0 items-center gap-2 rounded-lg px-2 py-1 text-sm has-focus-visible:ring-2 has-focus-visible:ring-inset has-focus-visible:ring-button-focus"
+                >
                   <GlobeIcon
                     aria-hidden="true"
                     class="size-4 shrink-0 text-ink-muted"
                   />
+                  <span class="shrink-0 text-ink-muted">Domain</span>
                   <input
-                    aria-label="Domain"
+                    id="new-company-domain"
                     placeholder="Domain (optional), like acme.com"
                     autocomplete="off"
                     spellcheck={false}

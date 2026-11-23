@@ -12,7 +12,7 @@ async fn preserve_attempt(pool: Pool<Postgres>, unconfirmed: bool) -> anyhow::Re
     let mut input = prepared();
     input.undo_delay_secs = 0;
     repo.admit_send(&actor(), link(), attempt, input).await?;
-    let claim = claim_delivery(&pool, link(), message(), 300)
+    let claim = claim_delivery(&pool, link(), message(), 300, "example.com")
         .await?
         .unwrap();
     assert!(begin_submission(&pool, &claim, 300).await?);
@@ -92,7 +92,7 @@ async fn trash_rechecks_draft_state_after_admission(pool: Pool<Postgres>) -> any
     let mut input = prepared();
     input.undo_delay_secs = 0;
     repo.admit_send(&actor(), link(), attempt, input).await?;
-    let claim = claim_delivery(&pool, link(), message(), 300)
+    let claim = claim_delivery(&pool, link(), message(), 300, "example.com")
         .await?
         .unwrap();
     assert!(

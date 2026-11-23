@@ -786,7 +786,8 @@ async fn rejection_persistence_failure_keeps_work_and_defers_reply_resolution() 
             crate::domain::pending::PendingCommands::new(),
             PromptMentionsMock::new(),
             NotifierMock::new(),
-        );
+        )
+        .with_sandbox_operators([staff_sender()]);
         service.inner.queues.enqueue(id, entry.clone()).unwrap();
         service.inner.busy.admit(id);
         for _ in 0..2 {

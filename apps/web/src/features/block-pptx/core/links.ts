@@ -42,8 +42,8 @@ export function slideLinkId(link: string): number | undefined {
 }
 
 /**
- * What a typed address means: `macro.com` → `https://macro.com`,
- * `you@macro.com` → `mailto:you@macro.com`, anything with a scheme as is.
+ * What a typed address means: `example.com` → `https://example.com`,
+ * `you@example.com` → `mailto:you@example.com`, anything with a scheme as is.
  */
 export function normalizeAddress(input: string): string {
   const text = input.trim();

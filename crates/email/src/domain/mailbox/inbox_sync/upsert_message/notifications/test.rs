@@ -49,33 +49,6 @@ fn skips_unparseable_primaries_keeping_valid_ones() {
 }
 
 #[test]
-fn staff_recipients_are_split_onto_the_apns_path() {
-    let (staff, customers) = partition_email_push_recipients(HashSet::from([
-        id("macro|staff@macro.com"),
-        id("macro|staff+notify@macro.com"),
-        id("macro|user@example.com"),
-    ]));
-
-    assert_eq!(
-        staff,
-        HashSet::from([
-            id("macro|staff@macro.com"),
-            id("macro|staff+notify@macro.com"),
-        ])
-    );
-    assert_eq!(customers, HashSet::from([id("macro|user@example.com")]));
-}
-
-#[test]
-fn customer_only_recipients_do_not_take_the_apns_path() {
-    let (staff, customers) =
-        partition_email_push_recipients(HashSet::from([id("macro|user@example.com")]));
-
-    assert!(staff.is_empty());
-    assert_eq!(customers, HashSet::from([id("macro|user@example.com")]));
-}
-
-#[test]
 fn signal_filter_requires_importance_and_unshared() {
     let thread_id = Uuid::nil();
     match signal_filter(thread_id) {

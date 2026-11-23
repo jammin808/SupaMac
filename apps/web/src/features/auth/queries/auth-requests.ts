@@ -1,10 +1,13 @@
+import { WEB_BASE_PATH } from '@app/constants/routerBase';
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { SERVER_HOSTS } from '@core/constant/servers';
 import { platformFetch } from '@core/util/platformFetch';
 import { authServiceClient } from '@service-auth/client';
 import type { SendCodeResult, VerifyCodeResult } from '../context/auth-context';
+import { signInMethods } from '../sign-in-methods';
 
 /** Where the passwordless magic link returns. */
-const REDIRECT_URI = `${window.location.origin}/app`;
+const REDIRECT_URI = `${window.location.origin}${WEB_BASE_PATH}`;
 
 /** The one account that signs in with a password instead of a code. */
 const PASSWORD_LOGIN_EMAIL_SHA256 =
@@ -31,7 +34,8 @@ export async function sendEmailCode(input: {
   isAgent: boolean;
 }): Promise<SendCodeResult> {
   const { email, password, isAgent } = input;
-  if (await isPasswordLogin(email)) {
+  const methods = signInMethods();
+  if (methods.password && (await isPasswordLogin(email))) {
     if (!password) return { t: 'password-required' };
     const tokens = await authServiceClient.passwordLogin({ password, email });
     return tokens.isErr()
@@ -57,13 +61,15 @@ export async function sendEmailCode(input: {
       }),
     }
   ).catch(() => undefined);
-  if (!response) return { t: 'failed', message: 'Unable to reach Macro.' };
+  if (!response)
+    return { t: 'failed', message: `Unable to reach ${PRODUCT_NAME}.` };
   if (!response.ok) return { t: 'failed', message: await response.text() };
 
   // 202: the address must sign in through its organization's identity provider.
   if (response.status === 202) {
     const body: unknown = await response.json().catch(() => undefined);
     if (
+      !methods.domainSso ||
       !body ||
       typeof body !== 'object' ||
       !('idp_id' in body) ||

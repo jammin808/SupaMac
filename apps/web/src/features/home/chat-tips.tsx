@@ -1,5 +1,6 @@
 import { LIST_VIEW_DOCS_URL } from '@app/constants/docs-links';
 import { openAgentsPage } from '@app/features/agents-view/primitives/open-page';
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { useSplitLayout } from '@components/app/split-layout/layout';
 import { useSettingsState } from '@core/constant/SettingsState';
 import ArrowUpRightIcon from '@icon/system/regular/arrow-up-right.svg';
@@ -69,7 +70,7 @@ export function ChatTipsSection() {
         <SetupRow
           icon={<PuzzlePieceIcon class="size-4" />}
           title="Connect your own agents"
-          desc="Use Macro as a tool from Claude Code, Cursor, or any MCP client"
+          desc={`Use ${PRODUCT_NAME} as a tool from Claude Code, Cursor, or any MCP client`}
           trailing={
             /* The arrow MUST stay BLACK. See comment at top of file. */
             <ChevronRightIcon class={SETUP_ROW_ARROW_CLASSES} />

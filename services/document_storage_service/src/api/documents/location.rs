@@ -7,7 +7,7 @@ use rayon::prelude::*;
 use std::str::FromStr;
 
 use crate::model::request::documents::location::LocationQueryParams;
-use crate::service::cloudfront::{get_cloudfront_signed_options, get_presigned_url};
+use crate::service::cloudfront::{document_url, get_cloudfront_signed_options, get_presigned_url};
 use axum::{
     Extension,
     body::Body,
@@ -20,10 +20,7 @@ use model::{
     response::{GenericErrorResponse, GenericResponse, PresignedUrl},
 };
 use model_owner::Owner;
-use s3_key::{
-    build_cloud_storage_bucket_document_key, build_docx_to_pdf_converted_document_key,
-    document_key_url_path,
-};
+use s3_key::{build_cloud_storage_bucket_document_key, build_docx_to_pdf_converted_document_key};
 
 #[derive(serde::Deserialize)]
 pub struct Params {
@@ -111,14 +108,11 @@ pub async fn get_location_handler(
         .unwrap()
 }
 
-/// Signs a document key and returns a CloudFront presigned URL.
+/// Signs a document key and returns its download link.
 /// The object key is used as-is for S3 existence verification and
 /// percent-encoded only where it becomes the URL path.
 #[tracing::instrument(skip(state), err)]
-async fn sign_document_key(
-    state: &ApiContext,
-    #[allow(unused_variables)] key: &str,
-) -> anyhow::Result<LocationResponseData> {
+async fn sign_document_key(state: &ApiContext, key: &str) -> anyhow::Result<LocationResponseData> {
     #[cfg(feature = "location_check")]
     {
         tracing::trace!("checking if file exists in s3, key: {}", key);
@@ -128,31 +122,12 @@ async fn sign_document_key(
         }
     }
 
-    let signed_options = get_cloudfront_signed_options(
-        &state
-            .config
-            .document_storage_service_cloudfront_signer_public_key_id,
-        state
-            .config
-            .document_storage_service_cloudfront_signer_private_key
-            .as_ref(),
-        state
-            .config
-            .document_storage_service_presigned_url_expiry_seconds,
-    )?;
-
-    let signed_url = get_presigned_url(
-        &state
-            .config
-            .document_storage_service_cloudfront_distribution_url,
-        &document_key_url_path(key),
-        &signed_options,
-    )?;
+    let signed_url = document_url(&state.s3_client, &state.config, key).await?;
 
     Ok(LocationResponseData::PresignedUrl(signed_url))
 }
 
-/// Gets a signed CloudFront URL for a versioned document.
+/// Gets the signed download link for a versioned document.
 ///
 /// For static files (PDF, HTML), the version is always resolved from the DB.
 /// For editable files (MD, Canvas), a caller-provided version ID is used if present,
@@ -218,6 +193,18 @@ async fn get_docx_urls(
         .await?
     };
     tracing::debug!(elapsed = ?start_shas.elapsed(), "got document shas");
+
+    // A part's key is its sha. A presigned GET costs an HMAC, not the RSA
+    // signature the rayon pool below spreads out.
+    if macro_aws_config::is_local_aws() {
+        let mut presigned_urls = Vec::with_capacity(shas.len());
+        for sha in shas {
+            let presigned_url = document_url(&state.s3_client, &state.config, &sha).await?;
+            presigned_urls.push(PresignedUrl { presigned_url, sha });
+        }
+
+        return Ok(LocationResponseData::PresignedUrls(presigned_urls));
+    }
 
     let signed_options = get_cloudfront_signed_options(
         &state

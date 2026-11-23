@@ -1,3 +1,4 @@
+import { WEB_BASE_PATH } from '@app/constants/routerBase';
 import { useAnalytics } from '@app/lib/analytics/analytics-context';
 import { t } from '@app/lib/i18n';
 import { TraceFlow } from '@app/observability/flow';
@@ -175,7 +176,7 @@ function LiveBilling(props: { controls?: JSX.Element }) {
   const handleManage = async () => {
     try {
       const url = await portal.mutateAsync({
-        returnUrl: `${window.location.origin}/app`,
+        returnUrl: `${window.location.origin}${WEB_BASE_PATH}`,
       });
       window.location.href = url;
     } catch (error) {

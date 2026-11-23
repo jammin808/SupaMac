@@ -1,3 +1,4 @@
+import { WEB_BASE_PATH } from '@app/constants/routerBase';
 import type { BlockName } from '@core/block';
 import { mergeRegister } from '@lexical/utils';
 import { $getId, type NodeIdMappings } from '@macro-inc/lexical-core';
@@ -390,7 +391,7 @@ export function $getSelectionLocation() {
 export function $getLocationUrl(blockName: BlockName, blockId: string) {
   const url = new URL(window.location.href);
   if (blockId) {
-    url.pathname = `app/${blockName}/${blockId}`;
+    url.pathname = `${WEB_BASE_PATH}/${blockName}/${blockId}`;
   }
   const location = $getSelectionLocation();
   const params = url.searchParams;

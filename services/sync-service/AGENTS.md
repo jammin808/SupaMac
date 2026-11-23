@@ -70,6 +70,13 @@ to the requested surface. These are scoped sync JWTs, not app-session tokens.
 ## Gotchas
 
 - Preserve the Docker worker's empty OTLP default and explicit launcher `--var` forwarding; local tracing policy and shell-precedence controls are documented in `docs/development/running-locally.md`.
+- The Durable Object answers 403, before upgrading, to a request whose `Origin`
+  is off the allow-list (`src/inbound/cors.rs`); a request with no `Origin`
+  passes. The `ALLOWED_ORIGINS` worker variable (comma-separated) makes the list
+  exactly those origins; empty or missing keeps the built-in list, which allows
+  development origins (loopback ports and `host.local:3000`) and the mobile app only. Declare it in
+  every `[vars]` block of both wrangler configs, and keep the Docker launcher
+  forwarding the container's value with `--var`.
 
 - Bumping `loro-crdt` touches three lockfiles: `bun.lock`, the workspace
   `Cargo.lock`, and this directory's `package-lock.json` — update all three.

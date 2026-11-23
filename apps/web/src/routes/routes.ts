@@ -207,14 +207,20 @@ export const inviteRoute = defineRoute({
   externalSearch: '*',
 });
 
-/** Macro staff only: create and track GTM invite links. */
+/**
+ * The hosted service's staff only: create and track GTM invite links. A
+ * self-hosted instance does not register it (`appRouteElements`).
+ */
 export const internalInviteLinksRoute = defineRoute({
   id: 'internal-invite-links',
   path: 'internal/invite-links',
   externalSearch: '*',
 });
 
-/** Macro staff only: set the status banner every user sees. */
+/**
+ * The hosted service's staff only: set the status banner every user sees. A
+ * self-hosted instance does not register it (`appRouteElements`).
+ */
 export const internalSystemStatusRoute = defineRoute({
   id: 'internal-system-status',
   path: 'internal/status',
@@ -574,6 +580,12 @@ export const homeSplitRoute = defineRoute({
   id: 'view-home',
   path: 'home',
   search: '*' as const,
+});
+
+/** New Home's entry: it sends the split to the tab New Home was left on. */
+export const newHomeRoute = defineRoute({
+  id: 'view-new-home',
+  path: 'new-home',
 });
 
 export const recentRoute = defineRoute({

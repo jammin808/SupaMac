@@ -40,7 +40,8 @@ import {
   EXTERNAL_TRANSFORMERS,
   INTERNAL_TRANSFORMERS,
 } from '../transformers';
-import { E_TABLE_NODE } from '../transformers/tables';
+import { E_TABLE_NODE, isolatePipeTables } from '../transformers/tables';
+import { configureAppLinks } from '../utils/app-links';
 
 function createTestEditor() {
   return createEditor({
@@ -1334,20 +1335,25 @@ describe('pipe characters inside pipe-table cells', () => {
 
 describe('video link transformer', () => {
   it('converts markdown links with video URLs to video nodes', async () => {
-    const editor = createTestEditor();
-    await importMarkdown(
-      editor,
-      '[Screen Recording 2026-10-06 at 4.03.28 PM.mov](https://static-file-service.macro.com/file/3d7ab8c8-05b7-477f-aa83-7dd514219867)'
-    );
-
-    editor.getEditorState().read(() => {
-      const root = $getRoot();
-      const video = root.getChildren().find($isVideoNode);
-      expect(video).toBeDefined();
-      expect(video!.getUrl()).toBe(
-        'https://static-file-service.macro.com/file/3d7ab8c8-05b7-477f-aa83-7dd514219867'
+    configureAppLinks({ staticFileUrl: 'https://api.example.com/static-file' });
+    try {
+      const editor = createTestEditor();
+      await importMarkdown(
+        editor,
+        '[Screen Recording 2026-10-06 at 4.03.28 PM.mov](https://api.example.com/static-file/file/3d7ab8c8-05b7-477f-aa83-7dd514219867)'
       );
-    });
+
+      editor.getEditorState().read(() => {
+        const root = $getRoot();
+        const video = root.getChildren().find($isVideoNode);
+        expect(video).toBeDefined();
+        expect(video!.getUrl()).toBe(
+          'https://api.example.com/static-file/file/3d7ab8c8-05b7-477f-aa83-7dd514219867'
+        );
+      });
+    } finally {
+      configureAppLinks({});
+    }
   });
 
   it('converts links with .mp4 extension to video nodes', async () => {
@@ -1427,5 +1433,44 @@ describe('video link transformer', () => {
       expect($getRoot().getTextContent()).toContain('Document');
     });
     expect(exportMarkdown(editor)).toContain('document.pdf?next=clip.mp4');
+  });
+});
+
+describe('isolatePipeTables', () => {
+  it('keeps a header-and-delimiter table and gives it a blank line above', () => {
+    expect(
+      isolatePipeTables(
+        '<m-table><m-table-row><m-table-cell>Old</m-table-cell></m-table-row></m-table>\n| Step | Done |\n| --- | :---: |\n| Ship | yes |\nAfter'
+      )
+    ).toBe(
+      '<m-table><m-table-row><m-table-cell>Old</m-table-cell></m-table-row></m-table>\n\n| Step | Done |\n| --- | :---: |\n| Ship | yes |\nAfter'
+    );
+  });
+
+  it('escapes pipe lines that are not a table so they stay text', () => {
+    expect(
+      isolatePipeTables(
+        '| plain text |\n\n| a | b |\n| --- |\n\n| --- |\n| x |'
+      )
+    ).toBe('\\| plain text |\n\n\\| a | b |\n\\| --- |\n\n\\| --- |\n\\| x |');
+  });
+
+  it('keeps a table run that is already text in an existing paragraph', () => {
+    expect(
+      isolatePipeTables('| H |\n| --- |\n| B |\n\n| N |\n| --- |', [
+        'Intro\n| H |\n| --- |\n| B |',
+      ])
+    ).toBe('\\| H |\n\\| --- |\n\\| B |\n\n| N |\n| --- |');
+  });
+
+  it('pads a short body row with empty cells to the header width', () => {
+    expect(isolatePipeTables('| A | B | C |\n| --- | --- | --- |\n| x |')).toBe(
+      '| A | B | C |\n| --- | --- | --- |\n| x | | |'
+    );
+  });
+
+  it('leaves pipe lines in fenced code alone', () => {
+    const markdown = '```\n| a |\n| --- |\n| plain |\n```';
+    expect(isolatePipeTables(markdown)).toBe(markdown);
   });
 });

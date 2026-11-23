@@ -103,10 +103,16 @@ export function PipelineDialog(props: {
             <EntityComposer.Root>
               <EntityComposer.Header>
                 <Dialog.Title class="sr-only">New pipeline</Dialog.Title>
-                <EntityComposer.Title class="mb-0 min-w-0 flex-1 self-center">
+                <EntityComposer.Title class="mb-0 min-w-0 flex-1 flex-col gap-0.5 self-center rounded-lg py-1 has-focus-visible:ring-2 has-focus-visible:ring-inset has-focus-visible:ring-button-focus">
+                  <label
+                    for="new-pipeline-name"
+                    class="text-xs font-medium text-ink-muted"
+                  >
+                    Pipeline name
+                  </label>
                   <input
+                    id="new-pipeline-name"
                     autofocus
-                    aria-label="Pipeline name"
                     placeholder="Pipeline name"
                     maxlength={200}
                     required

@@ -38,7 +38,7 @@ async fn existing_message_read_failure_is_terminal_and_provider_absence_has_no_e
     fake.0.lock().unwrap().failures.push(("message", 1));
     let (delete, error) = failure(svc.process(Ok(input(operation()))).await);
     assert!(delete);
-    assert!(error.source.to_string().contains("before provider upsert"));
+    assert!(format!("{:#}", error.source).contains("before provider upsert"));
     let (svc, fake) = make_service(false);
     assert!(matches!(
         svc.process(Ok(input(operation()))).await,
@@ -245,7 +245,7 @@ async fn attachment_gates_skip_claims_and_query_failures_stop_publication() {
     assert!(!names(&fake.calls()).contains(&"documents"));
 }
 #[tokio::test]
-async fn notifications_select_signal_partitions_and_filter_sent_or_missing_messages() {
+async fn notifications_reach_every_recipient_on_one_path_and_filter_sent_or_missing_messages() {
     let (mut svc, fake) = setup();
     svc.features.notifications_enabled = true;
     {
@@ -273,11 +273,12 @@ async fn notifications_select_signal_partitions_and_filter_sent_or_missing_messa
             }
         })
         .collect();
-    assert_eq!(n.len(), 2);
+    // One notification for every recipient, an upstream staff address
+    // included, in real time and never as a push.
+    assert_eq!(n.len(), 1);
+    assert_eq!(n[0][0].as_array().map(Vec::len), Some(3));
     assert_eq!(n[0][1], true);
-    assert_eq!(n[0][2], true);
-    assert_eq!(n[1][1], true);
-    assert_eq!(n[1][2], false);
+    assert_eq!(n[0][2], false);
 }
 
 fn parsed_attachment() -> models_email::service::attachment::Attachment {
@@ -603,12 +604,7 @@ async fn contact_connections_follow_direction_and_enqueue_failure_is_terminal() 
     let (delete, error) = failure(svc.process(Ok(input(operation()))).await);
     assert!(delete);
     assert_eq!(error.reason, FailureReason::SqsEnqueueFailed);
-    assert!(
-        error
-            .source
-            .to_string()
-            .contains("Failed to enqueue contacts message")
-    );
+    assert!(format!("{:#}", error.source).contains("Failed to enqueue contacts message"));
 }
 #[tokio::test]
 async fn notification_query_failures_retry_after_the_insert_and_publication_failure_is_best_effort()
@@ -642,7 +638,7 @@ async fn notification_query_failures_retry_after_the_insert_and_publication_fail
 }
 
 #[tokio::test]
-async fn staff_inbox_notifications_keep_both_partitions_without_realtime_or_apns() {
+async fn inbox_mail_outside_signal_never_notifies_even_an_upstream_staff_owner() {
     let (mut svc, fake) = setup();
     svc.features.notifications_enabled = true;
     {
@@ -657,19 +653,7 @@ async fn staff_inbox_notifications_keep_both_partitions_without_realtime_or_apns
         svc.process(Ok(input(operation()))).await,
         InboxSyncDisposition::DoneDelete
     ));
-    let calls = fake.calls();
-    let n: Vec<_> = calls
-        .iter()
-        .filter_map(|c| {
-            if let Call::Import("notify", v) = c {
-                Some(v)
-            } else {
-                None
-            }
-        })
-        .collect();
-    assert_eq!(n.len(), 2);
-    assert!(n.iter().all(|v| v[1] == false && v[2] == false));
+    assert!(!names(&fake.calls()).contains(&"notify"));
 }
 #[tokio::test]
 async fn sent_draft_or_missing_committed_messages_never_query_notification_tiers() {

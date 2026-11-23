@@ -1,3 +1,4 @@
+import { WEB_BASE_PATH } from '@app/constants/routerBase';
 import { toast } from '@core/component/Toast/Toast';
 import { fireAndForget } from '@core/util/fireAndForget';
 import { getWebOrigin } from '@core/util/webOrigin';
@@ -60,7 +61,7 @@ export function ChannelJoinLinkButton(props: {
 
     try {
       await navigator.clipboard.writeText(
-        `${getWebOrigin()}/app/channel-invite?code=${code}`
+        `${getWebOrigin()}${WEB_BASE_PATH}/channel-invite?code=${code}`
       );
     } catch (error) {
       console.error('Failed to copy channel join link', error);

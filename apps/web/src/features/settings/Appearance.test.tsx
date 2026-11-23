@@ -13,16 +13,16 @@ describe('appearance settings', () => {
   it('opens the theme editor for the default light and dark themes', () => {
     render(() => <Appearance />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Edit Macro Light' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit SupaMac Light' }));
     expect(screen.getByRole('textbox', { name: 'Theme name' })).toHaveProperty(
       'value',
-      'Macro Light copy'
+      'SupaMac Light copy'
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Edit Macro Dark' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit SupaMac Dark' }));
     const names = screen
       .getAllByRole('textbox', { name: 'Theme name' })
       .map((input) => (input as HTMLInputElement).value);
-    expect(names).toEqual(['Macro Light copy', 'Macro Dark copy']);
+    expect(names).toEqual(['SupaMac Light copy', 'SupaMac Dark copy']);
   });
 });

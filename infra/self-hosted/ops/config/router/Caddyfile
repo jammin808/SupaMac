@@ -1,0 +1,44 @@
+# In-network front for two endpoints the services reach by fixed names.
+{
+	admin off
+	auto_https off
+}
+
+# `localstack:4566`: the one AWS endpoint the services are given
+# (LOCAL_AWS_URL). The name is not cosmetic: the services rewrite presigned
+# URLs for browsers only when the endpoint host is `localstack`.
+#
+# Queue, table and key calls name their API in X-Amz-Target; S3 calls carry no
+# such header. Host is passed through unchanged, because the object store
+# verifies each request's signature, and Host is part of what was signed.
+:4566 {
+	@queues header X-Amz-Target AmazonSQS.*
+	@tables header X-Amz-Target DynamoDB_*
+	@keys header X-Amz-Target TrentService.*
+
+	handle @queues {
+		reverse_proxy elasticmq:9324
+	}
+	handle @tables {
+		reverse_proxy dynamodb:8000
+	}
+	handle @keys {
+		reverse_proxy kms:8080
+	}
+	handle {
+		reverse_proxy minio:9000
+	}
+}
+
+# `search:9200`: OpenSearch when the `search` profile runs it. The document
+# storage service refuses to start unless GET /_cat/health answers 200, so
+# without OpenSearch this answers that one probe and refuses everything else:
+# the service starts, and search requests fail instead of hanging.
+:9200 {
+	reverse_proxy opensearch:9200
+
+	handle_errors {
+		respond /_cat/health 200
+		respond 503
+	}
+}

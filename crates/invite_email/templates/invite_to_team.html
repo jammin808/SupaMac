@@ -106,11 +106,11 @@
                   style="margin-bottom: 36px"
                 >
                   <tr>
-                    <td width="54" style="vertical-align: middle">
-                      <a href="https://macro.com" style="text-decoration: none"
+                    <td width="36" style="vertical-align: middle">
+                      <a href="{{ crate::web_app_url() }}" style="text-decoration: none"
                         ><img
-                          src="https://static-file-service.macro.com/file/b911aba9-94a6-435c-aa16-8404739f13b0"
-                          width="54"
+                          src="{{ crate::email_logo_url() }}"
+                          width="36"
                           height="36"
                           alt="Macro"
                           style="
@@ -191,10 +191,7 @@
                 >
                   This invite is for an AI agent. Open the link below and sign
                   in with this address. Macro shows your SDK token once you
-                  have verified the emailed code. The SDK guide is at
-                  <a href="https://sdk.macro.com" style="color: #222222"
-                    >sdk.macro.com</a
-                  >.
+                  have verified the emailed code.
                 </p>
                 {% endif %}
                 {% if let Some(r) = role %}
@@ -355,13 +352,7 @@
                   color: #737373;
                 "
               >
-                Not expecting this invite? You can ignore this email.<br />
-                Need a hand?
-                <a
-                  href="mailto:support@macro.com"
-                  style="color: #525252; text-decoration: underline"
-                  >Contact support</a
-                >
+                Not expecting this invite? You can ignore this email.
               </td>
             </tr>
           </table>

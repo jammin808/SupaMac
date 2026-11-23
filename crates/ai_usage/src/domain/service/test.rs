@@ -5,6 +5,11 @@ fn user() -> MacroUserIdStr<'static> {
     SYSTEM_USER_ID.clone()
 }
 
+/// The admin the services under test name.
+fn admin() -> MacroUserIdStr<'static> {
+    MacroUserIdStr::try_from_email("admin@example.com").unwrap()
+}
+
 fn completion(feature: AiFeature, total: Option<f32>) -> CompletionUsage {
     CompletionUsage {
         feature,
@@ -423,7 +428,7 @@ async fn usage_on_a_team_provider_key_is_recorded_against_it_and_never_counted()
 async fn default_disabled_writes_do_not_change_previously_counted_usage() {
     let repo = FakeRepo::default();
     let enabled = UsageServiceImpl::new(repo.clone()).with_enforcement(AiUsageEnforcement::Enabled);
-    let disabled = UsageServiceImpl::new(repo.clone());
+    let disabled = UsageServiceImpl::new(repo.clone()).with_admins([admin()]);
     let actor = MacroUserIdStr::try_from("macro|someone@example.com".to_owned()).unwrap();
     let event = UsageContext::new(AiFeature::Chat, actor).into_event(
         "model".into(),
@@ -438,7 +443,7 @@ async fn default_disabled_writes_do_not_change_previously_counted_usage() {
     disabled.record_now(event).await.unwrap();
     assert_eq!(*repo.counting.lock().unwrap(), vec![true, false]);
     let summary = disabled
-        .get_usage(user(), UsageApiParams::default())
+        .get_usage(admin(), UsageApiParams::default())
         .await
         .unwrap();
     assert_eq!(
@@ -448,10 +453,19 @@ async fn default_disabled_writes_do_not_change_previously_counted_usage() {
     );
 }
 
+fn free_pricing() -> ModelPricing {
+    ModelPricing::Tokens {
+        input: 0.0,
+        output: 0.0,
+        cache_read: None,
+        cache_write: None,
+    }
+}
+
 #[tokio::test]
 async fn admin_policy_protects_usage_and_price_changes() {
     let repo = FakeRepo::default();
-    let service = UsageServiceImpl::new(repo.clone());
+    let service = UsageServiceImpl::new(repo.clone()).with_admins([admin()]);
     let other = MacroUserIdStr::try_from("macro|someone@example.com".to_owned()).unwrap();
     assert!(matches!(
         service
@@ -461,45 +475,54 @@ async fn admin_policy_protects_usage_and_price_changes() {
     ));
     assert!(matches!(
         service
-            .set_pricing(
-                other,
-                "whisper-1".into(),
-                ModelPricing::Tokens {
-                    input: 0.0,
-                    output: 0.0,
-                    cache_read: None,
-                    cache_write: None,
-                }
-            )
+            .set_pricing(other, "whisper-1".into(), free_pricing())
             .await,
         Err(UsageError::Forbidden)
     ));
     assert!(repo.pricing.lock().unwrap().is_none());
     service
-        .set_pricing(
-            user(),
-            "whisper-1".into(),
-            ModelPricing::Tokens {
-                input: 0.0,
-                output: 0.0,
-                cache_read: None,
-                cache_write: None,
-            },
-        )
+        .set_pricing(admin(), "whisper-1".into(), free_pricing())
         .await
         .unwrap();
     assert!(
         service
-            .get_usage(user(), UsageApiParams::default())
+            .get_usage(admin(), UsageApiParams::default())
             .await
             .is_ok()
     );
 }
 
+/// With no admins named, nobody reads usage or changes prices: neither the
+/// system user nor any email domain is an admin.
+#[tokio::test]
+async fn without_named_admins_usage_and_prices_are_closed() {
+    let repo = FakeRepo::default();
+    let service = UsageServiceImpl::new(repo.clone());
+    for actor in [
+        user(),
+        admin(),
+        MacroUserIdStr::try_from_email("someone@macro.com").unwrap(),
+    ] {
+        assert!(matches!(
+            service
+                .get_usage(actor.clone(), UsageApiParams::default())
+                .await,
+            Err(UsageError::Forbidden)
+        ));
+        assert!(matches!(
+            service
+                .set_pricing(actor, "whisper-1".into(), free_pricing())
+                .await,
+            Err(UsageError::Forbidden)
+        ));
+    }
+    assert!(repo.pricing.lock().unwrap().is_none());
+}
+
 #[tokio::test]
 async fn rejects_invalid_prices_before_writing() {
     let repo = FakeRepo::default();
-    let service = UsageServiceImpl::new(repo.clone());
+    let service = UsageServiceImpl::new(repo.clone()).with_admins([admin()]);
     for pricing in [-0.001, f32::NAN, f32::INFINITY]
         .into_iter()
         .flat_map(|price| {
@@ -511,7 +534,7 @@ async fn rejects_invalid_prices_before_writing() {
     {
         assert!(matches!(
             service
-                .set_pricing(user(), "whisper-1".into(), pricing)
+                .set_pricing(admin(), "whisper-1".into(), pricing)
                 .await,
             Err(UsageError::InvalidPricing)
         ));

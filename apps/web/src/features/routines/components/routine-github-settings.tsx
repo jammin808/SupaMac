@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { ToggleSwitch } from '@ui';
 import { createSignal, For, Show } from 'solid-js';
 import type {
@@ -111,7 +112,7 @@ export function RoutineGithubSettings(props: {
               when={options().length}
               fallback={
                 <p class="p-2 text-xs text-ink-muted">
-                  Install Macro’s GitHub app to watch a repository.
+                  Install {PRODUCT_NAME}’s GitHub app to watch a repository.
                 </p>
               }
             >
@@ -138,8 +139,8 @@ export function RoutineGithubSettings(props: {
       />
       <Show when={props.selector.includeBots}>
         <p class="text-xs text-ink-muted">
-          Includes Macro’s own app: make sure what this routine does on GitHub
-          doesn’t trigger it again.
+          Includes {PRODUCT_NAME}’s own app: make sure what this routine does on
+          GitHub doesn’t trigger it again.
         </p>
       </Show>
     </div>

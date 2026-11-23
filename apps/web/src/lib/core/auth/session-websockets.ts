@@ -1,3 +1,4 @@
+import { SERVER_HOSTS } from '@core/constant/servers';
 import { useIsAuthenticated, useUserId } from '@core/context/user';
 import { fireAndForget } from '@core/util/fireAndForget';
 import { contentHash } from '@core/util/hash';
@@ -45,7 +46,8 @@ export function useSessionWebsockets() {
           'session-websockets'
         );
         ws.reconnect();
-        storageWS.reconnect();
+        // A deployment without the storage socket service gives it no host.
+        if (SERVER_HOSTS['websocket-service']) storageWS.reconnect();
         onCleanup(() => {
           stopGatewayTrace();
           stopStorageTrace();

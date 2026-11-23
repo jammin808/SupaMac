@@ -10,7 +10,7 @@ const SESSION = '0198a4cc-e138-7670-a308-a6b766602700';
 const EXECUTION = '0198a4cc-e138-7670-a308-a6b766602788';
 const DOC = '0198a4cc-e138-7670-a308-a6b766602799';
 
-function macroAnswering(outcome: unknown) {
+function macroAnswering(outcome: unknown, webAppUrl = 'https://macro.com') {
   const requests: Array<{ url: string; body: unknown }> = [];
   globalThis.fetch = (async (input) => {
     const request = input instanceof Request ? input : new Request(input);
@@ -20,7 +20,7 @@ function macroAnswering(outcome: unknown) {
   const macro = new Macro({
     token: 'test-token',
     hosts: { 'agent-harness': 'https://agent.example.test' },
-    webAppUrl: 'https://macro.com',
+    webAppUrl,
   });
   const execution = macro.agentSessions
     .byId(SESSION)
@@ -116,5 +116,52 @@ describe('macro.ui', () => {
     expect(macro.ui.link('https://www.macro.com/app/channels/c').path).toBe(
       '/channels/c',
     );
+  });
+
+  test('link accepts only the client’s own web app', () => {
+    const { macro } = macroAnswering(
+      { status: 'no_client' },
+      'https://team.example.com',
+    );
+
+    expect(macro.ui.link('https://team.example.com/app/md/x').path).toBe(
+      '/md/x',
+    );
+    for (const url of [
+      'https://macro.com/app/md/x',
+      'https://dev.macro.com/app/md/x',
+      'https://staging.macro.com/app/md/x',
+    ]) {
+      expect(() => macro.ui.link(url), url).toThrow('Not a Macro app link');
+    }
+  });
+
+  test('links under the base path the web app URL names', async () => {
+    const { macro, execution, requests } = macroAnswering(
+      { status: 'sent', commandId: '0198a4cc-e138-7670-a308-a6b7666027aa' },
+      'https://team.example.com/workspace/',
+    );
+
+    const link = macro.ui.link(
+      'https://team.example.com/workspace/tasks?s0.tasks.tab=mine',
+    );
+    expect(link.path).toBe('/tasks?s0.tasks.tab=mine');
+    expect(link.webUrl()).toBe(
+      'https://team.example.com/workspace/tasks?s0.tasks.tab=mine',
+    );
+    expect(macro.ui.link('https://team.example.com/workspace').path).toBe('/');
+    for (const url of [
+      'https://team.example.com/app/md/x',
+      'https://team.example.com/workspaces/md/x',
+    ]) {
+      expect(() => macro.ui.link(url), url).toThrow('Not a Macro app link');
+    }
+
+    const result = await macro.ui.open(execution, macro.documents.byId(DOC));
+    expect(result.url).toBe(`https://team.example.com/workspace/md/${DOC}`);
+    expect(requests[0]?.body).toEqual({
+      executionId: EXECUTION,
+      path: `/md/${DOC}`,
+    });
   });
 });

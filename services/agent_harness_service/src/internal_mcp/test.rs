@@ -198,6 +198,8 @@ async fn each_harness_gets_only_internal_tools_and_writes_only_its_session() {
         for (host, expected) in [
             ("10.210.0.1:31327", StatusCode::OK),
             ("unconfigured.test", StatusCode::FORBIDDEN),
+            // No gateway is admitted that the deployment did not configure.
+            ("gateway.macro.com", StatusCode::FORBIDDEN),
         ] {
             assert_eq!(rpc_host(app.clone(), Some("secret"), "initialize", serde_json::json!({
                 "protocolVersion":"2025-03-26", "capabilities":{}, "clientInfo":{"name":"test","version":"1"}

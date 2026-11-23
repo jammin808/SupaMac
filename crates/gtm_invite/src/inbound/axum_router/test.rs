@@ -28,14 +28,14 @@ use crate::domain::models::{
 };
 use crate::domain::ports::GtmInviteService;
 use crate::inbound::axum_router::dto::{
-    GtmInviteLink, GtmInviteLinkList, GtmInviteLinkStatus, GtmInviteOffer, GtmInviteOfferStatus,
-    PublicGtmInviteLink,
+    GtmInviteLink, GtmInviteLinkStatus, GtmInviteOffer, GtmInviteOfferStatus, PublicGtmInviteLink,
 };
 use crate::inbound::axum_router::{GtmInviteRouterState, gtm_invite_router};
 
 const STAFF_JWT: &str = "staff";
 const OUTSIDER_JWT: &str = "outsider";
-const STAFF_USER_ID: &str = "macro|valentina@macro.com";
+/// An address at the upstream staff domain, which grants nothing here.
+const STAFF_USER_ID: &str = "macro|someone@macro.com";
 const OUTSIDER_USER_ID: &str = "macro|ada@startup.io";
 
 #[derive(Clone)]
@@ -94,7 +94,7 @@ fn sample_link() -> InviteLink {
         recipient_email: Some("ada@startup.io".into()),
         note: None,
         promo_code: "1MF".parse().unwrap(),
-        created_by: MacroUserIdStr::try_from_email("valentina@macro.com").unwrap(),
+        created_by: MacroUserIdStr::parse_from_str(STAFF_USER_ID).unwrap(),
         created_at: now,
         expires_at: now + Duration::hours(48),
         revoked_at: None,
@@ -265,22 +265,40 @@ async fn read_json<T: serde::de::DeserializeOwned>(response: axum::response::Res
 }
 
 #[tokio::test]
-async fn staff_can_create_links() {
+async fn link_management_refuses_the_upstream_staff_domain() {
     let app = build_router(FakeGtmInviteService::new(), false);
-    let request = authed(Request::post("/links"), STAFF_JWT)
+    let create = authed(Request::post("/links"), STAFF_JWT)
         .header(header::CONTENT_TYPE, "application/json")
         .body(json_body(serde_json::json!({ "firstName": "Grace" })))
         .unwrap();
+    let list = authed(Request::get("/links?mine=true"), STAFF_JWT)
+        .body(Body::empty())
+        .unwrap();
+    let revoke = authed(
+        Request::delete(format!("/links/{}", Uuid::now_v7())),
+        STAFF_JWT,
+    )
+    .body(Body::empty())
+    .unwrap();
 
-    let response = app.oneshot(request).await.unwrap();
+    for request in [create, list, revoke] {
+        let response = app.clone().oneshot(request).await.unwrap();
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    }
+}
 
-    assert_eq!(response.status(), StatusCode::OK);
-    let link: GtmInviteLink = read_json(response).await;
-    assert_eq!(link.first_name, "Grace");
-    assert_eq!(link.status, GtmInviteLinkStatus::Active);
-    assert_eq!(link.promo_code, "1MF");
-    assert_eq!(link.free_months, 1);
-    assert_eq!(link.created_by, STAFF_USER_ID);
+#[test]
+fn dashboard_links_carry_the_offer_and_redemption_details() {
+    let created = GtmInviteLink::from_link(sample_link(), 1, Utc::now());
+    assert_eq!(created.first_name, "Ada");
+    assert_eq!(created.status, GtmInviteLinkStatus::Active);
+    assert_eq!(created.promo_code, "1MF");
+    assert_eq!(created.free_months, 1);
+    assert_eq!(created.created_by, STAFF_USER_ID);
+
+    let redeemed = GtmInviteLink::from_link(redeemed_link(), 1, Utc::now());
+    assert_eq!(redeemed.status, GtmInviteLinkStatus::Redeemed);
+    assert_eq!(redeemed.redeemed_by.as_deref(), Some(OUTSIDER_USER_ID));
 }
 
 #[tokio::test]
@@ -310,22 +328,6 @@ async fn anonymous_callers_cannot_create_links() {
 }
 
 #[tokio::test]
-async fn staff_can_list_links_with_redemption_details() {
-    let app = build_router(FakeGtmInviteService::new(), false);
-    let request = authed(Request::get("/links?mine=true"), STAFF_JWT)
-        .body(Body::empty())
-        .unwrap();
-
-    let response = app.oneshot(request).await.unwrap();
-
-    assert_eq!(response.status(), StatusCode::OK);
-    let list: GtmInviteLinkList = read_json(response).await;
-    assert_eq!(list.links.len(), 2);
-    assert_eq!(list.links[1].status, GtmInviteLinkStatus::Redeemed);
-    assert_eq!(list.links[1].redeemed_by.as_deref(), Some(OUTSIDER_USER_ID));
-}
-
-#[tokio::test]
 async fn outsiders_cannot_list_or_revoke_links() {
     let app = build_router(FakeGtmInviteService::new(), false);
     let list = authed(Request::get("/links"), OUTSIDER_JWT)
@@ -346,23 +348,6 @@ async fn outsiders_cannot_list_or_revoke_links() {
         app.oneshot(revoke).await.unwrap().status(),
         StatusCode::FORBIDDEN
     );
-}
-
-#[tokio::test]
-async fn staff_can_revoke_links() {
-    let app = build_router(FakeGtmInviteService::new(), false);
-    let request = authed(
-        Request::delete(format!("/links/{}", Uuid::now_v7())),
-        STAFF_JWT,
-    )
-    .body(Body::empty())
-    .unwrap();
-
-    let response = app.oneshot(request).await.unwrap();
-
-    assert_eq!(response.status(), StatusCode::OK);
-    let link: GtmInviteLink = read_json(response).await;
-    assert_eq!(link.status, GtmInviteLinkStatus::Revoked);
 }
 
 #[tokio::test]

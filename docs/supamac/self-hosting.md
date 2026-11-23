@@ -89,3 +89,7 @@ broker and helper ports to private networks, replace development secrets and
 auth configuration, and exercise backup/restore and agent failure recovery.
 Keep agent tool execution isolated and scoped to the initiating user's authority.
 No infrastructure deployment or database reset is part of this source import.
+
+To serve the web app as static files in a sub-folder of a site, with the
+backend on another origin, see
+[Publishing the web app on static hosting](static-publishing.md).

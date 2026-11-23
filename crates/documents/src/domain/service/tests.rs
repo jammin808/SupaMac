@@ -139,6 +139,14 @@ impl PresignedUploadUrlPort for TestUploadUrlPort {
         Ok(String::new())
     }
 
+    async fn get_document_storage_presigned_url(
+        &self,
+        _key: &str,
+        _expires_in_seconds: u64,
+    ) -> anyhow::Result<String> {
+        Ok(String::new())
+    }
+
     async fn copy_object(&self, _source_key: &str, _destination_key: &str) -> anyhow::Result<()> {
         Ok(())
     }
@@ -2229,6 +2237,14 @@ impl PresignedUploadUrlPort for RecordingUploadUrlPort {
         Ok(String::new())
     }
 
+    async fn get_document_storage_presigned_url(
+        &self,
+        _key: &str,
+        _expires_in_seconds: u64,
+    ) -> anyhow::Result<String> {
+        Ok(String::new())
+    }
+
     async fn copy_object(&self, source_key: &str, destination_key: &str) -> anyhow::Result<()> {
         self.copies
             .lock()
@@ -2336,6 +2352,7 @@ impl crate::domain::ports::markdown::MarkdownInitializationPort for RejectUnexpe
         &self,
         _: &str,
         _: &str,
+        _: crate::domain::ports::markdown::MarkdownInitializationOptions,
     ) -> Result<Vec<u8>, DocumentError> {
         panic!("failed repository creation must not initialize markdown");
     }
@@ -2385,6 +2402,7 @@ async fn creator_forwards_explicit_consent_and_stops_after_repository_failure() 
         (
             MarkdownSubtype::Task {
                 property_values: None,
+                pinned_property_definition_ids: None,
                 share_with_team: false,
                 team_id: None,
             },
@@ -2881,6 +2899,7 @@ async fn default_task_properties_assign_the_acting_user_and_never_a_team_bot() {
                 project_id: None,
                 team_id: None,
                 property_values: None,
+                pinned_property_definition_ids: None,
                 share_with_team: false,
             },
         )
@@ -2901,6 +2920,61 @@ async fn default_task_properties_assign_the_acting_user_and_never_a_team_bot() {
             expected
         );
     }
+}
+
+#[tokio::test]
+async fn creation_assigns_empty_pinned_fields_without_clearing_provided_values() {
+    let task_properties = RecordingTaskPropertiesPort::default();
+    let service = DocumentServiceImpl::new(
+        make_mock_repo(),
+        test_cloudfront_config(),
+        sync_service_client::SyncServiceClient::new(
+            "test-sync-key".to_string(),
+            "http://sync-service.test".to_string(),
+        ),
+        TestUploadUrlPort,
+        task_properties.clone(),
+        TestConnectionService::default(),
+        TestEntityAccessManagementService::default(),
+        TestForeignEntityService::default(),
+        TestEventBroker::default(),
+    );
+    let provided = uuid::Uuid::now_v7();
+    let empty = uuid::Uuid::now_v7();
+    let principal = CreationPrincipal::User(test_user());
+    let value = SetPropertyValue::Number { value: 0.0 };
+    crate::domain::ports::DocumentService::handle_task_properties(
+        &service,
+        &principal,
+        "task-1",
+        &CreateTaskRequest {
+            task_name: "Template task".to_string(),
+            markdown: None,
+            project_id: None,
+            team_id: None,
+            property_values: Some(vec![PropertyInput {
+                property_id: provided.to_string(),
+                value: value.clone(),
+            }]),
+            pinned_property_definition_ids: Some(vec![
+                provided.to_string(),
+                empty.to_string(),
+                empty.to_string(),
+            ]),
+            share_with_team: false,
+        },
+    )
+    .await
+    .unwrap();
+    let writes = task_properties.writes.lock().unwrap().clone();
+    assert!(writes.iter().all(|(actor, _, _)| actor == &principal));
+    assert_eq!(
+        writes
+            .into_iter()
+            .map(|(_, id, value)| (id, value))
+            .collect::<Vec<_>>(),
+        vec![(provided, Some(value)), (empty, None)]
+    );
 }
 
 #[tokio::test]

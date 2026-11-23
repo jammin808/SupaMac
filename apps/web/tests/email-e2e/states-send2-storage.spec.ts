@@ -52,7 +52,7 @@ test('a draft says so when the storage it syncs through cannot start', async ({
   // not hear of it, the cache gives up after its 60-second connect timeout
   // (COORDINATOR_CONNECT_TIMEOUT_MS).
   await expect(waiting(page)).toContainText(
-    'Queued changes are preserved. Update or reload Macro to recover local storage.',
+    'Queued changes are preserved. Update or reload SupaMac to recover local storage.',
     { timeout: 75_000 }
   );
   await expect(

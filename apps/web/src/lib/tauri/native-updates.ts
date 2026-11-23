@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { toast } from '@core/component/Toast/Toast';
 import { fireAndForget } from '@core/util/fireAndForget';
 import { isPlatform } from '@core/util/platform';
@@ -17,17 +18,18 @@ export function nativeUpdateDescription(status: NativeUpdateStatus): string {
   return match(status)
     .with(
       { status: 'Disabled' },
-      () => 'Download the latest Macro app to update.'
+      () => `Download the latest ${PRODUCT_NAME} app to update.`
     )
     .with(
       { status: 'Idle' },
-      () => 'Macro checks for app updates automatically.'
+      () => `${PRODUCT_NAME} checks for app updates automatically.`
     )
     .with({ status: 'Checking' }, () => 'Checking for an app update…')
     .with({ status: 'Downloading' }, () => 'Downloading an app update…')
     .with(
       { status: 'Ready' },
-      () => 'An app update is ready. It will install when you quit Macro.'
+      () =>
+        `An app update is ready. It will install when you quit ${PRODUCT_NAME}.`
     )
     .with({ status: 'Installing' }, () => 'Installing the app update…')
     .with({ status: 'Error' }, (value) => value.data.message)
@@ -72,7 +74,7 @@ export function createNativeUpdates(flush: () => Promise<void>) {
       toast.failure(
         error instanceof Error
           ? error.message
-          : 'Could not restart Macro. Try again after your changes finish saving.'
+          : `Could not restart ${PRODUCT_NAME}. Try again after your changes finish saving.`
       );
     } finally {
       clearTimeout(timeout);

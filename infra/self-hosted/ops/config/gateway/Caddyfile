@@ -1,0 +1,199 @@
+# The one public door of the backend. Traefik terminates TLS for
+# <api host> (SUPAMAC_API_HOST) and forwards every request to :8080; this
+# file decides which service, if any, a path reaches. The jobs service has a
+# door of its own, another gateway (ops/config/jobs-gateway/Caddyfile): this
+# one is not on the `jobs` network.
+#
+# The route table follows the local stack's proxy
+# (tooling/xtask/crates/xtask_local/src/local/proxy.rs and inventory.rs), so
+# the paths are the ones the web client calls. What differs is everything the
+# local proxy does for a developer's convenience: this gateway adds no CORS,
+# forwards no internal credential, and reaches the object store only.
+{
+	admin off
+	auto_https off
+	servers :8080 {
+		# Traefik is the only caller, from a private address. `strict` reads
+		# X-Forwarded-For from the right, so an address a client wrote into
+		# the header can never be taken for the client's own.
+		trusted_proxies static private_ranges
+		trusted_proxies_strict
+	}
+}
+
+# Forward to one service. The services take the rightmost X-Forwarded-For
+# entry as the caller, for rate limits and audit, so they get exactly one
+# entry: the address the connection came from.
+(service) {
+	reverse_proxy {args[0]} {
+		header_up X-Forwarded-For {client_ip}
+	}
+}
+
+# Objects are bytes people uploaded, served from the host that holds the
+# session cookies. A browser must never run one as a page of this origin, and
+# only the UI may frame one.
+(object_headers) {
+	header {
+		Content-Security-Policy "default-src 'none'; style-src 'unsafe-inline'; img-src data:; frame-ancestors {$SUPAMAC_UI_ORIGIN}"
+		Cross-Origin-Resource-Policy cross-origin
+		X-Content-Type-Options nosniff
+		defer
+	}
+}
+
+# The deny rules, imported first in the `route`. The jobs gateway repeats
+# them word for word (ops/src/jobs-gateway.test.ts).
+(deny) {
+	# A request carrying the shared internal key and a user id is
+	# authorized as that user on every service. Nothing outside the
+	# compose network may present either, also not a wrong one.
+	request_header -X-Internal-*
+	request_header -X-Document-Storage-Service-*
+
+	# Internal routes are for calls between services. The services mount
+	# them on their public listener, and some mount their whole router a
+	# second time under their own prefix, so the match is on any position
+	# in the path.
+	@internal path */internal */internal/*
+	respond @internal 404
+
+	# Swagger UI and the OpenAPI documents list every route, internal
+	# ones included, to anyone who asks.
+	@api_docs path */docs */docs/* */api-doc */api-doc/*
+	respond @api_docs 404
+
+	# GET on the GraphQL path is the GraphiQL IDE. Queries are POST, and
+	# subscriptions use the /ws path below it.
+	@graphiql {
+		method GET
+		path */soup/graphql
+	}
+	respond @graphiql 404
+}
+
+# Presigned object URLs, below the /local-storage prefix. The services sign
+# them for the in-network name, so the object store must see that Host or
+# the signature fails. This reaches the object store alone: the queue, table
+# and key services share the in-network endpoint and must never be reachable
+# from here.
+(objects) {
+	# The store's own admin, metrics and health API.
+	respond /minio/* 404
+
+	import object_headers
+	reverse_proxy minio:9000 {
+		header_up Host localstack:4566
+	}
+}
+
+:8080 {
+	# `route` keeps the order written here: deny rules run before any routing.
+	route {
+		respond /healthz 200
+
+		import deny
+
+		# Object uploads go through /local-storage and may be large; an API
+		# request body is JSON. Sizes are decimal: 32MB is 32,000,000 bytes.
+		@api not path /local-storage/*
+		request_body @api {
+			max_size 32MB
+		}
+
+		handle_path /auth/* {
+			# FusionAuth calls these in-network to create and delete
+			# accounts; from outside they would be a way to create one. The
+			# Stripe webhook sits under the same path and has no Stripe
+			# account behind it.
+			@user_webhooks path */webhooks/user */webhooks/user/*
+			respond @user_webhooks 404
+
+			# Sign-in is by emailed code only. Password sign-in is an
+			# unthrottled guess at the FusionAuth admin account, Apple
+			# sign-in has no provider, and the welcome mail lets anyone send
+			# mail from here.
+			@unused_sign_in path */login/password */login/apple */mobile-welcome-email
+			respond @unused_sign_in 404
+
+			import service authentication-service:8080
+		}
+		handle_path /dss/* {
+			import service document-storage-service:8080
+		}
+		handle_path /contacts/* {
+			import service contacts-service:8080
+		}
+		handle_path /notification/* {
+			import service notification-service:8080
+		}
+		handle_path /unfurl/* {
+			import service unfurl-service:8080
+		}
+		handle_path /image-proxy/* {
+			import service image-proxy-service:8080
+		}
+		handle_path /agent-harness/* {
+			import service agent-harness-service:8080
+		}
+		handle_path /email/* {
+			import service email-service:8080
+		}
+		handle_path /calendar/* {
+			import service calendar-service:8080
+		}
+
+		# The web client opens these sockets without a trailing slash.
+		@connection_gateway path /connection-gateway /connection-gateway/*
+		handle @connection_gateway {
+			uri strip_prefix /connection-gateway
+			import service connection-gateway:8080
+		}
+		@sync path /sync /sync/*
+		handle @sync {
+			uri strip_prefix /sync
+			import service sync-service:8787
+		}
+
+		# Served by the agent harness under these prefixes, which it keeps.
+		@harness path /cognition /cognition/* /mcp /mcp/* /preview /preview/* /scheduled-action /scheduled-action/*
+		handle @harness {
+			import service agent-harness-service:8080
+		}
+
+		# The worker answers CORS itself, for the origin compose gives it.
+		handle_path /ai-editing/* {
+			import service ai-editing-worker:8933
+		}
+
+		# Static files: the API goes to the service, everything else is an
+		# object of the static-file bucket, read without a signature as it is
+		# behind the CDN upstream. That bucket allows anonymous GetObject and
+		# nothing else.
+		handle_path /static-file/* {
+			handle /api/* {
+				import service static-file-service:8080
+			}
+			@read method GET HEAD
+			handle @read {
+				import object_headers
+				rewrite * /static-file-storage{uri}
+				reverse_proxy minio:9000
+			}
+			handle {
+				respond 405
+			}
+		}
+
+		handle_path /local-storage/* {
+			request_body {
+				max_size 1GB
+			}
+			import objects
+		}
+
+		handle {
+			respond 404
+		}
+	}
+}

@@ -42,20 +42,18 @@ pub(crate) struct LoginQueryParams {
 }
 
 pub(crate) fn is_allowed_original_url(url: &Url) -> bool {
-    let local_origin = match macro_env::Environment::new_or_prod() {
-        macro_env::Environment::Local => Some(crate::api::utils::default_redirect_url()),
-        _ => None,
-    };
-    is_allowed_original_url_with_local_origin(url, local_origin.as_ref())
+    let frontend_origin = crate::api::utils::default_redirect_url();
+    is_allowed_original_url_with_frontend_origin(url, Some(&frontend_origin))
 }
 
-fn is_allowed_original_url_with_local_origin(url: &Url, local_origin: Option<&Url>) -> bool {
-    // Local stacks can run behind a remote HTTPS proxy. Trust only the exact
-    // configured frontend origin, including its scheme and port.
+fn is_allowed_original_url_with_frontend_origin(url: &Url, frontend_origin: Option<&Url>) -> bool {
+    // The web app is trusted only at the exact origin the deployment serves it
+    // from (`default_redirect_url`), including its scheme and port; every
+    // other https host is refused.
     if url.scheme() == "https"
         && url.username().is_empty()
         && url.password().is_none()
-        && local_origin.is_some_and(|origin| origin.origin() == url.origin())
+        && frontend_origin.is_some_and(|origin| origin.origin() == url.origin())
     {
         return true;
     }
@@ -64,11 +62,7 @@ fn is_allowed_original_url_with_local_origin(url: &Url, local_origin: Option<&Ur
         // The app owns the custom scheme and handles all macro URI routes itself.
         "macro" => true,
         "tauri" => url.host_str() == Some("localhost"),
-        "http" => matches!(url.host_str(), Some("localhost" | "tauri.localhost")),
-        "https" => matches!(
-            url.host_str(),
-            Some("localhost" | "tauri.localhost" | "dev.macro.com" | "macro.com" | "www.macro.com")
-        ),
+        "http" | "https" => matches!(url.host_str(), Some("localhost" | "tauri.localhost")),
         _ => false,
     }
 }

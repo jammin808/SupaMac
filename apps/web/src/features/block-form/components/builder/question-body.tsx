@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import CheckSquare from '@icon/system/regular/check-square.svg';
 import { For, type JSX, Match, Show, Switch } from 'solid-js';
 import type { FormColumn, FormOption } from '../../core/form-model';
@@ -94,7 +95,7 @@ export function QuestionPreview(props: {
         <FauxField>Pick a document</FauxField>
       </Match>
       <Match when={props.type === 'entity'}>
-        <FauxField>Pick from Macro</FauxField>
+        <FauxField>Pick from {PRODUCT_NAME}</FauxField>
       </Match>
       <Match when={props.type === 'relation'}>
         <FauxField>

@@ -1,4 +1,5 @@
 import { useAnalytics } from '@app/lib/analytics/analytics-context';
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import LogoIcon from '@icon/macro-logo.svg';
 import { useNavigate } from '@solidjs/router';
 import { Button, Surface } from '@ui';
@@ -23,7 +24,7 @@ export function MobileAuthWelcome() {
         <Surface depth={1}>
           <div class="flex flex-col items-center gap-2 py-10">
             <LogoIcon class="size-20 text-ink" />
-            <div class="text-lg font-medium">Welcome to Macro</div>
+            <div class="text-lg font-medium">Welcome to {PRODUCT_NAME}</div>
           </div>
           <div class="flex flex-col gap-3 px-8 pb-8">
             <Button

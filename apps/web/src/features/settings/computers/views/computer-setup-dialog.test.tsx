@@ -189,7 +189,7 @@ it('marks Bring your AI done on Macro credits once its sign-in was opened', () =
   const items = screen
     .getByRole('list', { name: 'Setup steps' })
     .querySelectorAll('li');
-  expect(items[2].textContent).toBe('Bring your AI · Macro credits');
+  expect(items[2].textContent).toBe('Bring your AI · SupaMac credits');
   expect(items[2].className).toContain('text-ink-muted');
   expect(items[2].querySelector('svg')).toBeTruthy();
 });
@@ -339,7 +339,7 @@ it('drops the shared sign-in note from Bring your AI once setup has failed', () 
     screen.queryByText(/Everyone using this computer can use this sign-in/)
   ).toBeNull();
   expect(
-    screen.queryByRole('button', { name: 'Use Macro credits instead' })
+    screen.queryByRole('button', { name: 'Use SupaMac credits instead' })
   ).toBeNull();
 });
 
@@ -393,7 +393,7 @@ it('shows setup as one line under the steps, expanding to every stage', () => {
     'Billing updated',
     'Computer created',
     expect.stringMatching(/^Starting up\d+:\d\d$/),
-    'Connecting to Macro',
+    'Connecting to SupaMac',
     'Sign in to Claude',
   ]);
 });
@@ -413,7 +413,7 @@ it('asks for Claude with two one-line options, and no hint under Continue', () =
   });
   const options = choice.querySelectorAll('input[type="radio"]');
   expect(options).toHaveLength(2);
-  fireEvent.click(screen.getByRole('radio', { name: 'Macro credits' }));
+  fireEvent.click(screen.getByRole('radio', { name: 'SupaMac credits' }));
   expect(onChoice).toHaveBeenCalledWith('macro_credits');
 });
 

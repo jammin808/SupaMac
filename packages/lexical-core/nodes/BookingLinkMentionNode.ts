@@ -13,7 +13,7 @@ import {
 } from 'lexical';
 import { type DecoratorComponent, getDecorator } from '../decoratorRegistry';
 import { $applyIdFromSerialized } from '../plugins/nodeIdPlugin';
-import { isAllowedLinkUrl } from '../utils/link-url';
+import { appLinkUrl, bookingUrlPattern } from '../utils/app-links';
 
 const VERSION = 1;
 
@@ -28,20 +28,19 @@ export type BookingLinkMentionInfo = {
   url: string;
 };
 
-/** Pattern to match Macro booking URLs: /app/book/:profile/:slug? */
-const MACRO_BOOKING_URL_PATTERN =
-  /^https?:\/\/(?:www\.)?(?:macro\.com|localhost:\d+|dev\.macro\.com|staging\.macro\.com)\/app\/book\/([^/?#]+)(?:\/([^/?#]+))?(?:[?#].*)?$/;
-
-/** Check whether a URL is a valid Macro booking link. */
+/**
+ * Whether a URL links to this app's booking page (`<app>/book/:profile/:slug?`,
+ * see `utils/app-links.ts`).
+ */
 export function isMacroBookingUrl(url: string): boolean {
-  return MACRO_BOOKING_URL_PATTERN.test(url);
+  return bookingUrlPattern().test(url);
 }
 
 /** Parse a booking URL into its parts. */
 export function parseBookingUrl(
   url: string
 ): { profileId: string; slug?: string } | null {
-  const match = url.match(MACRO_BOOKING_URL_PATTERN);
+  const match = url.match(bookingUrlPattern());
   if (!match) return null;
   const profileId = decodeURIComponent(match[1]);
   const slug = match[2] ? decodeURIComponent(match[2]) : undefined;
@@ -99,11 +98,14 @@ export class BookingLinkMentionNode extends DecoratorNode<
     this.__profileId = profileId;
     this.__slug = slug;
     this.__label = label;
-    // Saved state can hold any URL; one a link may not open is rebuilt.
+    // Saved state can hold any URL; one that is not this app's booking page
+    // is rebuilt from the profile and slug. Where there is no app to link to
+    // (a service converting Markdown) the URL stays empty, and the editor that
+    // loads the node rebuilds it.
     this.__url =
-      (url && isAllowedLinkUrl(url) ? url : undefined) ||
-      buildBookingUrl(profileId, slug) ||
-      `https://macro.com/app/book/${profileId}`;
+      (url && isMacroBookingUrl(url) ? url : undefined) ??
+      buildBookingUrl(profileId, slug) ??
+      '';
   }
 
   static importJSON(serializedNode: SerializedBookingLinkMentionNode) {
@@ -253,14 +255,10 @@ export class BookingLinkMentionNode extends DecoratorNode<
 }
 
 function buildBookingUrl(profileId: string, slug?: string): string | undefined {
-  if (typeof window === 'undefined') return undefined;
-  const hostname = window.location.hostname;
-  const cleanHost =
-    hostname === 'localhost' ? 'dev.macro.com' : hostname.replace('www.', '');
   const path = slug
-    ? `/app/book/${encodeURIComponent(profileId)}/${encodeURIComponent(slug)}`
-    : `/app/book/${encodeURIComponent(profileId)}`;
-  return `https://${cleanHost}${path}`;
+    ? `/book/${encodeURIComponent(profileId)}/${encodeURIComponent(slug)}`
+    : `/book/${encodeURIComponent(profileId)}`;
+  return appLinkUrl(path);
 }
 
 export function $createBookingLinkMentionNode(params: BookingLinkMentionInfo) {

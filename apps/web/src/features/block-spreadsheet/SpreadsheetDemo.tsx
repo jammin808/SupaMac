@@ -2,6 +2,7 @@ import {
   ChatWithAgentIcon,
   openChatWithAgent,
 } from '@app/features/chat/ChatWithAgentButton';
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import {
   SplitHeaderLeft,
   SplitHeaderRight,
@@ -109,7 +110,7 @@ export default function SpreadsheetDemo() {
       }),
     onSaveFailure: (action) =>
       toast.failure('Could not save spreadsheet', {
-        subtext: `Your changes are still here. Try ${action === 'share' ? 'sharing' : 'Ask Macro'} again.`,
+        subtext: `Your changes are still here. Try ${action === 'share' ? 'sharing' : `Ask ${PRODUCT_NAME}`} again.`,
       }),
   });
 
@@ -152,7 +153,7 @@ export default function SpreadsheetDemo() {
             onClick={() => fireAndForget(actions.ask(), 'spreadsheet-draft')}
           >
             <ChatWithAgentIcon class="size-3.5" />
-            Ask Macro
+            Ask {PRODUCT_NAME}
           </Button>
           <Button
             variant="secondary"

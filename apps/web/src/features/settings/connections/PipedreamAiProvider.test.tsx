@@ -64,14 +64,14 @@ describe('PipedreamAiProvider label', () => {
   it('says Macro Connect on a Connect grant with the macro-connect flag on', () => {
     flag.on = true;
     renderLinear('connect');
-    expect(screen.getByText('Powered by Macro Connect')).toBeTruthy();
+    expect(screen.getByText('Powered by SupaMac Connect')).toBeTruthy();
     expect(screen.queryByText(/Pipedream/)).toBeNull();
   });
 
   it('says Macro Connect before connecting with the flag on', () => {
     flag.on = true;
     renderLinear();
-    expect(screen.getByText('Powered by Macro Connect')).toBeTruthy();
+    expect(screen.getByText('Powered by SupaMac Connect')).toBeTruthy();
   });
 
   it('keeps the Pipedream label with the flag off', () => {

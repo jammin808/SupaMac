@@ -1,6 +1,11 @@
+import { SELF_HOSTED } from '@core/constant/servers';
 import { createSignal } from 'solid-js';
 import { match } from 'ts-pattern';
-import type { SignupProvider, SignupStep } from '../core/signup-draft';
+import {
+  type SignupProvider,
+  type SignupStep,
+  signupSteps,
+} from '../core/signup-draft';
 import { readSignupDraft, saveSignupDraft } from './flow-storage';
 
 /**
@@ -14,8 +19,11 @@ export function createSignupJourney(options: { showingEmail: boolean }) {
   // into that provider's inbox consent once it exists.
   if (options.showingEmail && draft?.provider)
     saveSignupDraft({ ...draft, provider: undefined });
+  const steps = signupSteps(SELF_HOSTED);
+  // A draft saved on a slide this deployment leaves out starts over.
+  const savedStep = steps.find((candidate) => candidate === draft?.step);
   const [step, setStep] = createSignal<SignupStep>(
-    options.showingEmail ? 'work' : (draft?.step ?? 'welcome')
+    options.showingEmail ? 'work' : (savedStep ?? 'welcome')
   );
   const [accent, setAccent] = createSignal(draft?.accent);
   const [connecting, setConnecting] = createSignal<SignupProvider>();
@@ -55,6 +63,7 @@ export function createSignupJourney(options: { showingEmail: boolean }) {
 
   return {
     step,
+    steps,
     accent,
     setAccent,
     commit,

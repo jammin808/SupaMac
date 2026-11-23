@@ -1,5 +1,4 @@
 import type { SettingsTab } from '@core/constant/SettingsState';
-import { useSettingsTabAvailable } from '@core/constant/settingsTabsConfig';
 import { lazyNamed } from '@core/util/lazyNamed';
 import { Show, Suspense } from 'solid-js';
 import { CalendarSettings } from '../calendar/calendar-settings';
@@ -20,6 +19,7 @@ import { IntegrationsPage } from './IntegrationsPage';
 import { MobileApp } from './MobileApp';
 import { Notifications } from './Notifications';
 import { Shortcuts } from './Shortcuts';
+import { shownSettingsTab, useShownSettingsTab } from './shown-settings-tabs';
 import { Tags } from './Tags';
 import { TeamPage } from './Team';
 import { TeamGeneral } from './TeamGeneral';
@@ -38,9 +38,9 @@ export function SettingsTabContent(props: {
   tab: SettingsTab;
   phone?: boolean;
 }) {
-  const isAvailable = useSettingsTabAvailable();
+  const isAvailable = useShownSettingsTab();
   const isCurrentTab = (tab: SettingsTab) =>
-    props.tab === tab && isAvailable(tab);
+    shownSettingsTab(props.tab) === tab && isAvailable(tab);
   return (
     <Suspense
       fallback={

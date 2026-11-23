@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import type { Capability, CapabilityScope } from './model';
 
 const SCOPE_LABEL: Record<CapabilityScope, string> = {
@@ -18,7 +19,9 @@ export function capabilityFacts(
   if (!row || row.mechanism === 'pipedream') {
     const onConnect =
       macroConnectEnabled && (!row || row.grantProvider === 'connect');
-    return onConnect ? 'Powered by Macro Connect' : 'Powered by Pipedream';
+    return onConnect
+      ? `Powered by ${PRODUCT_NAME} Connect`
+      : 'Powered by Pipedream';
   }
   return [row.account, SCOPE_LABEL[row.scope]].filter(Boolean).join(' · ');
 }

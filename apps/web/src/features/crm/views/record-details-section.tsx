@@ -21,13 +21,15 @@ export function RecordDetailsSection(props: {
     >
       <div class="flex min-w-0 flex-col gap-2">
         <EntityMetadataRow label="Name">
-          {props.company?.name ?? props.contact?.name ?? '—'}
+          <span class="select-text">
+            {props.company?.name ?? props.contact?.name ?? '—'}
+          </span>
         </EntityMetadataRow>
         <Show when={props.company}>
           {(company) => (
             <EntityMetadataRow label="Website">
               <For each={company().domains}>
-                {(domain) => <div>{domain.domain}</div>}
+                {(domain) => <div class="select-text">{domain.domain}</div>}
               </For>
             </EntityMetadataRow>
           )}

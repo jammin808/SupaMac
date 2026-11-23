@@ -53,3 +53,34 @@ fn only_public_unicast_is_public() {
         assert!(is_public(ip(allowed)), "{allowed} should be allowed");
     }
 }
+
+#[test]
+fn private_addresses_take_a_local_opt_in() {
+    for environment in [
+        Environment::Local,
+        Environment::Develop,
+        Environment::Production,
+    ] {
+        assert_eq!(
+            AddressPolicy::for_opt_in(environment, false).unwrap(),
+            AddressPolicy::PublicOnly,
+            "{environment:?}"
+        );
+    }
+
+    assert_eq!(
+        AddressPolicy::for_opt_in(Environment::Local, true).unwrap(),
+        AddressPolicy::AnyAddress
+    );
+
+    for deployed in [Environment::Develop, Environment::Production] {
+        let refused = AddressPolicy::for_opt_in(deployed, true).unwrap_err();
+
+        assert!(
+            refused
+                .to_string()
+                .contains("DEV_DANGEROUS_PRIVATE_MCP_ADDRESSES"),
+            "{deployed:?}: the error names the setting"
+        );
+    }
+}

@@ -2,6 +2,7 @@ import {
   TurnOffCalendarDialog,
   type TurnOffCalendarTarget,
 } from '@app/features/calendar/components/TurnOffCalendarDialog';
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { toast } from '@core/component/Toast/Toast';
 import {
   ENABLE_INBOX_RESYNC,
@@ -266,7 +267,7 @@ export function EmailCard(props: { class?: string } = {}) {
                 ? 'Connect another Google Workspace account'
                 : 'Connect a Google Workspace account'
             }
-            description="Sync a Gmail or Google Workspace inbox into Macro Email."
+            description={`Sync a Gmail or Google Workspace inbox into ${PRODUCT_NAME} Email.`}
           >
             <ConnectAction
               label="Connect"
@@ -281,7 +282,7 @@ export function EmailCard(props: { class?: string } = {}) {
               icon={<OutlookIcon />}
               title="Connect an Outlook account"
               badge={<OutlookBetaBadge />}
-              description="Sync an Outlook.com or Microsoft 365 inbox into Macro Email."
+              description={`Sync an Outlook.com or Microsoft 365 inbox into ${PRODUCT_NAME} Email.`}
             >
               <ConnectAction
                 label="Connect"
@@ -325,8 +326,8 @@ export function EmailCard(props: { class?: string } = {}) {
                 }
               >
                 Remove <span class="text-ink">{removeTarget()?.email}</span>?
-                This clears all of its email data from Macro and cannot be
-                undone.
+                This clears all of its email data from {PRODUCT_NAME} and cannot
+                be undone.
               </Show>
             </Dialog.Description>
             <div class="pt-3 justify-end items-center gap-3 inline-flex">
@@ -356,12 +357,24 @@ async function outlookAvailable(): Promise<boolean> {
   }
 }
 
+function isSyncFailure(status: SyncStatus): boolean {
+  return (
+    status === SyncStatus.ERROR ||
+    status === SyncStatus.NEEDS_REAUTH ||
+    status === SyncStatus.MAILBOX_UNAVAILABLE
+  );
+}
+
 function syncStatusLabel(status: SyncStatus): string {
   return match(status)
     .with(SyncStatus.SYNCING, () => 'Syncing…')
     .with(SyncStatus.UP_TO_DATE, () => 'Up to date')
     .with(SyncStatus.ERROR, () => 'Error — re-sync')
     .with(SyncStatus.NEEDS_REAUTH, () => 'Reconnect to resume sync')
+    .with(
+      SyncStatus.MAILBOX_UNAVAILABLE,
+      () => 'No Outlook mailbox for this account'
+    )
     .with(SyncStatus.INACTIVE, () => 'Disabled')
     .exhaustive(() => 'Unknown sync status');
 }
@@ -503,12 +516,8 @@ function InboxRow(props: {
                   <span
                     class="flex items-center gap-1 text-xs"
                     classList={{
-                      'text-failure':
-                        props.link.sync_status === SyncStatus.ERROR ||
-                        props.link.sync_status === SyncStatus.NEEDS_REAUTH,
-                      'text-ink-muted':
-                        props.link.sync_status !== SyncStatus.ERROR &&
-                        props.link.sync_status !== SyncStatus.NEEDS_REAUTH,
+                      'text-failure': isSyncFailure(props.link.sync_status),
+                      'text-ink-muted': !isSyncFailure(props.link.sync_status),
                     }}
                   >
                     <Show when={props.link.sync_status === SyncStatus.SYNCING}>

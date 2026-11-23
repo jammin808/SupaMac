@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { toast } from '@core/component/Toast/Toast';
 import { useDisableCalendarMutation } from '@queries/email/link';
 import { Button, Dialog, Panel } from '@ui';
@@ -53,10 +54,11 @@ export function TurnOffCalendarDialog(props: {
         <Panel.Body class="p-6 font-sans flex flex-col gap-3">
           <Dialog.Description class="text-ink-muted text-sm/tight font-normal">
             Turn off calendar for{' '}
-            <span class="text-ink">{props.target?.emailAddress}</span>? Macro
-            deletes its copy of these events and gives up calendar access. Your
-            calendar at the provider is untouched and email keeps syncing, but
-            turning calendar back on means granting access again.
+            <span class="text-ink">{props.target?.emailAddress}</span>?{' '}
+            {PRODUCT_NAME} deletes its copy of these events and gives up
+            calendar access. Your calendar at the provider is untouched and
+            email keeps syncing, but turning calendar back on means granting
+            access again.
           </Dialog.Description>
           <Show when={disableCalendar.isPending}>
             <p role="status" class="text-sm text-ink-muted">

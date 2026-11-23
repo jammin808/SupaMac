@@ -6,13 +6,13 @@ use std::process::Output;
 use std::sync::Arc;
 
 use agent_git::client::AgentGitClient;
-use agent_git::domain::models::RepoLimits;
+use agent_git::domain::models::{GitProcessLimits, RepoLimits};
 use agent_git::domain::ports::{PushRateLimiter, RepoRepository};
 use agent_git::domain::service::{AgentGitAdapters, AgentGitServiceImpl};
 use agent_git::domain::template::WORKSPACE_TEMPLATE;
 use agent_git::inbound::http::{AgentGitRouterState, agent_git_router};
 use agent_git::outbound::bare_repo_store::BareRepoStore;
-use agent_git::outbound::git_http_backend::GitHttpBackend;
+use agent_git::outbound::git_http_backend::{GIT_REQUEST_DEADLINE, GitHttpBackend};
 use agent_git::outbound::pg_repo_repository::PgRepoRepository;
 use agent_git::outbound::push_rate_limiter::PgPushRateLimiter;
 use agent_git::outbound::repo_directories::RepoDirectories;
@@ -101,12 +101,17 @@ async fn start_server(pool: PgPool, storage_root: &Path, max_repo_size_bytes: u6
                 pool.clone(),
             )),
             limiter: PgPushRateLimiter::new(pool.clone(), 30),
-            backend: GitHttpBackend::new(directories, tokio_util::task::TaskTracker::new()),
+            backend: GitHttpBackend::new(
+                directories,
+                tokio_util::task::TaskTracker::new(),
+                GIT_REQUEST_DEADLINE,
+            ),
             creators,
             flags: Some(Rollout),
         },
         RepoLimits {
             max_repo_size_bytes,
+            git: GitProcessLimits::default(),
         },
         WORKSPACE_TEMPLATE,
     );
@@ -539,10 +544,10 @@ async fn a_voice_change_is_one_server_commit_that_keeps_the_agents_work(pool: Pg
 
     let pulled = git(&checkout, &["pull", "--ff-only", "origin", "main"]).await;
     assert!(pulled.status.success(), "{pulled:?}");
-    let log = git(&checkout, &["log", "--format=%an %s", "-3"]).await;
+    let log = git(&checkout, &["log", "--format=%an <%ae> %s", "-3"]).await;
     assert_eq!(
         String::from_utf8_lossy(&log.stdout),
-        "Macro Set call voice\nAgent remember\nMacro Initial workspace\n"
+        "Macro <> Set call voice\nAgent <agent@example.com> remember\nMacro <> Initial workspace\n"
     );
     assert_eq!(
         std::fs::read_to_string(checkout.join("memory.md")).unwrap(),

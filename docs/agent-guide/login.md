@@ -76,7 +76,8 @@ account that isn't a new agent continues to `/app/team-invite?id=<id>`.
 
 After the code or Google sign-in, an agent skips onboarding and goes to
 `/app/agent-setup`, a markdown page with the SDK token as plain page text, the
-product and SDK docs links, how to set a name and profile picture, install and pair
+product and SDK docs links (none on a self-hosted build, whose SDK snippet names
+the instance's own hosts instead), how to set a name and profile picture, install and pair
 `macrod`, and create more tokens, and a link to the app. The app shell sends an unconfirmed agent back here. An
 invited agent also joins the inviting team at this point; if that fails, the page
 says so and the invite stays pending: reloading tries again, and the emailed invite
@@ -89,9 +90,10 @@ has run, so it gets them like a person's signup. Requesting a code outside the a
 signup page, or signing in with SSO outside it, reverts the account to a person unless
 it holds a token, has confirmed setup, or has a pending agent invite.
 
-Production Google/SSO and inbox/calendar connections may return to either
-`https://macro.com` or `https://www.macro.com`. Verify connections from both hosts;
-the web inbox link flow returns to `/app/inbox-link-callback` on the originating host.
+Google/SSO and inbox/calendar connections return only to the exact origin of the
+deployment's default redirect URL (on a local or self-hosted stack its
+`FRONTEND_ORIGIN`), localhost, `tauri://localhost` and `macro:`; the web inbox link
+flow returns to `/app/inbox-link-callback` on that origin.
 
 On desktop, connecting a Gmail or Outlook account, reconnecting one, or enabling
 calendar opens the selected provider's consent in the system browser. The app
@@ -503,8 +505,8 @@ earlier, so requests after a resume start a fresh one instead of waiting.
 
 Use the stack's configured HTTPS frontend origin for Google account linking.
 In local mode, authentication accepts that exact origin (including port) as a
-return URL. Remote hostnames must use HTTPS; hosted environments retain their
-existing redirect allowlist.
+return URL. Remote hostnames must use HTTPS; every environment trusts only its
+default redirect URL's origin.
 
 If Google redirects to `http://localhost:<auth-port>/oauth2/google/callback`,
 forward that port from the browser's machine to the VM's authentication port

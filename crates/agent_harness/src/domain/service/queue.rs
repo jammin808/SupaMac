@@ -458,11 +458,11 @@ where
         match &command {
             HarnessCommand::Open(open)
                 if AgentKind::of(open.bot_id) == AgentKind::SandboxedCoder
-                    && !is_macro_staff(open.origin.actor()) =>
+                    && !self.is_sandbox_operator(open.origin.actor()) =>
             {
                 return Err(AgentSessionError::Forbidden.into());
             }
-            // The queue mutations sit behind the same staff gate as delivery:
+            // The queue mutations sit behind the same operator gate as delivery:
             // an edited entry is delivered later under its original identity,
             // so rewriting (or dropping) what a Daytona session is about to
             // run is the same privilege as prompting it.
@@ -484,7 +484,9 @@ where
                     return Err(AgentSessionError::Archived(session_id).into());
                 }
                 if AgentKind::of(session.bot_id) == AgentKind::SandboxedCoder
-                    && !actor.as_ref().is_some_and(is_macro_staff)
+                    && !actor
+                        .as_ref()
+                        .is_some_and(|actor| self.is_sandbox_operator(actor))
                 {
                     return Err(AgentSessionError::Forbidden.into());
                 }

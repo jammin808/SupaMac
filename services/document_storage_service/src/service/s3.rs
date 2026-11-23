@@ -12,6 +12,7 @@ mod put_presigned_url;
 mod upload_document;
 
 use std::sync::Arc;
+use std::time::Duration;
 
 use aws_sdk_s3::{self as s3, primitives::ByteStream};
 #[allow(unused_imports)]
@@ -74,6 +75,22 @@ impl S3Client {
             &self.inner,
             &self.document_storage_bucket,
             key,
+            internal_presigned_helpers::EXPIRY,
+        )
+        .await
+    }
+
+    /// Generates an expiring presigned url for downloading a document object
+    pub async fn get_document_presigned_url(
+        &self,
+        key: &str,
+        expires_in_seconds: u64,
+    ) -> anyhow::Result<String> {
+        internal_presigned_helpers::get_presigned_url(
+            &self.inner,
+            &self.document_storage_bucket,
+            key,
+            Duration::from_secs(expires_in_seconds),
         )
         .await
     }
@@ -226,3 +243,6 @@ impl S3Client {
         Ok(true)
     }
 }
+
+#[cfg(test)]
+mod test;

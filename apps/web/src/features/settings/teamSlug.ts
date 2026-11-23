@@ -1,3 +1,5 @@
+import { WEB_BASE_PATH } from '@app/constants/routerBase';
+
 export const TEAM_SLUG_MAX_LENGTH = 20;
 
 export const TEAM_SLUG_ALLOWED_INPUT_REGEX: RegExp = /^[A-Za-z_\- \t\n\f\r]*$/;
@@ -73,7 +75,7 @@ export function buildTeamTaskAutolinkTargetUrl(
   teamSlug: string,
   webOrigin: string
 ): string {
-  return `${webOrigin.replace(/\/$/, '')}/app/task-slug/${teamSlug}-<num>`;
+  return `${webOrigin.replace(/\/$/, '')}${WEB_BASE_PATH}/task-slug/${teamSlug}-<num>`;
 }
 
 const TEAM_TASK_NUMBER_REGEX: RegExp = /^\d{1,9}$/;

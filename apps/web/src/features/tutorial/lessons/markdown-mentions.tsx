@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { buildConfig } from '@core/component/LexicalMarkdown/builder/MarkdownConfigBuilder';
 import { MarkdownShell } from '@core/component/LexicalMarkdown/builder/MarkdownShell';
 import { createSignal, onCleanup } from 'solid-js';
@@ -18,7 +19,7 @@ function MarkdownMentionsContent(_props: LessonContentProps) {
   return (
     <div class="flex flex-col gap-8 onboarding-stagger">
       <p class="text-ink-muted mt-2">
-        Macro's editor supports rich markdown, mentions, and emoji. Try
+        {PRODUCT_NAME}'s editor supports rich markdown, mentions, and emoji. Try
         mentioning someone or something by typing <strong>@</strong> in the
         editor.
       </p>

@@ -29,7 +29,7 @@ test('an empty new email hints at each field, and each refused send names what i
 }) => {
   await mailbox.open('/app/mail/new');
   const to = page.getByRole('combobox', {
-    name: 'Macro users or email addresses',
+    name: 'SupaMac users or email addresses',
   });
   await expect(to).toBeVisible();
   await expect(to).toHaveValue('');

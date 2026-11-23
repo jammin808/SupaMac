@@ -80,11 +80,36 @@ maybe_env_var! {
         EnableGmailOpsQueue,
         EnableNotificationQueue,
         McpCredentialsKeySecretName,
+        PosthogApiKey,
+        PosthogHost,
+        DevDangerousPrivateMcpAddresses,
     }
 }
 
+/// PostHog's US ingestion origin, used when `POSTHOG_HOST` is unset.
+const DEFAULT_POSTHOG_HOST: &str = "https://us.i.posthog.com";
+
 maybe_env_var! {
     struct GoogleGenerativeAiApiKey;
+}
+
+/// A PostHog client for service-wide flags, or `None` without a project key.
+pub fn service_feature_flags(
+    posthog_api_key: Option<&str>,
+    posthog_host: Option<&str>,
+    environment: Environment,
+) -> anyhow::Result<Option<feature_flags::outbound::posthog::PostHogFeatureFlags>> {
+    let Some(key) = posthog_api_key.filter(|key| !key.trim().is_empty()) else {
+        return Ok(None);
+    };
+    feature_flags::outbound::posthog::PostHogFeatureFlags::new(
+        posthog_host.unwrap_or(DEFAULT_POSTHOG_HOST),
+        key.to_owned(),
+        std::time::Duration::from_secs(3),
+        environment,
+    )
+    .map(Some)
+    .map_err(|error| anyhow::anyhow!("invalid feature flag configuration: {error}"))
 }
 
 /// The text-to-image provider for the GenerateImage tool: Gemini's Nano
@@ -151,6 +176,9 @@ pub fn build_cognition_tool_context() -> anyhow::Result<crate::ToolCognitionTool
 /// - `ENABLE_EMAIL_SCHEDULED_QUEUE`
 /// - `ENABLE_GMAIL_OPS_QUEUE` (if disabled, thread-label updates can't enqueue Gmail sync ops)
 /// - `ENABLE_NOTIFICATION_QUEUE` (if disabled, notification status updates skip push clearing)
+///
+/// `DEV_DANGEROUS_PRIVATE_MCP_ADDRESSES=true` lets the import selector's MCP
+/// client reach private addresses; it is refused outside the local environment.
 ///
 /// `ATTACHMENT_BUCKET` (the email service's draft attachment bucket) is
 /// optional; without it `SendEmail` refuses attachments but still sends.
@@ -233,6 +261,12 @@ pub async fn build_tool_service_context_from_env(
         .unwrap_or(false);
     let enable_notification_queue = maybe_env
         .enable_notification_queue
+        .as_ref()
+        .and_then(|v| v.value())
+        .and_then(|v| v.parse::<bool>().ok())
+        .unwrap_or(false);
+    let private_mcp_addresses = maybe_env
+        .dev_dangerous_private_mcp_addresses
         .as_ref()
         .and_then(|v| v.value())
         .and_then(|v| v.parse::<bool>().ok())
@@ -389,6 +423,18 @@ pub async fn build_tool_service_context_from_env(
         )),
         sqs: aws_sqs_client,
         macro_event_broker: macro_event_broker.clone(),
+        environment,
+        feature_flags: service_feature_flags(
+            maybe_env
+                .posthog_api_key
+                .as_ref()
+                .and_then(|key| key.value()),
+            maybe_env
+                .posthog_host
+                .as_ref()
+                .and_then(|host| host.value()),
+            environment,
+        )?,
     };
     let databases_gateway = side_effect_clients.connection_gateway.as_ref().clone();
     let channel_tool_context = crate::tool_context::build_channel_tool_context_with_side_effects(
@@ -564,6 +610,7 @@ pub async fn build_tool_service_context_from_env(
         &databases_tool_context,
         soup_service.clone(),
         pool.clone(),
+        side_effect_clients.feature_flags.clone(),
     );
     let crm_tool_context = crate::tool_context::build_crm_tool_context(pool.clone());
     let pipeline_tool_context = crate::tool_context::build_pipeline_tool_context(
@@ -627,7 +674,10 @@ pub async fn build_tool_service_context_from_env(
         let mcp_selector = Arc::new(mcp_select::McpToolSelector::new(
             native_servers.clone(),
             mcp_client::outbound::guarded_http::McpHttp::new(
-                mcp_client::outbound::guarded_http::AddressPolicy::for_environment(environment),
+                mcp_client::outbound::guarded_http::AddressPolicy::for_opt_in(
+                    environment,
+                    private_mcp_addresses,
+                )?,
             )?,
             pipedream_connections.clone(),
             Arc::new(pipedream_client.clone()),

@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import CheckIcon from '@icon/system/bold/check-bold.svg?component-solid';
 import ClipboardIcon from '@icon/system/bold/clipboard-bold.svg?component-solid';
 import { Button } from '@ui';
@@ -14,11 +15,12 @@ export function AiChatEmptyState() {
         <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div class="min-w-0">
             <div class="mb-2 inline-flex items-center rounded-xs border border-accent/20 bg-accent/10 px-2 py-1 text-xs text-accent">
-              Macro MCP
+              {PRODUCT_NAME} MCP
             </div>
-            <h2 class="text-xl/tight">Connect AI to Macro</h2>
+            <h2 class="text-xl/tight">Connect AI to {PRODUCT_NAME}</h2>
             <p class="mt-2 max-w-[56ch] text-sm/6 text-ink-muted">
-              Use macro with your favorite AI chat client or code editor
+              Use {PRODUCT_NAME} with your favorite AI chat client or code
+              editor
             </p>
           </div>
         </div>

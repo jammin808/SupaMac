@@ -1,7 +1,7 @@
 //! Admin-only HTTP API for querying AI cost and re-pricing models.
 //!
-//! Every route is restricted to Macro admins — callers whose user id resolves
-//! to an `@macro.com` email.
+//! Every route is restricted to the admins the host names
+//! (`UsageServiceImpl::with_admins`); with none named, every caller is refused.
 
 use super::models::UsageSummary;
 use crate::domain::{AiFeature, ModelPricing, UsageApiParams, UsageError, UsageService};

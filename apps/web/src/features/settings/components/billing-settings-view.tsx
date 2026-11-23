@@ -1,4 +1,6 @@
+import { WEB_BASE_PATH } from '@app/constants/routerBase';
 import { type PaidPlanTier, PLAN_BY_TIER } from '@app/features/paywall/plans';
+import { SELF_HOSTED } from '@core/constant/servers';
 import { plural } from '@core/util/string';
 import CalendarIcon from '@icon/system/regular/calendar-blank.svg';
 import EnvelopeIcon from '@icon/system/regular/envelope.svg';
@@ -44,16 +46,20 @@ export function BillingSettingsView(props: {
     <SettingsPage
       title="Billing"
       description={
-        <>
-          For questions about billing,{' '}
-          <a
-            class="text-link hover:text-link-hover visited:text-link-visited inline-flex items-center"
-            href="mailto:support@macro.com"
-          >
-            contact us
-            <EnvelopeIcon class="size-4 inline mx-1" />
-          </a>
-        </>
+        // The address is the hosted service's support; a self-hosted bundle,
+        // where this plain test folds, names none.
+        SELF_HOSTED ? undefined : (
+          <>
+            For questions about billing,{' '}
+            <a
+              class="text-link hover:text-link-hover visited:text-link-visited inline-flex items-center"
+              href="mailto:support@macro.com"
+            >
+              contact us
+              <EnvelopeIcon class="size-4 inline mx-1" />
+            </a>
+          </>
+        )
       }
     >
       {props.controls}
@@ -90,7 +96,7 @@ export function BillingSettingsView(props: {
                       each seat's plan in{' '}
                       <a
                         class="text-link hover:text-link-hover"
-                        href="/app/settings/team-members"
+                        href={`${WEB_BASE_PATH}/settings/team-members`}
                         onClick={props.onTeamSettings}
                       >
                         Team settings
@@ -111,7 +117,7 @@ export function BillingSettingsView(props: {
                       • set each seat's plan in{' '}
                       <a
                         class="text-link hover:text-link-hover"
-                        href="/app/settings/team-members"
+                        href={`${WEB_BASE_PATH}/settings/team-members`}
                         onClick={props.onTeamSettings}
                       >
                         Team settings

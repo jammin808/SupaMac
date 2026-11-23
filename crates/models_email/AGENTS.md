@@ -21,7 +21,7 @@ thread/message API types, DB row types, and Gmail API response shapes.
 
 ## Boundaries
 
-- Depends on: `email_utils`, `macro_user_id`, `models_pagination`.
+- Depends on: `email_utils`, `macro_env_var`, `macro_user_id`, `models_pagination`.
 - Used by: `ai_tools`, `calendar_service`, `email_api_client`, `email_db_client`,
   `email_refresh_handler`, `email_scheduled_handler`, `email_service(_client)`,
   `gmail_client`, `search_processing_service`, `search_service`, `sqs_client`,
@@ -48,4 +48,4 @@ rolling upgrades; decoding old payloads must never attach a current generation.
 
 - Scheduled-message models retain optional agent correlation for delayed delivery; older rows decode without attribution.
 
-- `sign_in_email` recognises Macro's own sign-in emails by sender: the addresses FusionAuth and the auth service send sign-in mail from, which send nothing else. Its tests read the FusionAuth stack's per-environment config and the local kickstart, so a changed sender fails them; update `SIGN_IN_SENDERS` with it.
+- `sign_in_email` recognises Macro's own sign-in emails by sender: the addresses FusionAuth and the auth service send sign-in mail from, which send nothing else. Its tests read the FusionAuth stack's per-environment config and the local kickstart, so a changed sender fails them; update `SIGN_IN_SENDERS` with it. A deployment's own sender, `AUTH_SENDER_ADDRESS` in the reading service's environment (a self-hosted stack's identity server sends codes from it too), is recognised beside that list, never instead of it.

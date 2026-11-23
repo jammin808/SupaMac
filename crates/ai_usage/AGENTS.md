@@ -49,6 +49,9 @@ flexible admin query API.
 
 ## Gotchas
 
+- The admin query and re-pricing API admits only the accounts the host names
+  with `UsageServiceImpl::with_admins`; with none named it refuses everyone,
+  the reserved `SYSTEM_USER_ID` included.
 - `UsageRecorder` (analytics) is best-effort and never fails the
   originating call; `FinancialUsage` (billable) is awaited and fail-closed
   — don't conflate the two when adding a new recording path.

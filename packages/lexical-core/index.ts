@@ -52,6 +52,7 @@ export * from './plugins/peerIdPlugin';
 
 export * from './transformers';
 export { toXml } from './transformers/xml';
+export * from './utils/app-links';
 export * from './utils/applyDiffs';
 export * from './utils/buildDiffState';
 export * from './utils/buildWhoMap';

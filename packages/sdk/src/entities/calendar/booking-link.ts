@@ -4,6 +4,7 @@ import type {
 } from '../../../generated/calendar/types.gen';
 import { MacroNotFoundError, unwrap } from '../../utils';
 import type { MacroClient } from '../../utils/client';
+import { webAppLink } from '../../utils/web-app';
 import { MacroEntity } from '../entity';
 import type { Team } from '../teams/team';
 
@@ -110,7 +111,7 @@ export function bookingPageUrl(
   profileId: string,
   slug?: string,
 ): string {
-  const page = `${client.webAppUrl}/app/book/${profileId}`;
+  const page = webAppLink(client.webAppUrl, `/book/${profileId}`);
   return slug === undefined ? page : `${page}/${slug}`;
 }
 

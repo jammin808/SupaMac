@@ -1,0 +1,113 @@
+# The jobs service's own door to SupaMac (docs/supamac/jobs.md, Security),
+# a gateway of its own on the `jobs` network and the internal one
+# (compose.yaml). The stack's main gateway is not on the `jobs` network, so
+# nothing in the jobs containers reaches its public routes: not /unfurl or
+# /image-proxy, which fetch any address and would be a way around the
+# egress proxy, and not the sign-in routes, whose throttles are per address.
+#
+# It listens on :8081 alone and serves the storage API and GET of the
+# objects that API links to, nothing else. The deny rules and the object
+# headers repeat the main gateway's (ops/config/gateway/Caddyfile) word for
+# word; ops/src/jobs-gateway.test.ts holds the two to each other.
+{
+	admin off
+	auto_https off
+	# No caller's X-Forwarded-For is trusted: the jobs container has a
+	# private address, and the services must see that address, never one it
+	# wrote into the header.
+}
+
+# Forward to one service. The services take the rightmost X-Forwarded-For
+# entry as the caller, for rate limits and audit, so they get exactly one
+# entry: the address the connection came from.
+(service) {
+	reverse_proxy {args[0]} {
+		header_up X-Forwarded-For {client_ip}
+	}
+}
+
+# Objects are bytes people uploaded, served from the host that holds the
+# session cookies. A browser must never run one as a page of this origin, and
+# only the UI may frame one.
+(object_headers) {
+	header {
+		Content-Security-Policy "default-src 'none'; style-src 'unsafe-inline'; img-src data:; frame-ancestors {$SUPAMAC_UI_ORIGIN}"
+		Cross-Origin-Resource-Policy cross-origin
+		X-Content-Type-Options nosniff
+		defer
+	}
+}
+
+# The deny rules, imported first in the `route`.
+(deny) {
+	# A request carrying the shared internal key and a user id is
+	# authorized as that user on every service. Nothing outside the
+	# compose network may present either, also not a wrong one.
+	request_header -X-Internal-*
+	request_header -X-Document-Storage-Service-*
+
+	# Internal routes are for calls between services. The services mount
+	# them on their public listener, and some mount their whole router a
+	# second time under their own prefix, so the match is on any position
+	# in the path.
+	@internal path */internal */internal/*
+	respond @internal 404
+
+	# Swagger UI and the OpenAPI documents list every route, internal
+	# ones included, to anyone who asks.
+	@api_docs path */docs */docs/* */api-doc */api-doc/*
+	respond @api_docs 404
+
+	# GET on the GraphQL path is the GraphiQL IDE. Queries are POST, and
+	# subscriptions use the /ws path below it.
+	@graphiql {
+		method GET
+		path */soup/graphql
+	}
+	respond @graphiql 404
+}
+
+# Presigned object URLs, below the /local-storage prefix. The services sign
+# them for the in-network name, so the object store must see that Host or
+# the signature fails. This reaches the object store alone: the queue, table
+# and key services share the in-network endpoint and must never be reachable
+# from here.
+(objects) {
+	# The store's own admin, metrics and health API.
+	respond /minio/* 404
+
+	import object_headers
+	reverse_proxy minio:9000 {
+		header_up Host localstack:4566
+	}
+}
+
+# The upload API takes up to 25 MiB.
+:8081 {
+	route {
+		respond /healthz 200
+
+		import deny
+
+		request_body {
+			max_size 32MB
+		}
+
+		handle_path /dss/* {
+			import service document-storage-service:8080
+		}
+
+		@object_read {
+			method GET
+			path /local-storage/*
+		}
+		handle @object_read {
+			uri strip_prefix /local-storage
+			import objects
+		}
+
+		handle {
+			respond 404
+		}
+	}
+}

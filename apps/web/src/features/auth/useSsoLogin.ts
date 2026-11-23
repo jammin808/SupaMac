@@ -116,11 +116,11 @@ async function nativeSsoLogin(
 }
 
 /**
- * The hosted OAuth callback sets cookies on macro.com. A proxied browser, and
- * every native shell, needs the session-code handoff to establish cookies
- * locally instead. A local stack's callback runs on the auth service's own
- * port, where its cookies would reach every stack on the machine, so its proxy
- * ignores them and needs the handoff too.
+ * The hosted OAuth callback sets cookies on the hosted service's domain. A
+ * proxied browser, and every native shell, needs the session-code handoff to
+ * establish cookies locally instead. A local stack's callback runs on the auth
+ * service's own port, where its cookies would reach every stack on the
+ * machine, so its proxy ignores them and needs the handoff too.
  */
 function needsSessionCodeHandoff(authUrl: URL): boolean {
   return (

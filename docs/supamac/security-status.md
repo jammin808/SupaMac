@@ -1,7 +1,10 @@
 # Security and verification status
 
 Initial assessment: 2026-11-19. Imported upstream revision:
-`f8a38d2b114fab2e35563684b3b4e2ef33a39b58`.
+`5eda62e0428f8815ba50f17bb2d86ac208256c76`, imported 2026-11-22. Every count
+on this page was measured on an earlier snapshot, revision
+`f8a38d2b114fab2e35563684b3b4e2ef33a39b58` of 2026-11-19, and none has been
+measured again since.
 
 **Release status: blocked.** These are full-source inherited findings, not a
 clean security assessment. Adding scanners does not certify the application.
@@ -90,7 +93,18 @@ also failed: its check annotation reports that the hosted runner lost
 communication with GitHub. Full logs were unavailable, so the cause is not
 confirmed. CodeQL now has a 4 GiB memory budget and two analysis threads, with
 Cargo limited to two build jobs in static analysis, to leave runner headroom.
-A successful Rust analysis remains a release requirement.
+On the tree merged with upstream `e0ece1d1` the Rust job failed again, with
+full logs: the four-CPU hosted runner received a shutdown signal eleven
+minutes into source extraction, before any query ran. The memory budget
+bounds query evaluation, not the extractor, which loads the whole Cargo
+workspace; running out of memory during extraction is the likely cause, not a
+confirmed one. A successful Rust analysis remains a release requirement.
+
+The two languages are analysed by the jobs `codeql-javascript-typescript` and
+`codeql-rust`, which replaced one `codeql` job over a matrix. After their first
+run on `main`, delete any configuration of the former `codeql` job still listed
+under Security, Code scanning, Tool status: a configuration that no longer runs
+keeps its alerts open.
 
 Feature branches run through pull-request CI only. Push CI runs on `main`,
 avoiding duplicate full scans for the same pull-request update. Scheduled and

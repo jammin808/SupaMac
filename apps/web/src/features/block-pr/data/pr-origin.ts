@@ -1,3 +1,8 @@
+import { WEB_BASE_PATH } from '@app/constants/routerBase';
+import { PRODUCT_NAME } from '@app/lib/constants/product';
+import { SELF_HOSTED } from '@core/constant/servers';
+import { getWebOrigin } from '@core/util/webOrigin';
+
 /** The tool a pull request was started from. */
 export type PrOriginTool =
   | 'claude'
@@ -42,11 +47,11 @@ export const PR_ORIGIN_LABELS: Record<PrOriginTool, string> = {
   devin: 'Devin',
   copilot: 'Copilot',
   jules: 'Jules',
-  macro: 'Macro',
+  macro: PRODUCT_NAME,
 };
 
 export const PR_ORIGIN_SIGNAL_LABELS: Record<PrOriginSignal, string> = {
-  'agent-session': 'opened by a Macro agent session',
+  'agent-session': `opened by a ${PRODUCT_NAME} agent session`,
   'session-link': 'session linked in the description',
   description: 'named in the description',
   author: 'opened by its bot account',
@@ -62,6 +67,20 @@ export function toolForHarness(harness: string | undefined): PrOriginTool {
   return 'macro';
 }
 
+/** `text` as a pattern that matches it literally. */
+const literal = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * A link to one of this product's agent sessions: the hosted product's on any
+ * of its hosts, or a self-hosted instance's on its own web app only.
+ */
+const OWN_SESSION_LINK = SELF_HOSTED
+  ? new RegExp(
+      `${literal(`${getWebOrigin()}${WEB_BASE_PATH}`)}/agent/[\\w-]+`,
+      'i'
+    )
+  : /https:\/\/(?:[\w-]+\.)?macro\.com\/app\/agent\/[\w-]+/i;
+
 /** Session links agents leave in the pull requests they open. */
 const SESSION_LINKS: readonly [PrOriginTool, RegExp][] = [
   ['claude', /https:\/\/claude\.ai\/code\/[\w-]+/i],
@@ -72,7 +91,7 @@ const SESSION_LINKS: readonly [PrOriginTool, RegExp][] = [
   ],
   ['devin', /https:\/\/app\.devin\.ai\/sessions\/[\w-]+/i],
   ['jules', /https:\/\/jules\.google\.com\/[^\s)\]"'>]+/i],
-  ['macro', /https:\/\/(?:[\w-]+\.)?macro\.com\/app\/agent\/[\w-]+/i],
+  ['macro', OWN_SESSION_LINK],
 ];
 
 /** Footers and trailers that name the tool without a session link. */

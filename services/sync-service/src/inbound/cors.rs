@@ -1,19 +1,72 @@
-use worker::Cors;
+#[cfg(test)]
+mod test;
 
-pub static ALLOWED_ORIGINS: &[&str] = &[
+use worker::{Cors, Env};
+
+/// The worker variable that names the allowed origins, comma-separated, each
+/// as a browser sends it in `Origin`: `scheme://host[:port]`.
+const ALLOWED_ORIGINS_VAR: &str = "ALLOWED_ORIGINS";
+
+/// Origins of a developer's machine and the mobile app's webview. A
+/// deployment names its own origins in `ALLOWED_ORIGINS`.
+static BUILT_IN_ORIGINS: &[&str] = &[
     "http://localhost:5173",
     "http://localhost:3000",
     "http://host.local:3000",
-    "https://dev.macro.com",
-    "https://staging.macro.com",
-    "https://www.macro.com",
-    "https://macro.com",
     "capacitor://localhost",
-    "https://apollo-testing.macro.com",
 ];
 
-pub fn is_origin_allowed(origin: &str) -> bool {
-    if ALLOWED_ORIGINS.contains(&origin) {
+/// Which browser origins may call this worker. Follows
+/// `macro_cors::OriginAllowList`, which the axum services use; this worker
+/// can't share that type because its crate is built on tower-http.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum OriginAllowList {
+    /// `ALLOWED_ORIGINS` names no origin: the built-in origins and loopback
+    /// development ports, and no public origin.
+    BuiltIn,
+    /// `ALLOWED_ORIGINS` names these origins: they are allowed, compared
+    /// exactly, and nothing else is.
+    Exact(Vec<String>),
+}
+
+impl OriginAllowList {
+    /// Reads the allow-list from the `ALLOWED_ORIGINS` worker variable.
+    pub fn from_env(env: &Env) -> Self {
+        let configured = env
+            .var(ALLOWED_ORIGINS_VAR)
+            .ok()
+            .map(|value| value.to_string());
+
+        Self::parse(configured.as_deref())
+    }
+
+    fn parse(configured: Option<&str>) -> Self {
+        let origins: Vec<String> = configured
+            .unwrap_or_default()
+            .split(',')
+            .map(str::trim)
+            .filter(|origin| !origin.is_empty())
+            .map(str::to_owned)
+            .collect();
+
+        if origins.is_empty() {
+            Self::BuiltIn
+        } else {
+            Self::Exact(origins)
+        }
+    }
+
+    /// Whether `origin`, the value of an `Origin` header, is on the list.
+    pub fn allows(&self, origin: &str) -> bool {
+        match self {
+            Self::BuiltIn => is_built_in_origin(origin),
+            Self::Exact(origins) => origins.iter().any(|allowed| allowed == origin),
+        }
+    }
+}
+
+fn is_built_in_origin(origin: &str) -> bool {
+    if BUILT_IN_ORIGINS.contains(&origin) {
         return true;
     }
     // `localhost` and `*.localhost` (loopback-reserved; local dev uses
@@ -25,21 +78,15 @@ pub fn is_origin_allowed(origin: &str) -> bool {
     {
         return (3000..=3999).contains(&port) || (20000..=60000).contains(&port);
     }
-    // Allow feature branch previews: https://{subdomain}.preview.macro.com
-    if let Some(host) = origin.strip_prefix("https://")
-        && let Some(subdomain) = host.strip_suffix(".preview.macro.com")
-    {
-        return !subdomain.is_empty() && !subdomain.contains('/');
-    }
     false
 }
 
 /// Workaround for this bug: <https://github.com/cloudflare/workers-rs/issues/554>
-pub fn cors(request_origin: Option<&str>) -> Cors {
+pub fn cors(origins: &OriginAllowList, request_origin: Option<&str>) -> Cors {
     use worker::Method;
     let cors_origins = request_origin
         .map(|o| {
-            if is_origin_allowed(o) {
+            if origins.allows(o) {
                 vec![o.to_string()]
             } else {
                 vec![]

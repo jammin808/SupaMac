@@ -38,6 +38,8 @@ export type SignupJourneySlots = {
 /** Sign-in and sign-up: SSO or an emailed code, then whatever comes next. */
 export function AuthView(props: {
   intent: AuthIntent;
+  /** Continue with Google; off where no Google sign-in is set up. */
+  showGoogle: boolean;
   showApple: boolean;
   /** Continue with Microsoft, behind `enable-microsoft-signup`. */
   showMicrosoft?: boolean;
@@ -65,12 +67,17 @@ export function AuthView(props: {
   signedIn: (user: Accessor<AuthUser>) => JSX.Element;
 }) {
   const context = useAuthContext();
+  // With no provider to continue with, the picker would hold one button: the
+  // email step opens in its place, with nothing to go back to.
+  const emailOnly = () =>
+    !props.showGoogle && !props.showApple && props.showMicrosoft !== true;
   const login = createEmailLogin(context, {
     intent: props.intent,
     initialEmail: props.initialEmail,
     autoStart: props.autoStart,
     onVerified: props.onVerified,
     fallbackNotice: props.ssoFallbackNotice,
+    emailOnly: emailOnly(),
   });
   createSessionIdentity(context);
   redeemSessionToken(context, () => props.token);
@@ -116,6 +123,7 @@ export function AuthView(props: {
         <LoginCard
           compact={props.compact}
           agentSignup={props.intent === 'agent-signup'}
+          showGoogle={props.showGoogle}
         >
           <Stepper
             step={STEP_INDEX[login.step()]}
@@ -123,6 +131,7 @@ export function AuthView(props: {
           >
             <Stepper.Step>
               <LoginPicker
+                showGoogle={props.showGoogle}
                 showApple={props.showApple}
                 showMicrosoft={props.showMicrosoft === true}
                 onGoogle={() =>
@@ -144,7 +153,7 @@ export function AuthView(props: {
               />
             </Stepper.Step>
             <Stepper.Step>
-              <EmailStep login={login} />
+              <EmailStep login={login} hideBack={emailOnly()} />
             </Stepper.Step>
             <Stepper.Step>
               <VerifyStep login={login} />
@@ -172,7 +181,7 @@ export function AuthView(props: {
 
 const STEP_INDEX = { choose: 0, email: 1, verify: 2 } as const;
 
-function EmailStep(props: { login: EmailLogin }) {
+function EmailStep(props: { login: EmailLogin; hideBack?: boolean }) {
   return (
     <EmailForm
       email={props.login.email()}
@@ -183,7 +192,7 @@ function EmailStep(props: { login: EmailLogin }) {
       onEmailInput={props.login.setEmail}
       onPasswordInput={props.login.setPassword}
       onSubmit={props.login.submitEmail}
-      onBack={props.login.back}
+      onBack={props.hideBack ? undefined : props.login.back}
     />
   );
 }

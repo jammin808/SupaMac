@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   parseMacroAppUrl,
   parsePastedGithubPrUrl,
@@ -54,6 +54,33 @@ describe('parseMacroAppUrl', () => {
     `https://dev.macro.com/app/unknown-route/${sessionId}`,
   ])('does not convert invalid or foreign links: %s', (url) => {
     expect(parseMacroAppUrl(url).isValid).toBe(false);
+  });
+});
+
+describe('parseMacroAppUrl under another base path', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
+  it('reads the block and id after a base path of any depth', async () => {
+    vi.stubEnv('__APP_BASE_PATH__', '/team/workspace');
+    vi.resetModules();
+    const { parseMacroAppUrl } = await import('./textPastePlugin');
+
+    expect(
+      parseMacroAppUrl(
+        `http://localhost:3000/team/workspace/md/${sessionId}?view=edit`
+      )
+    ).toEqual({
+      isValid: true,
+      id: sessionId,
+      block: 'md',
+      params: { view: 'edit' },
+    });
+    expect(
+      parseMacroAppUrl(`http://localhost:3000/app/md/${sessionId}`).isValid
+    ).toBe(false);
   });
 });
 

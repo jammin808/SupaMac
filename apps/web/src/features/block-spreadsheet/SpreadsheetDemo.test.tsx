@@ -109,12 +109,12 @@ describe('Ask Macro in the spreadsheet demo', () => {
     render(() => <SpreadsheetDemo />);
     const buttons = screen.getAllByRole('button');
     expect(
-      buttons.indexOf(screen.getByRole('button', { name: 'Ask Macro' }))
+      buttons.indexOf(screen.getByRole('button', { name: 'Ask SupaMac' }))
     ).toBeLessThan(
       buttons.indexOf(screen.getByRole('button', { name: 'Share' }))
     );
     fireEvent.click(screen.getByRole('button', { name: 'Select budget' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Ask Macro' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ask SupaMac' }));
     await waitFor(() => expect(mocks.chat).toHaveBeenCalledOnce());
     expect(mocks.chat).toHaveBeenCalledWith({
       type: 'document',
@@ -137,7 +137,7 @@ describe('Ask Macro in the spreadsheet demo', () => {
   it('keeps editing available after save failure and never opens an unattached chat', async () => {
     mocks.save.mockRejectedValueOnce(new Error('Offline'));
     render(() => <SpreadsheetDemo />);
-    fireEvent.click(screen.getByRole('button', { name: 'Ask Macro' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ask SupaMac' }));
     await waitFor(() => expect(mocks.failure).toHaveBeenCalledOnce());
     expect(mocks.chat).not.toHaveBeenCalled();
     expect(mocks.replace).not.toHaveBeenCalled();
@@ -147,7 +147,9 @@ describe('Ask Macro in the spreadsheet demo', () => {
         .hasAttribute('disabled')
     ).toBe(false);
     expect(
-      screen.getByRole('button', { name: 'Ask Macro' }).hasAttribute('disabled')
+      screen
+        .getByRole('button', { name: 'Ask SupaMac' })
+        .hasAttribute('disabled')
     ).toBe(false);
   });
 });
@@ -158,7 +160,7 @@ describe('Spreadsheet draft title menu', () => {
     expect(mocks.menuTrigger).toHaveBeenCalledWith(expect.any(Function));
     expect(mocks.menuActions).toHaveBeenLastCalledWith(
       expect.objectContaining({
-        macro: [expect.objectContaining({ label: 'Ask Macro' })],
+        macro: [expect.objectContaining({ label: 'Ask SupaMac' })],
         sharing: [expect.objectContaining({ label: 'Share' })],
         file: [expect.objectContaining({ label: 'Rename' })],
       })
@@ -175,7 +177,7 @@ describe('Spreadsheet draft title menu', () => {
     });
     expect(
       screen.getAllByRole('menuitem').map((item) => item.textContent)
-    ).toEqual(['Ask Macro', 'Share', 'Rename']);
+    ).toEqual(['Ask SupaMac', 'Share', 'Rename']);
     fireEvent.keyDown(screen.getByRole('menuitem', { name: 'Rename' }), {
       key: 'Enter',
     });
@@ -194,7 +196,7 @@ describe('Spreadsheet draft title menu', () => {
     fireEvent.keyDown(screen.getByRole('button', { name: 'File actions' }), {
       key: 'Enter',
     });
-    fireEvent.keyDown(screen.getByRole('menuitem', { name: 'Ask Macro' }), {
+    fireEvent.keyDown(screen.getByRole('menuitem', { name: 'Ask SupaMac' }), {
       key: 'Enter',
     });
     await waitFor(() => expect(mocks.chat).toHaveBeenCalledOnce());

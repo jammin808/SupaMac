@@ -2,6 +2,7 @@ import type { PropertyInput } from '../../../generated/storage/types.gen';
 import { MacroError, unwrap } from '../../utils';
 import type { MacroClient } from '../../utils/client';
 import { rejectUnknownOptions } from '../../utils/options';
+import { webAppLink } from '../../utils/web-app';
 import { Document } from '../documents/document';
 import type { Initiative } from '../initiatives/initiative';
 import type { Project } from '../projects/project';
@@ -83,7 +84,7 @@ export class Task extends Document {
       dueDate?: Date;
       /** Scopes the team task number; may be omitted when the creator belongs to exactly one team. */
       team?: Team;
-      /** Defaults to true. */
+      /** Defaults to team sharing, or private when the session cannot share. */
       shareWithTeam?: boolean;
     },
   ): Promise<Task> {
@@ -110,7 +111,7 @@ export class Task extends Document {
           markdown: opts.markdown ?? null,
           projectId: opts.project?.id ?? null,
           teamId: opts.team?.id ?? null,
-          shareWithTeam: opts.shareWithTeam ?? true,
+          shareWithTeam: opts.shareWithTeam,
           propertyValues: await initialProperties(client, opts),
         },
       }),
@@ -251,7 +252,7 @@ export class Task extends Document {
    * @readonly
    */
   override webUrl(): string {
-    return `${this.client.webAppUrl}/app/task/${this.id}`;
+    return webAppLink(this.client.webAppUrl, `/task/${this.id}`);
   }
 
   /** Search tasks by name and content, most relevant first, auto-paginated; `maxItems` caps the total. */

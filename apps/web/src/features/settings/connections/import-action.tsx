@@ -1,4 +1,5 @@
 import { importSourceFor } from '@app/features/connector-import/core/catalog';
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { fireAndForget } from '@core/util/fireAndForget';
 import { lazyNamed } from '@core/util/lazyNamed';
 import { Telemetry } from '@macro-inc/observability';
@@ -69,13 +70,13 @@ export function ImportAction(props: { appSlug: string; name: string }) {
 export function connectorDescription(appSlug: string, name: string): string {
   const found = importSourceFor(appSlug);
   if (!found) {
-    return `Agents can use ${name} when you ask them to. Nothing is copied into Macro.`;
+    return `Agents can use ${name} when you ask them to. Nothing is copied into ${PRODUCT_NAME}.`;
   }
   const destination = match(found.config.category)
     .with('files', () => 'your Drive')
     .with('tasks', () => 'Tasks')
     .with('crm', () => 'the CRM')
-    .with('channels', () => 'Macro')
+    .with('channels', () => PRODUCT_NAME)
     .exhaustive();
   const items = found.provider.detail;
   return `Import ${items.charAt(0).toLowerCase()}${items.slice(1)} into ${destination}, or connect so agents can use ${name} without copying anything.`;

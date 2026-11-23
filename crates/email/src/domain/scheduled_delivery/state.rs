@@ -133,9 +133,11 @@ pub trait CompletionQueries: Send {
 }
 
 /// Acquire a fresh or expired claim under the common message -> schedule lock order.
+/// A first delivery is sent with the RFC 5322 Message-ID
+/// `<message id>.<attempt>@<message_id_domain>`: the sending mailbox's own domain.
 #[tracing::instrument(
     target = "email_db_client::messages::scheduled::delivery",
-    skip(pool),
+    skip(pool, message_id_domain),
     err
 )]
 pub async fn claim_delivery(
@@ -143,6 +145,7 @@ pub async fn claim_delivery(
     link_id: Uuid,
     message_id: Uuid,
     lease_seconds: i32,
+    message_id_domain: &str,
 ) -> anyhow::Result<Option<DeliveryClaim>> {
     let mut tx = pool.begin().await?;
     let message = tx.message_sent(link_id, message_id).await?;
@@ -161,7 +164,7 @@ pub async fn claim_delivery(
     let header = schedule.delivery_message_id.or_else(|| {
         (!reconcile).then(|| {
             format!(
-                "{}.{}@send.macro.com",
+                "{}.{}@{message_id_domain}",
                 message_id,
                 macro_uuid::generate_uuid_v7()
             )

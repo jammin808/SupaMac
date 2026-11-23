@@ -8,6 +8,7 @@ version = "0.1.0"
 askama = { workspace = true }
 chrono = { workspace = true }
 hmac = { workspace = true }
+invite_email = { path = "../invite_email" }
 macro_env = { path = "../macro_env" }
 macro_service_urls = { path = "../macro_service_urls" }
 macro_user_id = { path = "../macro_user_id" }

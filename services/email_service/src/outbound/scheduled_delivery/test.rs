@@ -117,7 +117,7 @@ async fn recovered_completion_publishes_canonical_thread_and_keeps_message_ident
         "INSERT INTO email_scheduled_messages (link_id, message_id, send_time) VALUES ($1, $2, NOW() - INTERVAL '1 second')",
         link, original_message,
     ).execute(&pool).await?;
-    let claim = super::delivery::claim_delivery(&pool, link, original_message, 300)
+    let claim = super::delivery::claim_delivery(&pool, link, original_message, 300, "example.com")
         .await?
         .unwrap();
     assert!(super::delivery::begin_submission(&pool, &claim, 300).await?);

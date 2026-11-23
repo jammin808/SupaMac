@@ -15,6 +15,7 @@ use macro_authorization::{
     INTERNAL_API_KEY_HEADER, InternalAuthConfig, InternalOnly, MacroAuthJwtValidator,
     MacroAuthorizationExtractor, MacroAuthorizationServiceImpl, MacroAuthorizationState,
 };
+use macro_cors::OriginAllowList;
 use serde_json::{Value, json};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tower::ServiceExt;
@@ -33,6 +34,13 @@ const UNAUTHORIZED_BODY: &str = r#"{"message":"unauthorized"}"#;
 #[derive(Clone)]
 struct TestState {
     authorization_state: MacroAuthorizationState<AuthorizationService>,
+    allowed_origins: Arc<OriginAllowList>,
+}
+
+impl FromRef<TestState> for Arc<OriginAllowList> {
+    fn from_ref(state: &TestState) -> Self {
+        Arc::clone(&state.allowed_origins)
+    }
 }
 
 impl FromRef<TestState> for MacroAuthorizationState<AuthorizationService> {
@@ -78,6 +86,7 @@ fn test_state() -> TestState {
 
     TestState {
         authorization_state: MacroAuthorizationState::new(Arc::new(authorization_service)),
+        allowed_origins: Arc::new(OriginAllowList::BuiltIn),
     }
 }
 
@@ -174,6 +183,49 @@ async fn websocket_rejects_invalid_credentials_before_infrastructure_state() {
         vec![("authorization", "Bearer not-a-token")],
         vec![(INTERNAL_API_KEY_HEADER, TEST_INTERNAL_API_KEY)],
     ] {
+        let (status, body) = send_websocket_request(address, WEBSOCKET_PATH, &headers).await;
+        assert_eq!(status, StatusCode::UNAUTHORIZED);
+        assert_eq!(body, UNAUTHORIZED_BODY);
+    }
+
+    server.abort();
+}
+
+#[tokio::test]
+async fn websocket_refuses_an_unlisted_origin_before_checking_credentials() {
+    let state = TestState {
+        allowed_origins: Arc::new(OriginAllowList::Exact(vec![
+            "https://example.com".to_string(),
+        ])),
+        ..test_state()
+    };
+    let router = Router::new()
+        .route(WEBSOCKET_PATH, get(connection::ws_handler))
+        .with_state(state);
+    let listener = tokio::net::TcpListener::bind(("127.0.0.1", 0))
+        .await
+        .expect("test listener should bind");
+    let address = listener
+        .local_addr()
+        .expect("test listener should have a local address");
+    let server = tokio::spawn(async move {
+        axum::serve(listener, router.into_make_service())
+            .await
+            .expect("test server should run");
+    });
+
+    let (status, body) = send_websocket_request(
+        address,
+        WEBSOCKET_PATH,
+        &[("origin", "https://attacker.example")],
+    )
+    .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    assert_eq!(body, "origin not allowed");
+
+    // A listed origin, and a caller that is not a browser, get as far as the
+    // credential check.
+    for headers in [vec![("origin", "https://example.com")], Vec::new()] {
         let (status, body) = send_websocket_request(address, WEBSOCKET_PATH, &headers).await;
         assert_eq!(status, StatusCode::UNAUTHORIZED);
         assert_eq!(body, UNAUTHORIZED_BODY);

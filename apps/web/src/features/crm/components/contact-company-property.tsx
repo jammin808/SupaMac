@@ -24,8 +24,6 @@ export function ContactCompanyProperty(props: {
   companyName: string | undefined;
   editable: boolean;
   removable: boolean;
-  /** Whether the app could link a company again after removing this one. */
-  relinkable: boolean;
   /** Why a linked company can be neither switched nor removed. */
   lockedReason: string | undefined;
   /** Null removes the company. */
@@ -109,7 +107,7 @@ export function ContactCompanyProperty(props: {
   const editor = () => (
     <>
       <Show when={!props.editable}>
-        <p class="ph-no-capture truncate px-3 pt-3 text-sm">
+        <p class="ph-no-capture truncate px-3 pt-3 text-sm select-text">
           {props.companyName ?? t('crm.company')}
         </p>
       </Show>
@@ -235,7 +233,7 @@ export function ContactCompanyProperty(props: {
               class="min-w-0 shrink focus-visible:ring-2 focus-visible:ring-accent/20"
             >
               <BuildingsIcon class="size-3 shrink-0" />
-              <span class="truncate">
+              <span class="truncate select-text">
                 {props.companyName ??
                   (props.companyId ? t('crm.company') : t('crm.noCompany'))}
               </span>
@@ -328,10 +326,6 @@ export function ContactCompanyProperty(props: {
         body={
           <>
             {t('crm.removeCompanyBody')}
-            <Show when={!props.relinkable}>
-              {' '}
-              {t('crm.removeCompanyPermanent')}
-            </Show>
             <Show when={removalError()}>
               {(message) => (
                 <p role="alert" class="mt-3 text-failure">

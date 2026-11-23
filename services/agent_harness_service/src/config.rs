@@ -10,11 +10,12 @@ use database_env_vars::{DatabaseUrl, RedisUri};
 use entity_registry::NonUserOwners;
 pub use macro_env::Environment;
 use macro_uuid::Uuid;
+use mcp_client::outbound::guarded_http::AddressPolicy;
 
 use secretsmanager_client::LocalOrRemoteSecret;
 
 #[cfg(test)]
-mod test;
+pub(crate) mod test;
 
 macro_env_var::env_vars!(
     /// Local static file bucket, read only when using local AWS.
@@ -231,6 +232,17 @@ pub struct Config {
     /// share. `just run_local` sets `{project}_services`.
     #[macro_config_default(String::new())]
     pub local_container_network: String,
+    /// Let MCP traffic reach loopback, private and link-local addresses, and
+    /// let the Macro MCP upstream and the preview MCP be cleartext http.
+    ///
+    /// Default off: a custom MCP server's URL is whatever its owner typed, so
+    /// every connection made to one, and every request the egress proxy
+    /// forwards, reaches public addresses only, also when `ENVIRONMENT=local`.
+    /// `just run_local` sets it, because its MCP and preview services are
+    /// http on the compose network. Refused at boot unless
+    /// `ENVIRONMENT=local`.
+    #[macro_config_default(false)]
+    pub dev_dangerous_private_mcp_addresses: bool,
     /// The bot this deployment answers for.
     ///
     /// Still configuration, because `@claude` and `@codex` are separate
@@ -507,6 +519,13 @@ impl Config {
             ));
         }
         Ok(())
+    }
+
+    /// Which addresses MCP traffic may reach: public ones only, unless a
+    /// local environment opted in with `DEV_DANGEROUS_PRIVATE_MCP_ADDRESSES`.
+    pub fn mcp_address_policy(&self) -> anyhow::Result<AddressPolicy> {
+        AddressPolicy::for_opt_in(self.environment, self.dev_dangerous_private_mcp_addresses)
+            .map_err(Into::into)
     }
 
     /// The computers rollout allowlist; refused in production.

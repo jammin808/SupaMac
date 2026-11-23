@@ -37,9 +37,15 @@ async fn durable_send_freezes_the_authorized_alias_through_contact_sync(
     );
     // Provider synchronization may rewrite contacts while the send is queued.
     sqlx::query!("UPDATE email_contacts SET email_address = id::text || '@changed.example', name = 'Changed contact' WHERE link_id = $1", inbox_id()).execute(&pool).await?;
-    let claim = claim_delivery(&pool, inbox_id(), admitted.message_id.unwrap(), 300)
-        .await?
-        .unwrap();
+    let claim = claim_delivery(
+        &pool,
+        inbox_id(),
+        admitted.message_id.unwrap(),
+        300,
+        "example.com",
+    )
+    .await?
+    .unwrap();
     let content: PreparedSendContent = serde_json::from_value(claim.prepared_content.unwrap())?;
     assert_eq!(content.sender.email, "resident@test.com");
     assert_eq!(content.sender.name.as_deref(), Some("Property manager"));

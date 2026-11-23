@@ -9,7 +9,7 @@ pub async fn claim_delivery(
     message: Uuid,
     lease: i32,
 ) -> anyhow::Result<Option<DeliveryClaim>> {
-    state::claim_delivery(pool, link, message, lease).await
+    state::claim_delivery(pool, link, message, lease, "example.com").await
 }
 pub async fn begin_submission(
     pool: &PgPool,

@@ -61,6 +61,46 @@ const MACRO_SUPPORT_EMAILS: [&str; 15] = [
     "zhamilya@macro.com",
 ];
 
+/// The support channel a new person's account starts with.
+struct SupportChannel {
+    participants: HashSet<MacroUserIdStr<'static>>,
+    /// The welcome is written and posted as members of the Macro support
+    /// team, so only a channel that team is in gets it.
+    posts_welcome: bool,
+}
+
+/// The support channel for a new person's account, or `None` when the
+/// deployment has nobody to put in one. `configured_participants` are the
+/// addresses a deployment names in place of the Macro support team.
+fn support_channel(
+    configured_participants: Option<&HashSet<MacroUserIdStr<'static>>>,
+) -> Option<SupportChannel> {
+    let Some(participants) = configured_participants else {
+        let participants = MACRO_SUPPORT_EMAILS
+            .into_iter()
+            .map(MacroUserIdStr::try_from_email)
+            .collect::<Result<HashSet<_>, _>>()
+            .inspect_err(|e| {
+                tracing::error!(error=?e, "unable to parse support user ids for support channel");
+            })
+            .ok()?;
+
+        return Some(SupportChannel {
+            participants,
+            posts_welcome: true,
+        });
+    };
+
+    if participants.is_empty() {
+        return None;
+    }
+
+    Some(SupportChannel {
+        participants: participants.clone(),
+        posts_welcome: false,
+    })
+}
+
 fn support_channel_name<T: AsRef<str>>(email: &Email<T>) -> String {
     format!("Macro Support x {}", email.local_part())
 }
@@ -588,37 +628,36 @@ fn spawn_human_signup_content(ctx: &ApiContext, user_id: &str, email: &str) {
     // tasks it links to, with the guide pinned to the new user's sidebar
     // favorites), then create a private support channel connecting the new
     // user with the Macro support team and post the welcome script — which
-    // mentions the guide, so seeding runs first. Fire-and-forget: neither a
-    // failed seeding (retried, then skipped) nor a failed channel creation
-    // may block user creation.
+    // mentions the guide, so seeding runs first. A deployment that names its
+    // own support participants gets the channel without that team's welcome,
+    // and one that names none gets no channel (`support_channel`).
+    // Fire-and-forget: neither a failed seeding (retried, then skipped) nor a
+    // failed channel creation may block user creation.
     tokio::spawn({
         let document_storage_service_client = ctx.document_storage_service_client.clone();
         let channel_service = ctx.channel_service.clone();
         let channel_messages = ctx.channel_messages.clone();
         let entity_access_service = ctx.entity_access_service.clone();
         let favorites_service = ctx.favorites_service.clone();
+        let configured_participants = ctx.support_channel_participants.clone();
         let user_id = user_id.clone();
         let support_channel_name = support_channel_name.clone();
         async move {
             initialize_starter_docs_with_retries(&document_storage_service_client, &user_id)
                 .await;
 
+            let Some(SupportChannel {
+                participants,
+                posts_welcome,
+            }) = support_channel(configured_participants.as_deref())
+            else {
+                return;
+            };
+
             let owner_id = match MacroUserIdStr::try_from(user_id) {
                 Ok(owner_id) => owner_id,
                 Err(e) => {
                     tracing::error!(error=?e, "unable to parse user id for support channel");
-                    return;
-                }
-            };
-
-            let participants = match MACRO_SUPPORT_EMAILS
-                .into_iter()
-                .map(MacroUserIdStr::try_from_email)
-                .collect::<Result<HashSet<_>, _>>()
-            {
-                Ok(participants) => participants,
-                Err(e) => {
-                    tracing::error!(error=?e, "unable to parse support user ids for support channel");
                     return;
                 }
             };
@@ -651,6 +690,10 @@ fn spawn_human_signup_content(ctx: &ApiContext, user_id: &str, email: &str) {
                 .await
             {
                 tracing::error!(error=?e, channel_id=%channel.id, "failed to favorite Macro support channel");
+            }
+
+            if !posts_welcome {
+                return;
             }
 
             let welcome_gateway =

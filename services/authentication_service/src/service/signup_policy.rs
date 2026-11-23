@@ -13,8 +13,12 @@ const MACRO_EMAIL_DOMAIN: &str = "macro.com";
 pub enum SignupPolicy {
     /// Admit every signup origin.
     AllowAll,
-    /// Admit public signups when their normalized email is a Macro address or present.
-    EmailAllowlist { allowed_emails: HashSet<String> },
+    /// Admit public signups when their normalized email is present, or is a
+    /// Macro address while `admits_macro_domain` is set.
+    EmailAllowlist {
+        allowed_emails: HashSet<String>,
+        admits_macro_domain: bool,
+    },
 }
 
 impl SignupPolicy {
@@ -27,32 +31,36 @@ impl SignupPolicy {
     ///
     /// The resulting policy also admits every `@macro.com` address.
     pub fn from_allowlist_json(raw_json: &str) -> Result<Self, SignupPolicyConfigError> {
-        let value = serde_json::from_str::<Value>(raw_json)
-            .map_err(|_| SignupPolicyConfigError::MalformedJson)?;
-        let Value::Array(entries) = value else {
-            return Err(SignupPolicyConfigError::ExpectedArray);
-        };
+        Ok(Self::EmailAllowlist {
+            allowed_emails: parse_allowlist_json(raw_json)?,
+            admits_macro_domain: true,
+        })
+    }
 
-        let allowed_emails = entries
-            .iter()
-            .enumerate()
-            .map(|(index, entry)| normalize_allowlist_entry(index, entry))
-            .collect::<Result<HashSet<_>, _>>()?;
-
-        if allowed_emails.is_empty() {
-            return Err(SignupPolicyConfigError::EmptyAllowlist);
-        }
-
-        Ok(Self::EmailAllowlist { allowed_emails })
+    /// Create an exact-address allowlist from a JSON array of email strings.
+    ///
+    /// The resulting policy admits the listed addresses and nothing else: a
+    /// deployment Macro does not operate has no staff domain to admit.
+    pub fn from_exact_allowlist_json(raw_json: &str) -> Result<Self, SignupPolicyConfigError> {
+        Ok(Self::EmailAllowlist {
+            allowed_emails: parse_allowlist_json(raw_json)?,
+            admits_macro_domain: false,
+        })
     }
 
     /// Authorize a public signup email address.
     pub fn authorize_public_email(&self, email: &str) -> Result<(), SignupPolicyDenial> {
         match self {
             Self::AllowAll => Ok(()),
-            Self::EmailAllowlist { allowed_emails } => {
+            Self::EmailAllowlist {
+                allowed_emails,
+                admits_macro_domain,
+            } => {
                 let normalized_email = normalize_public_email(email)?;
-                if is_macro_email(&normalized_email) || allowed_emails.contains(&normalized_email) {
+                let is_admitted_macro_email =
+                    *admits_macro_domain && is_macro_email(&normalized_email);
+
+                if is_admitted_macro_email || allowed_emails.contains(&normalized_email) {
                     Ok(())
                 } else {
                     Err(SignupPolicyDenial::PublicEmailNotAllowed)
@@ -65,7 +73,7 @@ impl SignupPolicy {
     pub fn allowed_email_count(&self) -> Option<usize> {
         match self {
             Self::AllowAll => None,
-            Self::EmailAllowlist { allowed_emails } => Some(allowed_emails.len()),
+            Self::EmailAllowlist { allowed_emails, .. } => Some(allowed_emails.len()),
         }
     }
 }
@@ -74,9 +82,13 @@ impl fmt::Debug for SignupPolicy {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::AllowAll => formatter.write_str("SignupPolicy::AllowAll"),
-            Self::EmailAllowlist { allowed_emails } => formatter
+            Self::EmailAllowlist {
+                allowed_emails,
+                admits_macro_domain,
+            } => formatter
                 .debug_struct("SignupPolicy::EmailAllowlist")
                 .field("allowed_email_count", &allowed_emails.len())
+                .field("admits_macro_domain", admits_macro_domain)
                 .finish(),
         }
     }
@@ -123,6 +135,26 @@ pub enum SignupPolicyDenial {
     /// The public signup email could not be parsed.
     #[error("signup email address is invalid")]
     InvalidPublicEmail,
+}
+
+fn parse_allowlist_json(raw_json: &str) -> Result<HashSet<String>, SignupPolicyConfigError> {
+    let value = serde_json::from_str::<Value>(raw_json)
+        .map_err(|_| SignupPolicyConfigError::MalformedJson)?;
+    let Value::Array(entries) = value else {
+        return Err(SignupPolicyConfigError::ExpectedArray);
+    };
+
+    let allowed_emails = entries
+        .iter()
+        .enumerate()
+        .map(|(index, entry)| normalize_allowlist_entry(index, entry))
+        .collect::<Result<HashSet<_>, _>>()?;
+
+    if allowed_emails.is_empty() {
+        return Err(SignupPolicyConfigError::EmptyAllowlist);
+    }
+
+    Ok(allowed_emails)
 }
 
 fn normalize_allowlist_entry(

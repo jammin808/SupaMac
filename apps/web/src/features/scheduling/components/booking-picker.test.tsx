@@ -122,7 +122,7 @@ describe('BookingPicker', () => {
         onReceipt={vi.fn()}
       />
     ));
-    expect(screen.getByText('Macro call')).toBeTruthy();
+    expect(screen.getByText('SupaMac call')).toBeTruthy();
     expect(screen.queryByText('Google Meet')).toBeNull();
   });
 

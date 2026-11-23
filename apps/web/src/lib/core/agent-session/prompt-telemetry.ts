@@ -12,6 +12,7 @@
  * worse than no telemetry.
  */
 
+import { fromWebBasePath } from '@app/constants/routerBase';
 import type { Span } from '@macro-inc/observability';
 import { Telemetry } from '@macro-inc/observability';
 import type { WarmClaim } from '@queries/agent-session/warm';
@@ -544,21 +545,22 @@ function start(
 /** Bounded route categories only; paths and entity IDs are never telemetry labels. */
 function submitSurface(newSession: boolean): PromptSubmitSurface {
   if (!newSession) return 'agent_session';
-  const route = typeof location === 'undefined' ? '' : location.pathname;
+  const pathname = typeof location === 'undefined' ? '' : location.pathname;
   // Layout URLs enumerate panes without identifying the active one. Known
   // composers supply their origin explicitly; never guess the leftmost pane.
-  if (route.includes('/~/')) return 'other';
-  if (/^\/app\/drive(?:\/|$)/.test(route)) {
+  if (pathname.includes('/~/')) return 'other';
+  const route = fromWebBasePath(pathname);
+  if (route === undefined) return 'other';
+  if (/^\/drive(?:\/|$)/.test(route)) {
     return /\/(?:md|task|skill|snippet|canvas|pdf|code|csv|image|video|spreadsheet|unknown)\/[^/]+\/?$/.test(
       route
     )
       ? 'document'
       : 'drive';
   }
-  if (/^\/app\/?$/.test(route) || /^\/app\/home(?:\/|$)/.test(route))
-    return 'home';
-  if (/^\/app\/agents(?:\/|$)/.test(route)) return 'agents';
-  if (/^\/app\/search(?:\/|$)/.test(route)) return 'search';
-  if (/^\/app\/(?:md|pdf|code|document)\//.test(route)) return 'document';
+  if (route === '/' || /^\/home(?:\/|$)/.test(route)) return 'home';
+  if (/^\/agents(?:\/|$)/.test(route)) return 'agents';
+  if (/^\/search(?:\/|$)/.test(route)) return 'search';
+  if (/^\/(?:md|pdf|code|document)\//.test(route)) return 'document';
   return 'other';
 }

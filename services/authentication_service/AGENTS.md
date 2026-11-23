@@ -17,7 +17,8 @@ key issuance, and account merge/link flows.
 - `src/config.rs` + `src/doppler_config.rs`: env vars and the Doppler config
   validator binary (`authentication_service_doppler_config`).
 - `README.md`: the Develop signup allowlist (bypass flag, rollout/rollback
-  steps) and GTM invite links — read before touching signup policy.
+  steps), the settings a Local deployment on the internet needs, and GTM
+  invite links — read before touching signup policy or session cookies.
 
 ## Scope
 
@@ -48,6 +49,7 @@ key issuance, and account merge/link flows.
 ## Computer billing identifiers
 
 - Treat the six `STRIPE_COMPUTER_*_PRICE_ID` values as an optional all-or-none group: none means computer prices are not configured; any partial group fails startup and Doppler validation independently of physical fleet attachment. Validate configured price syntax in both startup and the Doppler binary.
+- Set `COMPUTERS_AGENT_EFFECTS=true` wherever the computers rollout is on: it runs the computers agents worker, the only consumer of `UndoAgentInvite`. Absent means off, and those effects wait in the outbox until it is on.
 - Store computer and seat prices as `stripe::PriceId` and reject malformed configured IDs during configuration loading with `config::configured_price_id` (async-stripe's parse accepts any string), including when no fleet is attached. `Config::computer_prices` returns a validation result.
 
 ## Checks
@@ -261,8 +263,37 @@ inputs cannot select an agent, and ordinary user credentials remain unattributed
   user has no links or grants left, so answer the route's "not linked" outcome
   (404 no grant, 200 for an idempotent removal), not a 500.
 - Develop admits new accounts only for `@macro.com` and allowlisted addresses;
-  `DEVELOPMENT_BYPASS_SIGNUP_ALLOWLIST=true` opens it to everyone. See
-  `README.md` before changing signup behavior.
+  `DEVELOPMENT_BYPASS_SIGNUP_ALLOWLIST=true` opens it to everyone. Local admits
+  everyone unless `SIGNUP_ALLOWLIST_JSON` is set, and then only the addresses
+  it lists: `@macro.com` gets no exception there, and a present but blank or
+  malformed value fails startup instead of opening signup. No path is exempt
+  in either environment: an invited teammate, a relocated shared mailbox, and
+  an agent signing up by email must be listed. See `README.md` before changing
+  signup behavior.
+- Session cookies are `SameSite=Strict` in Production and Local and `None` in
+  Develop (`Config::session_cookie_same_site`, resolved once at startup into
+  `ApiContext::session_cookie_same_site`).
+  `DEV_DANGEROUS_CROSS_SITE_COOKIES=true` (default false, so no Doppler key;
+  startup fails if it is set unless `ENVIRONMENT=local`) makes Local's `None`;
+  `just run_local` sets it. Never set it where other people can sign in: any
+  page they open could then act as them. Set and clear the cookies only
+  through `api::utils::create_access_token_cookie` and
+  `create_refresh_token_cookie` with that value, so a logout names the cookie
+  the login set.
+- Sign-out (`src/api/logout.rs`) revokes the session's refresh token at
+  FusionAuth (the `x-macro-refresh-token` header, else the cookie) before it
+  clears the cookies; FusionAuth's `/oauth2/logout` alone revokes nothing. A
+  failed revocation is logged and recorded on the span
+  (`refresh_token_revoked`), and the cookies are cleared regardless.
+- A person's new account gets a `Macro Support x <name>` channel with the
+  Macro support team (`MACRO_SUPPORT_EMAILS`), one of whom posts the welcome.
+  `SUPPORT_CHANNEL_PARTICIPANTS_JSON` replaces the team and drops the welcome;
+  `[]` means no channel (`support_channel` in the `user.create` webhook). Only
+  an absent variable keeps the Macro team.
+- This service's own mail (`/mobile-welcome-email`, and the unmounted merge
+  and email-link routes) is sent from `ApiContext::auth_sender_address`:
+  `AUTH_SENDER_ADDRESS`, default `auth@macro.com`. Sign-in codes come from
+  FusionAuth, whose sender is its tenant's and email template's setting.
 - Denial responses and policy errors must never disclose configured allowlist
   addresses; never paste operational addresses into code, logs, or docs.
 - New Outlook connections need the deployment switch
@@ -305,6 +336,11 @@ inputs cannot select an agent, and ordinary user credentials remain unattributed
   works (`needs_reauth` false); the refusal stands either way. Mirrors
   Outlook's required-scope check in `src/domain/microsoft.rs`; Macro has no
   mailbox-less link for either provider.
+- A sign-in's or link's `original_url` is trusted only on the deployment's
+  own frontend origin (`api::utils::default_redirect_url`, exact scheme, host
+  and port, https only), `localhost`, or the apps' `macro:` and
+  `tauri://localhost` (`login::sso::is_allowed_original_url`); no other host
+  is listed.
 - `/oauth/redirect` without a code logs `auth_handoff_failure=missing_code`
   with FusionAuth's error. When the state names an allowed `original_url`, it
   sends the browser back there with `sso_error` (`admin_consent_required`,
@@ -360,6 +396,14 @@ subscription reconciliation still use them. Prices have no fallback. See [requir
   through team deletion; drop it before DSS RPC if data appeared.
 - Keep account deletion and membership compensation independent of vault items;
   team items retain their immutable creator after a person leaves.
+- Account deletion queues contacts `user_deleted` just before deleting each
+  profile (a retry no longer lists a deleted profile). The contacts worker
+  refuses it while the profile exists; after 5 receives it moves to
+  `contacts-dlq-<stack>` with no replay, which happens only when the profile
+  was never deleted, and a retried deletion queues it again. It, the teams `directory_changed`
+  sends and the channel interactions share one `ListWritesGate`
+  (`contacts-list-writes`, service context `contacts-list-writes`), so they are
+  no-ops until the flag is on; legacy contacts messages are not gated.
 
 - Compose `FlaggedCrmAccessRollout` from the shared flag provider for team CRM
   preference writes. `enable-crm-member-access-changes` is evaluated freshly for

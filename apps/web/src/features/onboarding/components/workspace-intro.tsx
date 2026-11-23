@@ -1,4 +1,5 @@
 import { WorkspaceTexture } from '@app/components/WorkspaceTexture';
+import LogoIcon from '@icon/macro-logo.svg';
 import CheckIcon from '@icon/system/regular/check.svg';
 import {
   createEffect,
@@ -14,7 +15,6 @@ import {
   type WorkspaceAccent,
 } from '../core/workspace-accent';
 import { ContinueButton } from './controls';
-import { MacroMarkIcon } from './macro-mark-icon';
 import './workspace-intro.css';
 
 /** An onboarding-only introduction; the public homepage keeps its own hero. */
@@ -126,7 +126,7 @@ export function WorkspaceIntro(props: {
           type="button"
           aria-label="Play accent burst"
           onClick={celebrateAccent}
-          class="workspace-intro-icon base-header-logo relative flex size-20 items-center justify-center rounded-[22px] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ink"
+          class="workspace-intro-icon relative flex size-20 items-center justify-center rounded-[22px] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ink"
           style={{
             color: 'var(--intro-accent)',
             background:
@@ -135,7 +135,7 @@ export function WorkspaceIntro(props: {
               'var(--onboarding-intro-shadow, inset .5px .5px 1px #ffffff1c, inset -.5px -.5px 1px #0008, 0 1px 1px #131313, 0 4px 10px #0005)',
           }}
         >
-          <MacroMarkIcon class="h-7 w-10 overflow-visible" />
+          <LogoIcon class="size-10" />
         </button>
       </div>
       <fieldset class="mt-6 w-full max-w-[270px]">

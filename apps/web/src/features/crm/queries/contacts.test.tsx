@@ -1,6 +1,6 @@
 import { cleanup, render } from '@solidjs/testing-library';
 import { QueryClient, QueryClientProvider } from '@tanstack/solid-query';
-import { ok } from 'neverthrow';
+import { err, ok } from 'neverthrow';
 import { createRoot } from 'solid-js';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { useCompanyContactsQuery } from './company-contacts';
@@ -9,7 +9,10 @@ import {
   useCrmContactByEmailQuery,
   useSetContactNameMutation,
 } from './contacts';
-import type { CrmRecordDependencies } from './dependencies';
+import type {
+  CrmQueryDependencies,
+  CrmRecordDependencies,
+} from './dependencies';
 import { crmKeys } from './keys';
 
 vi.mock('@service-storage/crm-contacts', () => ({
@@ -126,7 +129,8 @@ it('refetches a searched Team list when a rename stops matching it', async () =>
   const deps = {
     client,
     storage: { listCompanyContactsPage, setContactName },
-  } as unknown as CrmRecordDependencies;
+    feedback: { success: vi.fn(), failure: vi.fn() },
+  } as unknown as CrmQueryDependencies;
   const { source, rename, dispose } = createRoot((dispose) => ({
     source: useCompanyContactsQuery(deps, () => ({
       companyId: 'company-1',
@@ -145,5 +149,37 @@ it('refetches a searched Team list when a rename stops matching it', async () =>
   });
   expect(listCompanyContactsPage).toHaveBeenCalledTimes(2);
   expect(source.contacts).toEqual([]);
+  dispose();
+});
+
+it('restores the name and says so when a rename is rejected', async () => {
+  const key = crmKeys.contact(contact.id).queryKey;
+  client.setQueryData(key, contact);
+  const feedback = { success: vi.fn(), failure: vi.fn() };
+  const deps = {
+    client,
+    storage: {
+      setContactName: vi.fn(async () => err([{ message: 'Refused' }])),
+    },
+    feedback,
+  } as unknown as CrmQueryDependencies;
+  const { rename, dispose } = createRoot((dispose) => ({
+    rename: useSetContactNameMutation(deps),
+    dispose,
+  }));
+
+  await expect(
+    rename.mutateAsync({
+      contactId: contact.id,
+      companyId: contact.companyId,
+      name: 'Typed name',
+    })
+  ).rejects.toBeDefined();
+
+  expect(client.getQueryData(key)).toMatchObject({ name: 'Example person' });
+  expect(feedback.failure).toHaveBeenCalledExactlyOnceWith(
+    'Could not save this change. Try again.'
+  );
+  expect(feedback.success).not.toHaveBeenCalled();
   dispose();
 });

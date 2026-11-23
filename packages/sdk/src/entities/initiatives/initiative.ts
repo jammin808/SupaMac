@@ -7,6 +7,7 @@ import type {
 import type { RichMessage } from '../../mentions';
 import { iterate, paginate, unwrap } from '../../utils';
 import type { MacroClient } from '../../utils/client';
+import { webAppLink } from '../../utils/web-app';
 import { MacroEntity } from '../entity';
 import {
   DiscussionComment,
@@ -72,7 +73,7 @@ export class Initiative extends MacroEntity<InitiativeDetail> {
    * @readonly
    */
   webUrl(): string {
-    return `${this.client.webAppUrl}/app/initiative/${this.id}`;
+    return webAppLink(this.client.webAppUrl, `/initiative/${this.id}`);
   }
 
   /** Identity, loaded detail and {@link webUrl}, so serialized handles carry their link. */

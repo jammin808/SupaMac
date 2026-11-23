@@ -1,9 +1,10 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import type { ThemeV3 } from '../types/themeTypes';
 
 /** Neutral light surfaces with white controls and the shared Macro blue accent. */
 export const macroLightTheme = {
   id: 'Macro Light',
-  name: 'Macro Light',
+  name: `${PRODUCT_NAME} Light`,
   version: 3,
   mode: 'light',
   colorTokens: {
@@ -40,10 +41,11 @@ export const macroLightTheme = {
     'ink-muted': 'var(--color-content-1)',
     'ink-subtle': 'var(--color-content-2)',
     'ink-disabled': 'var(--color-content-3)',
-    'ink-placeholder': 'var(--color-content-4)',
-    link: 'var(--color-accent)',
-    'link-hover': 'var(--color-accent)',
-    'link-visited': 'var(--color-accent)',
+    // Placeholder and link text hold 4.5:1 on white and on the page.
+    'ink-placeholder': 'oklch(0.54 0 59deg)',
+    link: 'oklch(0.52 0.12 250deg)',
+    'link-hover': 'oklch(0.52 0.12 250deg)',
+    'link-visited': 'oklch(0.52 0.12 250deg)',
     page: 'var(--color-surface-0)',
     panel: 'var(--color-surface-1)',
     dialog: 'var(--color-surface-2)',

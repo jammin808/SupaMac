@@ -4,12 +4,12 @@ name: SupaMac CI
 on:
   pull_request:
     branches:
-    - main
+      - main
   push:
     branches:
-    - main
+      - main
   schedule:
-  - cron: 31 7 * * 1
+    - cron: 31 7 * * 1
   workflow_dispatch: {}
 permissions:
   contents: read
@@ -18,158 +18,188 @@ jobs:
     name: Fork tooling and workflow checks
     runs-on: ubuntu-24.04
     env:
-      RUSTUP_TOOLCHAIN: 1.94.0
+      RUSTUP_TOOLCHAIN: '1.94.0'
     timeout-minutes: 30
     steps:
-    - name: Checkout
-      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
-      with:
-        clean: 'false'
-        persist-credentials: 'false'
-      env:
-        GIT_HTTP_LOW_SPEED_LIMIT: '10000'
-        GIT_HTTP_LOW_SPEED_TIME: '60'
-    - name: Setup Bun for current lockfile formats
-      uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
-      with:
-        bun-version: 1.4.5
-    - name: Install locked analysis dependencies
-      run: bun install --frozen-lockfile --ignore-scripts
-    - name: Install pinned Rust tooling
-      run: rustup toolchain install 1.94.0 --profile minimal --component rustfmt --component clippy
-    - name: Check and test fork tooling
-      run: |
-        cargo fmt --all -- --check
-        cargo clippy --locked -p xtask_workflows -- -D warnings
-        cargo test --locked -p xtask_workflows
-        cargo x workflows --check
-        bun test tooling/supamac
-        bun node_modules/typescript-native/bin/tsc --noEmit --strict --skipLibCheck --types bun --target es2022 --module esnext --moduleResolution bundler tooling/supamac/*.ts
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          clean: 'false'
+          persist-credentials: 'false'
+        env:
+          GIT_HTTP_LOW_SPEED_LIMIT: '10000'
+          GIT_HTTP_LOW_SPEED_TIME: '60'
+      - name: Setup Bun for current lockfile formats
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: '1.4.5'
+      - name: Install locked analysis dependencies
+        run: bun install --frozen-lockfile --ignore-scripts
+      - name: Install pinned Rust tooling
+        run: rustup toolchain install 1.94.0 --profile minimal --component rustfmt --component clippy
+      - name: Check and test fork tooling
+        run: |
+          cargo fmt --all -- --check
+          cargo clippy --locked -p xtask_workflows -p gh_workflow -- -D warnings
+          cargo test --locked -p xtask_workflows -p gh_workflow
+          cargo x workflows --check
+          bun test tooling/supamac
+          bun test infra/self-hosted/ops/src
+          bun node_modules/typescript-native/bin/tsc --noEmit --strict --skipLibCheck --types bun --target es2022 --module esnext --moduleResolution bundler tooling/supamac/*.ts
+      - name: Test and type-check the jobs service
+        run: |
+          bun install --frozen-lockfile --ignore-scripts
+          bun test
+          bun run check
+        working-directory: infra/self-hosted/ops/jobs
   dependencies:
     name: Live dependency advisories
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-    - name: Checkout
-      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
-      with:
-        clean: 'false'
-        persist-credentials: 'false'
-      env:
-        GIT_HTTP_LOW_SPEED_LIMIT: '10000'
-        GIT_HTTP_LOW_SPEED_TIME: '60'
-    - name: Setup Bun for current lockfile formats
-      uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
-      with:
-        bun-version: 1.4.5
-    - name: Audit JavaScript workspace lockfiles
-      run: bun tooling/supamac/audit-dependencies.ts
-    - name: Install pinned Rust advisory scanner
-      if: '!cancelled()'
-      run: |
-        curl -fsSL https://github.com/rustsec/rustsec/releases/download/cargo-audit/v0.23.0/cargo-audit-x86_64-unknown-linux-gnu-v0.23.0.tgz -o "$RUNNER_TEMP/cargo-audit.tgz"
-        printf 'b77993532b253fcbf550996d7716465ec3d734d4e74e7f87bfb65a19add0fb59  %s\n' "$RUNNER_TEMP/cargo-audit.tgz" | sha256sum --check
-        tar -xzf "$RUNNER_TEMP/cargo-audit.tgz" -C "$RUNNER_TEMP"
-    - name: Audit Rust dependencies
-      if: '!cancelled()'
-      run: '"$RUNNER_TEMP/cargo-audit-x86_64-unknown-linux-gnu-v0.23.0/cargo-audit" audit --file Cargo.lock --deny warnings'
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          clean: 'false'
+          persist-credentials: 'false'
+        env:
+          GIT_HTTP_LOW_SPEED_LIMIT: '10000'
+          GIT_HTTP_LOW_SPEED_TIME: '60'
+      - name: Setup Bun for current lockfile formats
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: '1.4.5'
+      - name: Audit JavaScript workspace lockfiles
+        run: bun tooling/supamac/audit-dependencies.ts
+      - name: Install pinned Rust advisory scanner
+        if: '!cancelled()'
+        run: |
+          curl -fsSL https://github.com/rustsec/rustsec/releases/download/cargo-audit/v0.23.0/cargo-audit-x86_64-unknown-linux-gnu-v0.23.0.tgz -o "$RUNNER_TEMP/cargo-audit.tgz"
+          printf 'b77993532b253fcbf550996d7716465ec3d734d4e74e7f87bfb65a19add0fb59  %s\n' "$RUNNER_TEMP/cargo-audit.tgz" | sha256sum --check
+          tar -xzf "$RUNNER_TEMP/cargo-audit.tgz" -C "$RUNNER_TEMP"
+      - name: Audit Rust dependencies
+        if: '!cancelled()'
+        run: '"$RUNNER_TEMP/cargo-audit-x86_64-unknown-linux-gnu-v0.23.0/cargo-audit" audit --file Cargo.lock --deny warnings'
   nix-dependencies:
     name: Nix dependencies (${{ matrix.runner }}, ${{ matrix.package }})
     runs-on: ${{ matrix.runner }}
     env:
       NIX_PACKAGE: ${{ matrix.package }}
     timeout-minutes: 60
-    steps:
-    - name: Checkout
-      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
-      with:
-        clean: 'false'
-        persist-credentials: 'false'
-      env:
-        GIT_HTTP_LOW_SPEED_LIMIT: '10000'
-        GIT_HTTP_LOW_SPEED_TIME: '60'
-    - name: Install Nix
-      uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa
-      with:
-        determinate: 'false'
-        kvm: 'false'
-        diagnostic-endpoint: ''
-    - name: Verify locked dependency output
-      run: |
-        nix build --no-link --no-update-lock-file ".#$NIX_PACKAGE"
-        nix build --no-link --no-update-lock-file --rebuild ".#$NIX_PACKAGE"
-    - name: Build agent runtime against locked dependencies
-      if: matrix.package == 'macro-agent-node-modules'
-      run: nix build --no-link --no-update-lock-file .#macro-agent-runtime
     strategy:
-      fail-fast: false
       matrix:
         include:
-        - runner: ubuntu-24.04
-          package: js-node-modules
-        - runner: macos-15
-          package: js-node-modules
-        - runner: ubuntu-24.04
-          package: macro-agent-node-modules
-  codeql:
-    name: CodeQL (${{ matrix.language }})
-    runs-on: ubuntu-24.04
-    env:
-      SQLX_OFFLINE: 'true'
-      CARGO_BUILD_JOBS: '2'
+          - package: js-node-modules
+            runner: ubuntu-24.04
+          - package: js-node-modules
+            runner: macos-15
+          - package: macro-agent-node-modules
+            runner: ubuntu-24.04
+      fail-fast: false
     steps:
-    - name: Checkout
-      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
-      with:
-        clean: 'false'
-        persist-credentials: 'false'
-      env:
-        GIT_HTTP_LOW_SPEED_LIMIT: '10000'
-        GIT_HTTP_LOW_SPEED_TIME: '60'
-    - name: Initialize CodeQL
-      uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066
-      with:
-        languages: ${{ matrix.language }}
-        build-mode: none
-        ram: '4096'
-        threads: '2'
-        queries: security-extended
-    - name: Analyse source
-      uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066
-      with:
-        category: /language:${{ matrix.language }}
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          clean: 'false'
+          persist-credentials: 'false'
+        env:
+          GIT_HTTP_LOW_SPEED_LIMIT: '10000'
+          GIT_HTTP_LOW_SPEED_TIME: '60'
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa
+        with:
+          determinate: 'false'
+          kvm: 'false'
+          diagnostic-endpoint: ''
+      - name: Verify locked dependency output
+        run: |
+          nix build --no-link --no-update-lock-file ".#$NIX_PACKAGE"
+          nix build --no-link --no-update-lock-file --rebuild ".#$NIX_PACKAGE"
+      - name: Build agent runtime against locked dependencies
+        if: matrix.package == 'macro-agent-node-modules'
+        run: nix build --no-link --no-update-lock-file .#macro-agent-runtime
+  codeql-javascript-typescript:
+    name: CodeQL (javascript-typescript)
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       security-events: write
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-        - language: javascript-typescript
-          timeout: 45
-        - language: rust
-          timeout: 120
-    timeout-minutes: ${{ matrix.timeout }}
+    env:
+      SQLX_OFFLINE: 'true'
+      CARGO_BUILD_JOBS: '2'
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          clean: 'false'
+          persist-credentials: 'false'
+        env:
+          GIT_HTTP_LOW_SPEED_LIMIT: '10000'
+          GIT_HTTP_LOW_SPEED_TIME: '60'
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066
+        with:
+          languages: javascript-typescript
+          build-mode: none
+          ram: '4096'
+          threads: '2'
+          queries: security-extended
+      - name: Analyse source
+        uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066
+        with:
+          category: /language:javascript-typescript
+  codeql-rust:
+    name: CodeQL (rust)
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      security-events: write
+    env:
+      SQLX_OFFLINE: 'true'
+      CARGO_BUILD_JOBS: '2'
+    timeout-minutes: 120
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          clean: 'false'
+          persist-credentials: 'false'
+        env:
+          GIT_HTTP_LOW_SPEED_LIMIT: '10000'
+          GIT_HTTP_LOW_SPEED_TIME: '60'
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066
+        with:
+          languages: rust
+          build-mode: none
+          ram: '4096'
+          threads: '2'
+          queries: security-extended
+      - name: Analyse source
+        uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066
+        with:
+          category: /language:rust
   secrets:
     name: Secrets scan
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-    - name: Checkout
-      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
-      with:
-        clean: 'false'
-        persist-credentials: 'false'
-      env:
-        GIT_HTTP_LOW_SPEED_LIMIT: '10000'
-        GIT_HTTP_LOW_SPEED_TIME: '60'
-    - name: Install pinned secret scanner
-      run: |
-        curl -fsSL https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz -o "$RUNNER_TEMP/gitleaks.tgz"
-        printf '551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  %s\n' "$RUNNER_TEMP/gitleaks.tgz" | sha256sum --check
-        tar -xzf "$RUNNER_TEMP/gitleaks.tgz" -C "$RUNNER_TEMP" gitleaks
-    - name: Scan working tree with redacted output
-      run: '"$RUNNER_TEMP/gitleaks" dir --redact --no-banner .'
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          clean: 'false'
+          persist-credentials: 'false'
+        env:
+          GIT_HTTP_LOW_SPEED_LIMIT: '10000'
+          GIT_HTTP_LOW_SPEED_TIME: '60'
+      - name: Install pinned secret scanner
+        run: |
+          curl -fsSL https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz -o "$RUNNER_TEMP/gitleaks.tgz"
+          printf '551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  %s\n' "$RUNNER_TEMP/gitleaks.tgz" | sha256sum --check
+          tar -xzf "$RUNNER_TEMP/gitleaks.tgz" -C "$RUNNER_TEMP" gitleaks
+      - name: Scan working tree with redacted output
+        run: '"$RUNNER_TEMP/gitleaks" dir --redact --no-banner .'
 concurrency:
   group: supamac-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true

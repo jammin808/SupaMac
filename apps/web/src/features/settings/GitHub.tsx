@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { authorizeGithub } from '@core/auth/authorize-github';
 import { toast } from '@core/component/Toast/Toast';
 import { SERVER_HOSTS } from '@core/constant/servers';
@@ -105,7 +106,7 @@ export function GitHubCard(props: { class?: string } = {}) {
       <IntegrationRow
         icon={<GithubIcon />}
         title="GitHub"
-        description="Review your pull requests in Macro, see live pull request status in docs and chats, and let agents work in your repositories."
+        description={`Review your pull requests in ${PRODUCT_NAME}, see live pull request status in docs and chats, and let agents work in your repositories.`}
         status={
           <Show when={github.connectionState()}>
             {(state) => <StatusDot state={state()} label={connectionLabel()} />}

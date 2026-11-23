@@ -1,3 +1,4 @@
+import { WEB_BASE_PATH } from '@app/constants/routerBase';
 import {
   isAllowedLinkUrl,
   LINK_PROTOCOLS,
@@ -146,7 +147,7 @@ export function buildSimpleEntityUrl(
   params?: Record<string, string>
 ): string {
   const type = ROUTE_SEGMENTS.get(entity.type) ?? entity.type;
-  const urlString = `${getWebOrigin()}/app/${type}/${entity.id}`;
+  const urlString = `${getWebOrigin()}${WEB_BASE_PATH}/${type}/${entity.id}`;
   const url = new URL(urlString);
   if (params) {
     for (const [key, value] of Object.entries(params)) {

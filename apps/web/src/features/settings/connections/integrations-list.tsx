@@ -1,5 +1,6 @@
 import { rowPillClasses } from '@app/features/entity/components/row-pill';
 import { TAG_COLORS } from '@app/features/property/tags/tagColors';
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { Badge, cn, TagDot } from '@ui';
 import { type Component, For, type JSX, Show } from 'solid-js';
 import { match } from 'ts-pattern';
@@ -199,7 +200,7 @@ export function IntegrationListRow(props: {
               title={
                 props.kind === 'mcp'
                   ? 'Agents use it through an MCP server'
-                  : 'Built into Macro'
+                  : `Built into ${PRODUCT_NAME}`
               }
             >
               {props.kind}

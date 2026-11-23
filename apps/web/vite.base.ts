@@ -10,12 +10,14 @@ import wasm from 'vite-plugin-wasm';
 import tsconfigpaths from 'vite-tsconfig-paths';
 // @ts-ignore
 import { browserslist, version } from './package.json';
+import { unexpectedCostlySelectors } from './scripts/costly-selectors';
 import { devCompression } from './scripts/dev-compression';
 import { devHttps } from './scripts/dev-https';
 import { devExternalSourcemaps } from './scripts/dev-sourcemaps';
 import { hostedDevProxy } from './scripts/hosted-dev-proxy';
 import { keepImportMetaDev } from './scripts/keep-import-meta-dev';
 import { localDevServer } from './scripts/local-dev-server';
+import { selfHostedFlagDefines } from './self-hosted-flags';
 
 function readShortSha(): string {
   try {
@@ -29,6 +31,42 @@ const shortSha = readShortSha();
 const appVersion = `${version}+${shortSha}`;
 /** Orders builds: a newer build takes the local cache over from older tabs. */
 const appBuildTime = Date.now();
+
+/**
+ * The URL path the built app is served from: `/app` on hosted deployments. A
+ * self-hosted bundle published in another folder sets MACRO_APP_BASE_PATH to
+ * that folder, e.g. `/supamac`. The router reads the same value (routerBase.ts).
+ */
+function readAppBasePath(): string {
+  const configured = process.env.MACRO_APP_BASE_PATH ?? '/app';
+  if (!/^(\/[A-Za-z0-9_-]+)+$/.test(configured)) {
+    throw new Error(
+      `MACRO_APP_BASE_PATH must be a path like /app or /team/app, got "${configured}"`
+    );
+  }
+  return configured;
+}
+
+const appBasePath = readAppBasePath();
+
+/**
+ * The origin of a self-hosted backend's single-origin proxy, which servers.ts
+ * then addresses in place of every upstream host. Read here as well because
+ * index.html preconnects to it.
+ */
+function readSelfHostedBackendOrigin(): string | undefined {
+  const configured = process.env.VITE_BACKEND_ORIGIN;
+  if (!configured) return undefined;
+  const url = new URL(configured);
+  if (url.protocol !== 'https:' || url.origin !== configured) {
+    throw new Error(
+      `VITE_BACKEND_ORIGIN must be an https origin with no path, got "${configured}"`
+    );
+  }
+  return configured;
+}
+
+const selfHostedBackendOrigin = readSelfHostedBackendOrigin();
 
 function readGitBranch(): string {
   try {
@@ -193,6 +231,37 @@ function posthogSourceMapLimit(): Plugin {
       if (problems.length === 0) return;
       this.error(
         `PostHog cannot symbolicate these chunks (source maps are required and must be at most ${limitBytes} bytes): ${problems.join(', ')}. Split the chunk behind lazy() boundaries or in startupChunks().`
+      );
+    },
+  };
+}
+
+/**
+ * Every whole-page restyle (a custom property written on <html>, a theme
+ * switch) tests each element against Chrome's universal rules, and some of
+ * those cost every element real work: `:root ::selection` and
+ * `:where(.a, .b) *` once made a restyle three times slower. Fail the build
+ * on a new one; `scripts/costly-selectors.ts` says what counts and how to
+ * scope it.
+ */
+function costlySelectorBudget(): Plugin {
+  return {
+    name: 'costly-selector-budget',
+    apply: 'build',
+    generateBundle(_options, bundle) {
+      const problems = Object.values(bundle).flatMap((file) => {
+        if (file.type !== 'asset' || !file.fileName.endsWith('.css')) return [];
+        const css =
+          typeof file.source === 'string'
+            ? file.source
+            : Buffer.from(file.source).toString('utf8');
+        return unexpectedCostlySelectors(css, file.fileName).map(
+          (selector) => `${selector} (${file.fileName})`
+        );
+      });
+      if (problems.length === 0) return;
+      this.error(
+        `These selectors make Chrome do work for every element on each whole-page restyle: ${problems.join(', ')}. Give the walk an ancestor class outside :is()/:where() (\`.x *\`, \`:where(.x) *\`), set a ::selection on the subtree root, or add the selector to ALLOWED_COSTLY_SELECTORS in scripts/costly-selectors.ts with why it must reach every element.`
       );
     },
   };
@@ -630,7 +699,7 @@ export const createAppViteConfig = (): UserConfigFn => {
     const NO_MINIFY = process.env.NO_MINIFY === 'true';
 
     return {
-      base: command === 'serve' ? '/' : '/app',
+      base: command === 'serve' ? '/' : appBasePath,
       assetsInclude: ['**/*.glb'],
       css: {
         preprocessorMaxWorkers: true,
@@ -658,6 +727,7 @@ export const createAppViteConfig = (): UserConfigFn => {
         gitBranchHmrPlugin(),
         cloudFrontCompressionLimit(),
         posthogSourceMapLimit(),
+        costlySelectorBudget(),
         acyclicStartupChunks(),
       ],
       define: defineEnv(ENV_MODE, command),
@@ -795,6 +865,12 @@ export const createAppViteConfig = (): UserConfigFn => {
   };
 };
 
+function gatewayOrigin(mode: string): string {
+  if (selfHostedBackendOrigin) return selfHostedBackendOrigin;
+  if (mode === 'development') return 'https://dev-gateway.macro.com';
+  return 'https://gateway.macro.com';
+}
+
 function getAssetsPath(mode: string, command: string): string {
   switch (mode) {
     case 'development':
@@ -817,15 +893,15 @@ function defineEnv(mode: string, command: string) {
     localBackendOrigin: process.env.VITE_LOCAL_BACKEND_ORIGIN,
   });
   return {
+    // A self-hosted bundle has no PostHog project to decide its features;
+    // the checked-in set does, unless the build's environment names a flag.
+    ...(selfHostedBackendOrigin ? selfHostedFlagDefines(process.env) : {}),
     'import.meta.env.__APP_VERSION__': JSON.stringify(appVersion),
     'import.meta.env.__APP_BUILD_TIME__': JSON.stringify(appBuildTime),
     'import.meta.env.ASSETS_PATH': JSON.stringify(getAssetsPath(mode, command)),
+    'import.meta.env.__APP_BASE_PATH__': JSON.stringify(appBasePath),
     // index.html preconnects to the API gateway; keep in sync with servers.ts.
-    'import.meta.env.GATEWAY_ORIGIN': JSON.stringify(
-      mode === 'development'
-        ? 'https://dev-gateway.macro.com'
-        : 'https://gateway.macro.com'
-    ),
+    'import.meta.env.GATEWAY_ORIGIN': JSON.stringify(gatewayOrigin(mode)),
     'import.meta.env.__LOCAL_DOCKER__': process.env.LOCAL_DOCKER === 'true',
     'import.meta.env.__LOCAL_JWT__': JSON.stringify(process.env.LOCAL_JWT),
     'import.meta.env.__GIT_BRANCH__': JSON.stringify(

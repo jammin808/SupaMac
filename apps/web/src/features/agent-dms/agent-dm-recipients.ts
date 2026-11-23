@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { MACRO_NEW_BOT_ID } from '@core/constant/macroNew';
 import { useUserId } from '@core/context/user';
 import { type CombinedRecipientItem, recipientEntityMapper } from '@core/user';
@@ -17,9 +18,9 @@ export function useAgentDmRecipients() {
     return [
       recipientEntityMapper('agent')({
         id: MACRO_NEW_BOT_ID,
-        name: 'Macro',
+        name: PRODUCT_NAME,
         handle: 'macro',
-        description: 'Your private conversation with Macro',
+        description: `Your private conversation with ${PRODUCT_NAME}`,
       }),
       ...visibleAgents
         .filter((agent) =>

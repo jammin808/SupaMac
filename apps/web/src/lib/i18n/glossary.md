@@ -8,6 +8,13 @@ an existing message; reuse its word for the term, not its whole phrase.
 Across languages:
 
 - Keep product and brand names in English: Macro, GitHub, Gmail, CRM, MCP, API.
+- Write the product's name as `Macro` in every catalog. The app shows the
+  product name in its place when a message is resolved (`product-name.ts`), so
+  the catalogs stay as the upstream project writes them. Where a language joins
+  an ending to the name (Finnish `Macron`, Swedish `Macros`), add that form to
+  `INFLECTED_NAMES` there; `i18n.test.ts` fails for a form that is missing. A
+  message that names something other than the product goes in
+  `KEPT_CATALOG_NAME` with its reason.
 - Keep `{{placeholders}}` exactly; move them to wherever the grammar needs.
 - Use the language's own quotation marks (`„…“`, `« … »`, `「…」`) around
   quoted names.

@@ -18,12 +18,38 @@ const HISTORY_LIMIT: u16 = 100;
 pub struct SystemStatusServiceImpl<R, B> {
     repo: R,
     broadcaster: B,
+    /// The only people who may set the status or read its history: empty
+    /// unless the deployment names them, so nobody may by default.
+    staff: Vec<MacroUserIdStr<'static>>,
 }
 
 impl<R, B> SystemStatusServiceImpl<R, B> {
-    /// Create a service over the given storage and broadcaster.
+    /// Create a service over the given storage and broadcaster, with no staff.
     pub fn new(repo: R, broadcaster: B) -> Self {
-        Self { repo, broadcaster }
+        Self {
+            repo,
+            broadcaster,
+            staff: Vec::new(),
+        }
+    }
+
+    /// Let `staff` set the status and read its history.
+    #[must_use]
+    pub fn with_staff(mut self, staff: impl IntoIterator<Item = MacroUserIdStr<'static>>) -> Self {
+        self.staff = staff.into_iter().collect();
+        self
+    }
+
+    fn require_staff(&self, user: &MacroUserIdStr<'_>) -> Result<(), SystemStatusError> {
+        if self
+            .staff
+            .iter()
+            .any(|staff| staff.as_ref() == user.as_ref())
+        {
+            Ok(())
+        } else {
+            Err(SystemStatusError::Forbidden)
+        }
     }
 }
 
@@ -45,7 +71,7 @@ impl<R: SystemStatusRepo, B: StatusBroadcaster> SystemStatusService
         &self,
         caller: &MacroUserIdStr<'_>,
     ) -> Result<Vec<StatusUpdate>, SystemStatusError> {
-        require_staff(caller)?;
+        self.require_staff(caller)?;
         Ok(self
             .repo
             .list_updates(HISTORY_LIMIT)
@@ -67,7 +93,7 @@ impl<R: SystemStatusRepo, B: StatusBroadcaster> SystemStatusService
         caller: &MacroUserIdStr<'_>,
         status: SystemStatus,
     ) -> Result<StatusUpdate, SystemStatusError> {
-        require_staff(caller)?;
+        self.require_staff(caller)?;
 
         let update = StatusUpdate {
             id: macro_uuid::generate_uuid_v7(),
@@ -94,13 +120,5 @@ impl<R: SystemStatusRepo, B: StatusBroadcaster> SystemStatusService
         }
 
         Ok(update)
-    }
-}
-
-fn require_staff(user: &MacroUserIdStr<'_>) -> Result<(), SystemStatusError> {
-    if user.is_macro_staff() {
-        Ok(())
-    } else {
-        Err(SystemStatusError::Forbidden)
     }
 }

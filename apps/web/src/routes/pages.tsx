@@ -9,6 +9,7 @@ import {
 } from '@app/features/scheduling/public-booking';
 import { useRouteParams } from '@app/lib/split-router';
 import { publishLoginSuccess } from '@core/auth/login-events';
+import { SELF_HOSTED } from '@core/constant/servers';
 import { isMobile } from '@core/mobile/isMobile';
 import { isNativeMobilePlatform } from '@core/mobile/isNativeMobilePlatform';
 import { lazy } from '@core/util/lazy';
@@ -38,9 +39,11 @@ export function LoginPage() {
 /**
  * Phone browsers (including Meta's in-app browser) leave their email on the
  * website's `/mobile-signup` and get a link to finish signing up on desktop.
+ * A self-hosted bundle sits in a folder of a website that has no such page, so
+ * there a phone gets the sign-in card like any other browser.
  */
 export function SignupPage() {
-  if (isMobile() && !isNativeMobilePlatform()) {
+  if (!SELF_HOSTED && isMobile() && !isNativeMobilePlatform()) {
     window.location.replace(
       `${getWebOrigin()}/mobile-signup${window.location.search}`
     );

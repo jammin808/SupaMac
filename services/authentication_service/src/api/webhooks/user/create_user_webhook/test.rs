@@ -15,7 +15,7 @@ use macro_user_id::user_id::MacroUserIdStr;
 
 use super::{
     MACRO_SUPPORT_EMAILS, UserCreateWebhookError, dispatch_user_create_webhook,
-    identity_provider_name, signup_requested_agent, support_channel_name,
+    identity_provider_name, signup_requested_agent, support_channel, support_channel_name,
     user_create_webhook_error_response,
 };
 
@@ -29,6 +29,39 @@ fn support_emails_are_distinct_user_ids() {
         .expect("every support email is a valid user id");
 
     assert_eq!(participants.len(), MACRO_SUPPORT_EMAILS.len());
+}
+
+#[test]
+fn support_channel_joins_the_macro_team_and_posts_its_welcome_by_default() {
+    let channel = support_channel(None).expect("the Macro support team has a channel");
+
+    assert_eq!(channel.participants.len(), MACRO_SUPPORT_EMAILS.len());
+    assert!(
+        channel
+            .participants
+            .contains(&MacroUserIdStr::try_from_email(MACRO_SUPPORT_EMAILS[0]).unwrap())
+    );
+    assert!(channel.posts_welcome);
+}
+
+#[test]
+fn deployment_without_support_participants_has_no_support_channel() {
+    let configured = std::collections::HashSet::new();
+
+    assert!(support_channel(Some(&configured)).is_none());
+}
+
+#[test]
+fn configured_support_participants_replace_the_macro_team_and_its_welcome() {
+    let configured =
+        std::collections::HashSet::from([
+            MacroUserIdStr::try_from_email("owner@example.com").unwrap()
+        ]);
+
+    let channel = support_channel(Some(&configured)).expect("a named participant has a channel");
+
+    assert_eq!(channel.participants, configured);
+    assert!(!channel.posts_welcome);
 }
 
 #[test]
@@ -113,6 +146,31 @@ async fn denied_develop_public_signup_does_not_invoke_onboarding() {
 
     assert!(!is_ok);
     assert_eq!(invocation_count, 0);
+}
+
+#[tokio::test]
+async fn exact_allowlist_denies_unlisted_and_macro_domain_signups_before_onboarding() {
+    let policy = SignupPolicy::from_exact_allowlist_json(r#"["owner@example.com"]"#).unwrap();
+
+    for email in ["stranger@example.com", "new.user@macro.com"] {
+        let req = user_create_webhook(email, None);
+
+        let (is_ok, invocation_count) = dispatch_with_invocation_count(&policy, req).await;
+
+        assert!(!is_ok, "{email}");
+        assert_eq!(invocation_count, 0, "{email}");
+    }
+}
+
+#[tokio::test]
+async fn exact_allowlist_admits_listed_signup_to_onboarding() {
+    let policy = SignupPolicy::from_exact_allowlist_json(r#"["owner@example.com"]"#).unwrap();
+    let req = user_create_webhook("Owner@Example.com", None);
+
+    let (is_ok, invocation_count) = dispatch_with_invocation_count(&policy, req).await;
+
+    assert!(is_ok);
+    assert_eq!(invocation_count, 1);
 }
 
 #[test]

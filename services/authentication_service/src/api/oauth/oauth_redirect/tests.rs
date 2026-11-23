@@ -105,7 +105,7 @@ async fn it_writes_session_code_to_db() {
     let mut dummy = DummyCb::default();
     let res = get_redirect_url(
         &Some(SsoState {
-            original_url: Some("https://macro.com".parse().unwrap()),
+            original_url: Some(default_redirect_url()),
             is_mobile: true,
             referral_code: None,
             is_agent: false,
@@ -115,8 +115,8 @@ async fn it_writes_session_code_to_db() {
     .await
     .unwrap();
     assert_eq!(dummy.called, 1);
-    assert_eq!(res.domain(), Some("macro.com"));
-    assert_eq!(res.scheme(), "https");
+    assert_eq!(res.host_str(), default_redirect_url().host_str());
+    assert_eq!(res.scheme(), default_redirect_url().scheme());
     let query = res.query_pairs();
     let p = query.collect::<Vec<_>>();
     assert!(
@@ -196,11 +196,7 @@ fn html_redirect_works() {
 async fn redirect_telemetry_carries_no_session_code() {
     let state = Some(SsoState {
         // A code left over from an earlier attempt rides in on the state.
-        original_url: Some(
-            "https://macro.com/app/login?token=stale-code"
-                .parse()
-                .unwrap(),
-        ),
+        original_url: Some(app_page("login?token=stale-code").parse().unwrap()),
         is_mobile: true,
         referral_code: None,
         is_agent: false,
@@ -235,6 +231,15 @@ async fn redirect_telemetry_carries_no_session_code() {
     );
 }
 
+/// A page of the web app this service redirects to, in whatever environment
+/// the tests run.
+fn app_page(path_and_query: &str) -> String {
+    format!(
+        "{}/{path_and_query}",
+        default_redirect_url().as_str().trim_end_matches('/')
+    )
+}
+
 fn sso_state(original_url: Option<&str>) -> SsoState {
     SsoState {
         original_url: original_url.map(|url| url.parse().unwrap()),
@@ -246,22 +251,19 @@ fn sso_state(original_url: Option<&str>) -> SsoState {
 
 #[test]
 fn sign_in_failure_returns_to_the_starting_page_with_the_reason() {
-    let state = sso_state(Some("https://macro.com/app/signup?referral_code=abc"));
+    let state = sso_state(Some(&app_page("signup?referral_code=abc")));
     let url = sign_in_failure_url(Some(&state), ConsentFailure::AdminConsentRequired).unwrap();
     assert_eq!(
         url.as_str(),
-        "https://macro.com/app/signup?referral_code=abc&sso_error=admin_consent_required"
+        app_page("signup?referral_code=abc&sso_error=admin_consent_required")
     );
 }
 
 #[test]
 fn sign_in_failure_replaces_an_earlier_reason() {
-    let state = sso_state(Some("https://macro.com/app/signup?sso_error=failed"));
+    let state = sso_state(Some(&app_page("signup?sso_error=failed")));
     let url = sign_in_failure_url(Some(&state), ConsentFailure::Cancelled).unwrap();
-    assert_eq!(
-        url.as_str(),
-        "https://macro.com/app/signup?sso_error=cancelled"
-    );
+    assert_eq!(url.as_str(), app_page("signup?sso_error=cancelled"));
 }
 
 #[test]

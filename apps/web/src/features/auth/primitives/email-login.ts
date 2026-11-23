@@ -40,10 +40,14 @@ export function createEmailLogin(
     onVerified?: () => void;
     /** A provider sign-in just failed: open on the email step and say why. */
     fallbackNotice?: string;
+    /** The emailed code is the only way in: there is no method to choose. */
+    emailOnly?: boolean;
   }
 ) {
+  const opensOnEmail =
+    options.emailOnly || options.initialEmail || options.fallbackNotice;
   const [step, setStep] = createSignal<LoginStep>(
-    options.initialEmail || options.fallbackNotice ? 'email' : 'choose'
+    opensOnEmail ? 'email' : 'choose'
   );
   const [email, setEmail] = createSignal(options.initialEmail ?? '');
   const [password, setPassword] = createSignal('');

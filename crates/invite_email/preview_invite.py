@@ -22,7 +22,9 @@ TEMPLATE_PATH = Path(__file__).parent / "templates" / "invite.html"
 # Dummy data
 # ---------------------------------------------------------------------------
 
-DUMMY_REFERRAL_URL = "http://localhost:3000/app/signup?referral_code=ABC123DEF"
+DUMMY_WEB_APP_URL = "http://localhost:3000/app/"
+DUMMY_REFERRAL_URL = DUMMY_WEB_APP_URL + "signup?referral_code=ABC123DEF"
+DUMMY_LOGO_URL = DUMMY_WEB_APP_URL + "macro-email-logo.png"
 
 # ---------------------------------------------------------------------------
 # Askama → Jinja2 syntax conversion
@@ -36,6 +38,10 @@ def askama_to_jinja2(src: str) -> str:
     # referral_url() is a method call on self in Askama; replace with the
     # dummy URL string directly so Jinja2 can render it as a plain variable.
     src = re.sub(r"\{\{\s*referral_url\(\)\s*\}\}", DUMMY_REFERRAL_URL, src)
+
+    # The crate's free functions for the web app's address and the logo.
+    src = re.sub(r"\{\{\s*crate::web_app_url\(\)\s*\}\}", DUMMY_WEB_APP_URL, src)
+    src = re.sub(r"\{\{\s*crate::email_logo_url\(\)\s*\}\}", DUMMY_LOGO_URL, src)
 
     # {% if let Some(var) = expr %} → {% if expr %}{% set var = expr %}
     # Jinja2 doesn't have if-let, but {% set %} inside {% if %} achieves the same.

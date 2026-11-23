@@ -13,7 +13,7 @@ import { FIXTURE_SCOPE, noImport } from './fixture-scope';
 
 afterEach(cleanup);
 
-const UNREACHABLE = "Can't reach Macro. Check your connection.";
+const UNREACHABLE = "Can't reach SupaMac. Check your connection.";
 const SERVICE_UNAVAILABLE =
   'Passwords is temporarily unavailable. Try again in a minute.';
 

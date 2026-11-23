@@ -1,6 +1,8 @@
+import { WEB_BASE_PATH } from '@app/constants/routerBase';
 import { toast } from '@core/component/Toast/Toast';
 import { useAiUsageLimitState } from '@core/constant/AiUsageLimitState';
 import { useSettingsState } from '@core/constant/SettingsState';
+import { SELF_HOSTED } from '@core/constant/servers';
 import { fireAndForget } from '@core/util/fireAndForget';
 import { isTauri } from '@core/util/platform';
 import { ThrownResultError } from '@core/util/result';
@@ -152,7 +154,7 @@ export function AiUsageLimitDialog() {
     // Come back to this page so the user can resend from where they were. The
     // native app's own origin isn't a URL Stripe can return to.
     const here = isTauri()
-      ? `${getWebOrigin()}/app/settings/usage`
+      ? `${getWebOrigin()}${WEB_BASE_PATH}/settings/usage`
       : window.location.href;
     try {
       window.location.href = await checkout.mutateAsync({
@@ -242,7 +244,7 @@ export function AiUsageLimitDialog() {
     if (portal.isPending) return;
     try {
       window.location.href = await portal.mutateAsync({
-        returnUrl: `${getWebOrigin()}/app/settings/usage`,
+        returnUrl: `${getWebOrigin()}${WEB_BASE_PATH}/settings/usage`,
       });
     } catch {
       setOfferError("Couldn't open payment methods. Please try again.");
@@ -283,7 +285,9 @@ export function AiUsageLimitDialog() {
         code={usageLimitCode() ?? undefined}
         freePlan={freePlan()}
         resetsAt={usageSnapshot()?.period_end}
-        offer={offer()}
+        // A self-hosted instance sells neither plans nor credits.
+        offer={SELF_HOSTED ? undefined : offer()}
+        noticeOnly={SELF_HOSTED}
         previewNotice={
           usagePreview.active()
             ? `Developer preview: ${usagePreview.plan() === 'free' ? 'Free' : 'paid'} plan. No account billing has changed.`

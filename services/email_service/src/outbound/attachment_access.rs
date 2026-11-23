@@ -99,7 +99,13 @@ impl MailAttachmentFiles {
             record.attachment.filename.as_deref().unwrap_or_default()
         )
     }
-    fn url(&self, key: &str) -> Result<String, AttachmentError> {
+    async fn url(&self, key: &str) -> Result<String, AttachmentError> {
+        // Under local AWS no CDN stands in front of the bucket to verify a
+        // CloudFront signature, so the link is one the store itself checks.
+        if macro_aws_config::is_local_aws() {
+            return store_signed_url(&self.s3, &self.bucket, key, self.url_ttl_seconds).await;
+        }
+
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map_err(|_| AttachmentError::Infrastructure)?
@@ -117,6 +123,23 @@ impl MailAttachmentFiles {
         .map_err(|_| AttachmentError::Infrastructure)
     }
 }
+
+/// An expiring GET for `key` that the store signs and verifies itself,
+/// addressed where a browser reaches the store.
+async fn store_signed_url(
+    s3: &s3_client::S3,
+    bucket: &str,
+    key: &str,
+    ttl_seconds: u64,
+) -> Result<String, AttachmentError> {
+    let presigned = s3
+        .get_presigned_url(bucket, key, ttl_seconds)
+        .await
+        .map_err(failed)?;
+
+    Ok(macro_aws_config::transform_aws_url(presigned.uri()))
+}
+
 fn failed<E: std::fmt::Debug>(error: E) -> AttachmentError {
     tracing::warn!(?error, "attachment storage deferred");
     AttachmentError::Infrastructure
@@ -128,7 +151,7 @@ impl AttachmentFiles for MailAttachmentFiles {
     ) -> Result<Option<String>, AttachmentError> {
         let key = Self::key(record);
         if self.s3.exists(&self.bucket, &key).await.map_err(failed)? {
-            Ok(Some(self.url(&key)?))
+            Ok(Some(self.url(&key).await?))
         } else {
             Ok(None)
         }
@@ -143,7 +166,7 @@ impl AttachmentFiles for MailAttachmentFiles {
             .put(&self.bucket, &key, &bytes)
             .await
             .map_err(failed)?;
-        self.url(&key)
+        self.url(&key).await
     }
     async fn store_document(
         &self,
@@ -192,3 +215,6 @@ impl AttachmentFiles for MailAttachmentFiles {
         })
     }
 }
+
+#[cfg(test)]
+mod test;

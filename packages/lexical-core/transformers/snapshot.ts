@@ -8,6 +8,7 @@ import {
   $isSnapshotNode,
   SnapshotNode,
 } from '../nodes/SnapshotNode';
+import { appLinkUrl } from '../utils/app-links';
 import {
   replaceTextWithUnknownMention,
   UnknownMentionNode,
@@ -83,11 +84,8 @@ export const E_SNAPSHOT_NODE: ElementTransformer = {
     }
 
     // Export as a document link similar to DocumentMention
-    const hostname =
-      window.location.hostname === 'localhost'
-        ? 'dev.macro.com'
-        : window.location.hostname.replace('www.', '').toLowerCase();
-    const documentUrl = `https://${hostname}/app/${blockName}/${documentId}`;
+    const documentUrl = appLinkUrl(`/${blockName}/${documentId}`);
+    if (!documentUrl) return documentName;
     return `[${documentName}](${documentUrl})`;
   },
   replace: (

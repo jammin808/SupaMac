@@ -1,3 +1,4 @@
+import { SELF_HOSTED } from '@core/constant/servers';
 import { deepEqual } from '@core/util/compareUtils';
 import { prepareEmailBody } from '@macro-inc/email-renderer';
 import { mountEmailBody } from '@macro-inc/email-renderer/browser';
@@ -22,6 +23,18 @@ export interface EmailMessageBodyProps {
   isFocused: boolean;
   /** Load Macro read-receipt pixels, so viewing this copy counts as an open. */
   showReadReceiptPixel?: boolean;
+}
+
+/**
+ * The sender domain whose personal mail keeps its own fonts: the hosted
+ * service's own addresses. A self-hosted instance has no such domain.
+ */
+const FONT_KEEPING_SENDER_DOMAIN = SELF_HOSTED ? undefined : '@macro.com';
+
+/** Whether a personal message from `email` is shown in its own fonts. */
+export function keepsSenderFonts(email: string | undefined): boolean {
+  if (!FONT_KEEPING_SENDER_DOMAIN || !email) return false;
+  return email.toLowerCase().endsWith(FONT_KEEPING_SENDER_DOMAIN);
 }
 
 /** Solid only translates reactive inputs and owns the renderer's lifetime. */
@@ -54,8 +67,7 @@ export function createEmailMessageBody(
       isPersonal: props.isPersonal,
       showFullContent: props.showFullContent,
       normalizeFonts:
-        props.isPersonal &&
-        !props.message.from?.email?.toLowerCase().endsWith('@macro.com'),
+        props.isPersonal && !keepsSenderFonts(props.message.from?.email),
       hiddenPixels: hiddenPixels(),
     }),
     undefined,

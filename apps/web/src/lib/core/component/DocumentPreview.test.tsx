@@ -248,7 +248,7 @@ describe('calendar mention card for a Macro call', () => {
     expect(view.container.textContent).not.toContain('/meet/join/');
     expect(view.container.textContent).toContain('Agenda');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Join Macro call' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Join SupaMac call' }));
     expect(mocks.openExternalUrl).toHaveBeenCalledWith(callUrl);
   });
 
@@ -258,7 +258,7 @@ describe('calendar mention card for a Macro call', () => {
 
     expect(view.container.textContent).toContain('Room 2');
     expect(
-      screen.getByRole('button', { name: 'Join Macro call' })
+      screen.getByRole('button', { name: 'Join SupaMac call' })
     ).toBeTruthy();
   });
 
@@ -271,7 +271,7 @@ describe('calendar mention card for a Macro call', () => {
     expect(view.container.textContent).not.toContain('/meet/join/');
     expect(view.container.textContent).toContain('Agenda');
     expect(
-      screen.queryByRole('button', { name: 'Join Macro call' })
+      screen.queryByRole('button', { name: 'Join SupaMac call' })
     ).toBeNull();
   });
 
@@ -282,7 +282,7 @@ describe('calendar mention card for a Macro call', () => {
 
     expect(view.container.textContent).toContain(meetUrl);
     expect(
-      screen.queryByRole('button', { name: 'Join Macro call' })
+      screen.queryByRole('button', { name: 'Join SupaMac call' })
     ).toBeNull();
   });
 
@@ -304,7 +304,7 @@ describe('calendar mention card for a Macro call', () => {
     ));
 
     fireEvent.click(
-      await screen.findByRole('button', { name: 'Join Macro call' })
+      await screen.findByRole('button', { name: 'Join SupaMac call' })
     );
 
     expect(mocks.openExternalUrl).toHaveBeenCalledWith(callUrl);

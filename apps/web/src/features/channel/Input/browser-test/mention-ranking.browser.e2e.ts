@@ -71,8 +71,8 @@ for (const mobile of [false, true]) {
     await editor.click();
     await page.keyboard.type('@');
     await expect(menu).toBeVisible({ timeout: 15_000 });
-    await page.keyboard.type('macro');
-    await expect(menu.getByText('Macro', { exact: true })).toBeVisible();
+    await page.keyboard.type('supamac');
+    await expect(menu.getByText('SupaMac', { exact: true })).toBeVisible();
     await expect(page.getByTestId('people-reads')).toHaveText('0');
     await page.keyboard.press('Escape');
     await editor.press('ControlOrMeta+a');

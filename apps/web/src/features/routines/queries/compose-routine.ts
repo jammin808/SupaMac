@@ -1,4 +1,5 @@
 import { handleAiUsageLimitError } from '@app/features/paywall/ai-usage-limit-handling';
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { isAiUsageLimitError } from '@app/lib/service-clients/ai-usage-limit';
 import type { ResultError } from '@core/util/result';
 import { sleep } from '@core/util/sleep';
@@ -10,7 +11,7 @@ import type {
   DraftedRoutine,
   DraftRequest,
 } from '@service-scheduled-action/generated/schemas';
-import type { ScheduleDraft } from '../core/draft';
+import type { RoutineApp, ScheduleDraft } from '../core/draft';
 import { createEmptyDraft } from '../core/routine-draft';
 import { stepsFromWire } from '../core/routine-steps';
 import { parseRoutineTriggers } from './routine-trigger-mapping';
@@ -130,7 +131,8 @@ export function draftFromRoutine(
   defaultModel: string
 ): ScheduleDraft | string {
   const steps = stepsFromWire(routine.steps);
-  if (!steps) return 'The draft used steps Macro can’t run. Try rephrasing.';
+  if (!steps)
+    return `The draft used steps ${PRODUCT_NAME} can’t run. Try rephrasing.`;
   const drafted = steps.map((step, index) => {
     const problems = routine.problems.find(
       (item) => item.index === index
@@ -142,6 +144,10 @@ export function draftFromRoutine(
   const base = {
     ...createEmptyDraft(defaultModel),
     created: routine.created,
+    ...(routine.appearance ? { appearance: routine.appearance } : {}),
+    // Apps it needs that aren't connected are required too: the review shows
+    // each one unconnected, to connect before saving or to remove.
+    apps: draftedApps(routine),
     name: routine.name,
     triggers: (routine.trigger && parseRoutineTriggers(routine.trigger)) ?? [],
     enabled: true,
@@ -151,6 +157,16 @@ export function draftFromRoutine(
   return drafted.length === 1 && only?.kind === 'agent'
     ? { ...base, prompt: only.instructions, target: only.target }
     : { ...base, steps: drafted };
+}
+
+/** The apps a drafted routine requires and those it needs, each slug once. */
+function draftedApps(routine: DraftedRoutine): RoutineApp[] {
+  const apps: RoutineApp[] = [];
+  for (const app of [...(routine.apps ?? []), ...(routine.missingApps ?? [])]) {
+    if (apps.some((seen) => seen.app_slug === app.app_slug)) continue;
+    apps.push({ app_slug: app.app_slug, server_name: app.server_name });
+  }
+  return apps;
 }
 
 /**

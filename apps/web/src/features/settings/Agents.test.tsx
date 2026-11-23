@@ -2,6 +2,7 @@
  * @vitest-environment jsdom
  */
 
+import { runSplitBack } from '@components/app/split-layout/back-interceptor';
 import { Model } from '@core/component/AI/constant/model';
 import { useAgentModelsQueries } from '@queries/agents/models';
 import { useRunnableHarnessesQuery } from '@queries/harnesses/harnesses';
@@ -35,6 +36,10 @@ import {
   selectOptions,
 } from './tests/select-helpers';
 
+const device = vi.hoisted(() => ({ touch: false }));
+vi.mock('@core/mobile/isTouchDevice', () => ({
+  isTouchDevice: () => device.touch,
+}));
 const agentsPageProps = {
   onCursor: vi.fn(),
   onSetUpRuntime: vi.fn(),
@@ -326,6 +331,7 @@ beforeAll(() => {
 });
 
 beforeEach(() => {
+  device.touch = false;
   avatarMocks.upload.mockReset();
   apiKeyMocks.query.data = undefined;
   apiKeyMocks.save.mockReset();
@@ -379,6 +385,16 @@ const MACROD_HARNESS = {
 } satisfies Harness;
 
 describe('Agents', () => {
+  it('returns from a phone agent editor to its list before navigating away', () => {
+    device.touch = true;
+    updateSearchParams({ createAgent: 'true' });
+    render(() => <Agents {...agentsPageProps} />);
+    expect(screen.getByRole('region', { name: 'New agent' })).toBeTruthy();
+    const goBack = vi.fn();
+    expect(runSplitBack({ canGoBack: () => true, goBack })).toBe(true);
+    expect(screen.queryByRole('region', { name: 'New agent' })).toBeNull();
+    expect(goBack).not.toHaveBeenCalled();
+  });
   it('opens the new-agent form from a link and clears the action on cancel', () => {
     updateSearchParams({ createAgent: 'true' });
     render(() => <Agents {...agentsPageProps} />);
@@ -478,7 +494,7 @@ describe('Agents', () => {
 
     const list = screen.getByRole('region', { name: 'Your agents' });
 
-    expect(within(list).getByText('Macro')).toBeTruthy();
+    expect(within(list).getByText('SupaMac')).toBeTruthy();
     expect(
       within(list)
         .getAllByText(/^@/)
@@ -486,13 +502,13 @@ describe('Agents', () => {
     ).toEqual(['@macro']);
     expect(within(list).getByText('Team')).toBeTruthy();
     expect(
-      within(list).getByText('In Macro · Sonnet 5.5 · All channels')
+      within(list).getByText('In SupaMac · Sonnet 5.5 · All channels')
     ).toBeTruthy();
     expect(
-      within(list).queryByRole('button', { name: 'Delete Macro' })
+      within(list).queryByRole('button', { name: 'Delete SupaMac' })
     ).toBeNull();
     expect(
-      within(list).queryByRole('button', { name: 'Edit Macro' })
+      within(list).queryByRole('button', { name: 'Edit SupaMac' })
     ).toBeNull();
   });
 
@@ -615,14 +631,14 @@ describe('Agents', () => {
       ?.parentElement as HTMLElement;
     expect(within(releaseRow).getByText('Team')).toBeTruthy();
     expect(
-      within(releaseRow).getByText('In Macro · Sonnet 5.5 · #engineering')
+      within(releaseRow).getByText('In SupaMac · Sonnet 5.5 · #engineering')
     ).toBeTruthy();
 
     const bugFixerRow = within(list).getByText('Bug fixer').parentElement
       ?.parentElement as HTMLElement;
     expect(within(bugFixerRow).getByText('Private')).toBeTruthy();
     expect(
-      within(bugFixerRow).getByText('In Macro · Sonnet 5.5 · All channels')
+      within(bugFixerRow).getByText('In SupaMac · Sonnet 5.5 · All channels')
     ).toBeTruthy();
   });
 
@@ -1185,7 +1201,7 @@ describe('Agents', () => {
     expect(within(dialog).queryByLabelText('Description')).toBeNull();
     expect(within(dialog).getByLabelText('Instructions')).toBeTruthy();
     expect(
-      within(dialog).getByRole('radio', { name: 'In Macro' })
+      within(dialog).getByRole('radio', { name: 'In SupaMac' })
     ).toHaveProperty('checked', true);
     expect(
       within(dialog).getByRole('radio', { name: 'In Cursor' })
@@ -1220,7 +1236,7 @@ describe('Agents', () => {
       within(dialog).getByRole('button', { name: 'Connect Cursor' })
     ).toBeTruthy();
     expect(
-      within(dialog).getByRole('radio', { name: 'In Macro' })
+      within(dialog).getByRole('radio', { name: 'In SupaMac' })
     ).toHaveProperty('checked', true);
   });
 
@@ -1368,7 +1384,7 @@ describe('Agents', () => {
     const dialog = screen.getByRole('region', { name: /^(New|Edit) agent$/ });
     expect(within(dialog).queryByLabelText('Anthropic API key')).toBeNull();
     expect(
-      within(dialog).getByText('Runs on Macro usage unless you add one.')
+      within(dialog).getByText('Runs on SupaMac usage unless you add one.')
     ).toBeTruthy();
 
     fireEvent.click(within(dialog).getByRole('button', { name: 'Add key' }));
@@ -1533,7 +1549,7 @@ describe('Agents', () => {
     expect(where.dataset.harnessId).toBe('computer-harness');
     expect(where.dataset.checked).toBe('true');
     expect(
-      within(dialog).getByRole('radio', { name: 'In Macro' })
+      within(dialog).getByRole('radio', { name: 'In SupaMac' })
     ).toHaveProperty('checked', false);
     expect(agentSettingsRequest()).toBeUndefined();
   });
@@ -1546,7 +1562,7 @@ describe('Agents', () => {
 
     const dialog = screen.getByRole('region', { name: /^(New|Edit) agent$/ });
     expect(
-      within(dialog).getByRole('radio', { name: 'In Macro' })
+      within(dialog).getByRole('radio', { name: 'In SupaMac' })
     ).toHaveProperty('checked', true);
     expect(
       within(dialog).getByRole('radio', { name: 'In Cursor' })
@@ -2154,7 +2170,7 @@ it.each(['in-memory', 'cursor'])(
     fireEvent.click(
       within(dialog).getByRole('radio', {
         name: {
-          'in-memory': 'In Macro',
+          'in-memory': 'In SupaMac',
           cursor: 'In Cursor',
         }[harness]!,
       })

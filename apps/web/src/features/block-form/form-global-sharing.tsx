@@ -4,6 +4,7 @@
  * form's own access. The detail loads before the dialog opens and stays live
  * inside it, so an audience change shows as soon as it is saved.
  */
+import { WEB_BASE_PATH } from '@app/constants/routerBase';
 import { getPermissions } from '@core/component/SharePermissions';
 import { toast } from '@core/component/Toast/Toast';
 import { ShareModal } from '@core/component/TopBar/ShareButton';
@@ -35,7 +36,8 @@ export function createFormShareInput(options: {
   notify: FormContext['notify'];
 }): Accessor<ShareModalInput | undefined> {
   // Shared links open on the web, even from the desktop app.
-  const link = () => respondLink(`${getWebOrigin()}/app/`, options.formId());
+  const link = () =>
+    respondLink(`${getWebOrigin()}${WEB_BASE_PATH}/`, options.formId());
   const copyLink = useCopyLink();
   const audience = createAudienceChange(options);
   // One component for the dialog's life: a refreshed detail must not remount it.

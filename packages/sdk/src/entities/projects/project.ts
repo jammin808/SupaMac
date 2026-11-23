@@ -4,6 +4,7 @@ import type {
 } from '../../../generated/storage/types.gen';
 import { unwrap } from '../../utils';
 import type { MacroClient } from '../../utils/client';
+import { webAppLink } from '../../utils/web-app';
 import type { Channel } from '../channels/channel';
 import { shareWithChannel } from '../channels/share';
 import { PropertiedEntity } from '../entity';
@@ -100,7 +101,7 @@ export class Project extends PropertiedEntity<ProjectDetail> {
    * @readonly
    */
   webUrl(): string {
-    return `${this.client.webAppUrl}/app/project/${this.id}`;
+    return webAppLink(this.client.webAppUrl, `/project/${this.id}`);
   }
 
   /** Identity, loaded detail and {@link webUrl}, so serialized handles carry their link. */

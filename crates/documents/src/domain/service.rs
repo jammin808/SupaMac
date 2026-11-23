@@ -438,17 +438,24 @@ impl<
         )
     }
 
-    fn make_presigned_url(&self, key: &str) -> anyhow::Result<String> {
+    /// The link an object is read from, good for the configured expiry.
+    async fn make_presigned_url(&self, key: &str) -> anyhow::Result<String> {
+        // Under local AWS no CDN stands in front of the bucket to verify a
+        // CloudFront signature, so the link is one the store itself checks.
+        if macro_aws_config::is_local_aws() {
+            return self
+                .upload_url_service
+                .get_document_storage_presigned_url(
+                    key,
+                    self.cloudfront_config.presigned_url_expiry_seconds,
+                )
+                .await;
+        }
+
         let constructed_url = self.cloudfront_url_for_key(key);
         let options = self.get_signed_options();
 
-        let signed_url = if !macro_aws_config::is_local_aws() {
-            get_signed_url(&constructed_url, &options)?
-        } else {
-            constructed_url
-        };
-
-        Ok(signed_url)
+        Ok(get_signed_url(&constructed_url, &options)?)
     }
 
     async fn get_editable_url(
@@ -471,7 +478,7 @@ impl<
         let document_key =
             build_cloud_storage_bucket_document_key(owner, document_id, document_version_id);
 
-        let signed_url = self.make_presigned_url(&document_key)?;
+        let signed_url = self.make_presigned_url(&document_key).await?;
         Ok(LocationResponseData::PresignedUrl(signed_url))
     }
 
@@ -490,7 +497,7 @@ impl<
         let document_key =
             build_cloud_storage_bucket_document_key(owner, document_id, document_version_id);
 
-        let signed_url = self.make_presigned_url(&document_key)?;
+        let signed_url = self.make_presigned_url(&document_key).await?;
         Ok(LocationResponseData::PresignedUrl(signed_url))
     }
 
@@ -501,7 +508,7 @@ impl<
     ) -> anyhow::Result<LocationResponseData> {
         let document_key = build_docx_to_pdf_converted_document_key(owner, document_id);
 
-        let signed_url = self.make_presigned_url(&document_key)?;
+        let signed_url = self.make_presigned_url(&document_key).await?;
         Ok(LocationResponseData::PresignedUrl(signed_url))
     }
 
@@ -521,6 +528,17 @@ impl<
                 .await
                 .map_err(Into::into)?
         };
+
+        // A part's key is its sha, so each is signed like any other object.
+        if macro_aws_config::is_local_aws() {
+            let mut presigned_urls = Vec::with_capacity(shas.len());
+            for sha in shas {
+                let presigned_url = self.make_presigned_url(&sha).await?;
+                presigned_urls.push(PresignedUrl { presigned_url, sha });
+            }
+
+            return Ok(LocationResponseData::PresignedUrls(presigned_urls));
+        }
 
         let options = self.get_signed_options();
         let distribution_url = &self.cloudfront_config.distribution_url;
@@ -2412,7 +2430,7 @@ impl<
     }
 
     /// Assigns the task properties to a document
-    #[tracing::instrument(skip(self, request), err)]
+    #[tracing::instrument(skip_all, fields(document_id = %document_id), err)]
     async fn handle_task_properties(
         &self,
         principal: &CreationPrincipal,
@@ -2445,11 +2463,13 @@ impl<
                 .collect::<Vec<_>>()
         };
 
+        let mut assigned = std::collections::HashSet::new();
         for property_input in properties {
             let Ok(property_uuid) = uuid::Uuid::parse_str(&property_input.property_id) else {
                 tracing::warn!(property_id=?property_input.property_id, "invalid property_id UUID, skipping");
                 continue;
             };
+            assigned.insert(property_uuid);
 
             let _ = self
                 .task_properties_service
@@ -2465,6 +2485,29 @@ impl<
                             error=?e,
                             property_uuid=?property_uuid,
                             "unable to set entity property")
+                });
+        }
+
+        // An empty selected field still belongs to the task. Persist its assignment
+        // so every authorized viewer reads the definition through this entity,
+        // rather than depending on the creator's personal definition list.
+        for definition_id in request.pinned_property_definition_ids.iter().flatten() {
+            let Ok(property_uuid) = uuid::Uuid::parse_str(definition_id) else {
+                continue;
+            };
+            if !assigned.insert(property_uuid) {
+                continue;
+            }
+            let _ = self
+                .task_properties_service
+                .set_entity_property(principal, document_id, property_uuid, None)
+                .await
+                .inspect_err(|error| {
+                    tracing::warn!(
+                        error = ?error,
+                        property_uuid = %property_uuid,
+                        "unable to assign empty task property"
+                    );
                 });
         }
 

@@ -1,4 +1,5 @@
 import { LocalRuntimeSetupDialog } from '@app/features/local-runtime/views/local-runtime-setup-dialog';
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { useUserId } from '@core/context/user';
 import { fireAndForget } from '@core/util/fireAndForget';
 import { lazyNamed } from '@core/util/lazyNamed';
@@ -140,7 +141,7 @@ export function LocalRuntimePrompt() {
                 Run agents on this computer
               </span>
               <span class="block text-xs text-ink-muted">
-                Use your installed agents and local files in Macro.
+                Use your installed agents and local files in {PRODUCT_NAME}.
               </span>
             </span>
             <span class="shrink-0 text-xs font-medium text-accent">Set up</span>

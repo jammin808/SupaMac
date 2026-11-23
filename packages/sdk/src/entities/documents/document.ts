@@ -29,6 +29,7 @@ import {
 } from '../../utils';
 import type { MacroClient } from '../../utils/client';
 import { rejectUnknownOptions } from '../../utils/options';
+import { webAppLink } from '../../utils/web-app';
 import { Canvas } from '../canvases/canvas';
 import type { Channel } from '../channels/channel';
 import { shareWithChannel } from '../channels/share';
@@ -1218,7 +1219,7 @@ export class Document
     const fileType =
       this.detail.peek()?.fileType ?? this.detail.listedField('fileType');
     const route = fileType && NATIVE_FILE_TYPES.has(fileType) ? fileType : 'md';
-    return `${this.client.webAppUrl}/app/${route}/${this.id}`;
+    return webAppLink(this.client.webAppUrl, `/${route}/${this.id}`);
   }
 
   /** Identity, loaded detail and {@link webUrl}, so serialized handles carry their link. */

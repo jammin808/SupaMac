@@ -52,7 +52,7 @@ test('a draft changed in the mailbox says which version to keep, then that the m
   // The service learns of the conflict on its next write to the mailbox.
   await expect(notice).toBeVisible({ timeout: 30_000 });
   await expect(
-    notice.getByRole('button', { name: 'Keep Macro version', exact: true })
+    notice.getByRole('button', { name: 'Keep SupaMac version', exact: true })
   ).toBeVisible();
   await expect(
     notice.getByRole('button', { name: 'Use mailbox version', exact: true })

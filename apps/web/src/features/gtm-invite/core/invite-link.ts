@@ -4,6 +4,8 @@
  * the token in localStorage until the visitor has an account; the first
  * authenticated load redeems it and the plan step shows the offer.
  */
+
+import { SELF_HOSTED } from '@core/constant/selfHosted';
 import { isTauri } from '@core/util/platform';
 import type { GtmInviteLinkStatus } from '@service-auth/generated/schemas/gtmInviteLinkStatus';
 import { match } from 'ts-pattern';
@@ -32,6 +34,9 @@ export function isPlausibleInviteToken(value: unknown): value is string {
  * prospect, so links always point at the web app.
  */
 export function inviteLinkOrigin(): string {
+  // A self-hosted build names only its own origin; the hosted fallback below
+  // folds out of its bundle.
+  if (SELF_HOSTED) return window.location.origin;
   if (
     typeof window !== 'undefined' &&
     !isTauri() &&

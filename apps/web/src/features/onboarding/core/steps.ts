@@ -11,6 +11,39 @@ export const ONBOARDING_STEPS = [
 ] as const;
 export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];
 
+/**
+ * Steps only the hosted service walks: its product pitch, its company's
+ * security claims, and its paid plans. None describes a self-hosted instance.
+ */
+const HOSTED_ONLY_STEPS: readonly OnboardingStep[] = [
+  'vision',
+  'security',
+  'plan',
+];
+
+/** The steps a deployment's flow walks, in order. */
+export function onboardingSteps(
+  selfHosted: boolean
+): readonly OnboardingStep[] {
+  if (!selfHosted) return ONBOARDING_STEPS;
+  return ONBOARDING_STEPS.filter((step) => !HOSTED_ONLY_STEPS.includes(step));
+}
+
+/**
+ * `step` when `steps` walks it, else the first step of `steps` that follows
+ * it in the full order, so progress saved on a left-out step resumes past it.
+ */
+function firstStepFrom(
+  step: OnboardingStep,
+  steps: readonly OnboardingStep[]
+): OnboardingStep {
+  const onward = ONBOARDING_STEPS.slice(ONBOARDING_STEPS.indexOf(step));
+  return (
+    onward.find((candidate) => steps.includes(candidate)) ??
+    steps[steps.length - 1]
+  );
+}
+
 /** How the user left a step; analytics records it and skipping can fork. */
 export type StepOutcome = 'completed' | 'skipped';
 
@@ -28,19 +61,21 @@ export const isStoryStep = (step: OnboardingStep): step is StoryStep =>
 
 export function nextOnboardingStep(
   step: OnboardingStep,
-  outcome: StepOutcome
+  outcome: StepOutcome,
+  steps: readonly OnboardingStep[] = ONBOARDING_STEPS
 ): OnboardingStep {
   // Without a first account, offering a second account would be misleading.
   if (step === 'work' && outcome === 'skipped') return 'tools';
-  const index = ONBOARDING_STEPS.indexOf(step);
-  return ONBOARDING_STEPS[Math.min(index + 1, ONBOARDING_STEPS.length - 1)];
+  const index = steps.indexOf(step);
+  return steps[Math.min(index + 1, steps.length - 1)];
 }
 
 export function previousOnboardingStep(
-  step: OnboardingStep
+  step: OnboardingStep,
+  steps: readonly OnboardingStep[] = ONBOARDING_STEPS
 ): OnboardingStep | undefined {
-  const index = ONBOARDING_STEPS.indexOf(step);
-  return index > 0 ? ONBOARDING_STEPS[index - 1] : undefined;
+  const index = steps.indexOf(step);
+  return index > 0 ? steps[index - 1] : undefined;
 }
 
 /** A `?step` value that names a current onboarding step. */
@@ -56,11 +91,24 @@ export function parseOnboardingStepParam(
  * Where to open the flow.
  * Checkout return, then saved progress (including legacy names), then a
  * `?step` link, then welcome. A Google sign-up return is passed in as `work`.
+ * A step `steps` leaves out opens the next one it walks.
  */
 export function restoreOnboardingStep(
   saved: unknown,
   checkoutReturn = false,
-  requestedStep?: unknown
+  requestedStep?: unknown,
+  steps: readonly OnboardingStep[] = ONBOARDING_STEPS
+): OnboardingStep {
+  return firstStepFrom(
+    restoredStep(saved, checkoutReturn, requestedStep),
+    steps
+  );
+}
+
+function restoredStep(
+  saved: unknown,
+  checkoutReturn: boolean,
+  requestedStep: unknown
 ): OnboardingStep {
   if (checkoutReturn) return 'plan';
   const resumed = resumeSavedStep(saved);

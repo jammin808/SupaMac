@@ -1,10 +1,12 @@
 import { DEFAULT_ROUTE } from '@app/constants/defaultRoute';
+import { WEB_BASE_PATH } from '@app/constants/routerBase';
 import { openAddInboxDialog } from '@app/features/inbox/AddInboxDialog';
 import { AdminConsentRequiredDialog } from '@app/features/inbox/AdminConsentRequiredDialog';
 import { ShareInboxConflictDialog } from '@app/features/inbox/ShareInboxConflictDialog';
 import { onboardingPathWithStep } from '@app/features/onboarding/core/next-target';
 import { useAnalytics } from '@app/lib/analytics/analytics-context';
 import type { AppEvents } from '@app/lib/analytics/app-events';
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { t } from '@app/lib/i18n';
 import { useFlow, usePending } from '@app/observability/flow';
 import { updateUserAuth } from '@core/auth';
@@ -18,6 +20,8 @@ import {
   announceAlreadyConnected,
   announceConsentCancelled,
   announceLinkedInbox,
+  INBOX_CHANGED_MESSAGE,
+  INBOX_IDENTITY_CONFLICT_MESSAGE,
 } from '@core/email-link/link-outcome';
 import {
   consumeInboxLinkReturn,
@@ -215,7 +219,7 @@ function promptForEmailAccess(scopes: ConsentScopes | undefined) {
       titleColor: 'var(--color-failure)',
       dismissLabel: t('common.maybeLater'),
       content: () =>
-        "Macro connects an account's email and calendar together, so keep the email permissions checked. The account was not connected.",
+        `${PRODUCT_NAME} connects an account's email and calendar together, so keep the email permissions checked. The account was not connected.`,
       actions: [
         {
           label: 'Try again',
@@ -413,6 +417,18 @@ function EmailLinkCallbackHandler(props: Pick<EmailAuthParams, 'successPath'>) {
               navigateAfterLink();
               return;
             }
+            if (err.tag === 'IdentityConflict') {
+              trackOutcome('identity_conflict');
+              toast.failure(INBOX_IDENTITY_CONFLICT_MESSAGE);
+              navigateAfterLink();
+              return;
+            }
+            if (err.tag === 'Changed') {
+              trackOutcome('changed');
+              toast.failure(INBOX_CHANGED_MESSAGE);
+              navigateAfterLink();
+              return;
+            }
             if (err.tag === 'NoGmailGrant') {
               trackOutcome('no_gmail_grant');
               toast.failure(
@@ -567,7 +583,7 @@ function EmailSignUp(
     analytics.pageView('signup');
   });
 
-  const withAppPrefix = (path: string) => `/app${path}`;
+  const withAppPrefix = (path: string) => `${WEB_BASE_PATH}${path}`;
 
   onMount(() => {
     if (emailLinks.data && emailLinks.data.links.length > 0) {

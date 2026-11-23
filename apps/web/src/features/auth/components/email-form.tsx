@@ -12,7 +12,8 @@ export function EmailForm(props: {
   onEmailInput: (value: string) => void;
   onPasswordInput: (value: string) => void;
   onSubmit: () => void;
-  onBack: () => void;
+  /** Absent when the emailed code is the only way in: nothing to go back to. */
+  onBack?: () => void;
 }) {
   return (
     <form
@@ -46,10 +47,12 @@ export function EmailForm(props: {
         Continue
         <ArrowRight class="size-5 shrink-0" />
       </AuthButton>
-      <AuthButton variant="secondary" onClick={props.onBack}>
-        <ArrowLeft class="size-5 shrink-0" />
-        Back to sign in
-      </AuthButton>
+      <Show when={props.onBack}>
+        <AuthButton variant="secondary" onClick={() => props.onBack?.()}>
+          <ArrowLeft class="size-5 shrink-0" />
+          Back to sign in
+        </AuthButton>
+      </Show>
     </form>
   );
 }

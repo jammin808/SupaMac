@@ -1,3 +1,4 @@
+import './lib/core/util/zodContentSecurityPolicy';
 import { initializeBrowserObservability } from './observability/browser';
 import './index.css';
 
@@ -8,10 +9,13 @@ import '@fontsource-variable/playfair-display';
 // import 'solid-devtools';
 import { initializeLexical } from '@core/component/LexicalMarkdown/init';
 import { isTouchDevice } from '@core/mobile/isTouchDevice';
+import { fireAndForget } from '@core/util/fireAndForget';
+import { markHighlightInheritance } from '@core/util/highlightInheritance';
 import { getPlatform } from '@core/util/platform';
 import { installPlatformFetch } from '@core/util/platformFetch';
 import { recoverFromFailedLoad } from '@core/util/reloadForNewerBuild';
 import { Telemetry } from '@macro-inc/observability';
+import { initializeGraphqlSoupCache } from '@service-storage/graphql-soup';
 import { initMonochromeIcons } from '@ui/utils/monochromeIcons';
 import { ErrorBoundary, render } from 'solid-js/web';
 import { FatalError } from './components/app/FatalError';
@@ -34,6 +38,7 @@ const renderApp = () => {
   document.documentElement.dataset.touchDevice = isTouchDevice()
     ? 'true'
     : 'false';
+  markHighlightInheritance();
 
   // Track current input modality (keyboard / mouse / touch) on the document element.
   // Used by hotkeys and other modality-aware behaviors.
@@ -95,6 +100,12 @@ async function main() {
   // A translated interface waits for its messages (already loading, cached
   // after the first visit) so the first screen isn't English for a moment.
   await Promise.all([observabilityReady(), languageReady()]);
+  // Install the shared host before login/request producers mount. Its local
+  // handshake runs in the background; the first screen never waits for storage.
+  fireAndForget(
+    initializeGraphqlSoupCache().then(() => perfMark('boot.cache-ready')),
+    'graphql-cache-startup'
+  );
   try {
     await prepareNotificationLaunch();
   } catch (error) {

@@ -2,6 +2,7 @@ import type {
   AccountDeletionReason,
   AppEvents,
 } from '@app/lib/analytics/app-events';
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 
 export const ACCOUNT_DELETION_FEEDBACK_MAX_LENGTH = 500;
 
@@ -9,14 +10,14 @@ export const ACCOUNT_DELETION_REASON_OPTIONS: ReadonlyArray<{
   value: AccountDeletionReason;
   label: string;
 }> = [
-  { value: 'not_using_enough', label: "I don't use Macro enough" },
+  { value: 'not_using_enough', label: `I don't use ${PRODUCT_NAME} enough` },
   { value: 'missing_features', label: "I'm missing features I need" },
-  { value: 'difficult_to_use', label: 'Macro is difficult to use' },
+  { value: 'difficult_to_use', label: `${PRODUCT_NAME} is difficult to use` },
   {
     value: 'bugs_or_performance',
     label: "I've experienced bugs or performance issues",
   },
-  { value: 'too_expensive', label: 'Macro is too expensive' },
+  { value: 'too_expensive', label: `${PRODUCT_NAME} is too expensive` },
   {
     value: 'prefer_another_product',
     label: 'I prefer another product',

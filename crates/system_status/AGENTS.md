@@ -2,9 +2,11 @@
 
 ## What it is
 
-Platform status banner: Macro staff set the status (operational, degraded,
+Platform status banner: staff set the status (operational, degraded,
 major outage with a message) and every user sees a banner while it is not
-operational. Each update is kept as history; the newest is current.
+operational. Each update is kept as history; the newest is current. Staff are
+the accounts the host names with `SystemStatusServiceImpl::with_staff`; with
+none named, nobody may set the status or read its history.
 
 ## How it works
 
@@ -20,7 +22,8 @@ remembers a dismissal by that id.
 
 - `src/domain/models.rs`: `SystemStatus` (message only on non-operational
   variants, enforced again by the table's CHECK) and the wire shapes.
-- `src/domain/service.rs`: staff check, store, then best-effort broadcast.
+- `src/domain/service.rs`: staff check against the named staff, store, then
+  best-effort broadcast.
 - `src/inbound/axum_router/set_status.rs`: the documented endpoint staff call.
 
 ## Scope

@@ -1,4 +1,5 @@
 import { isListViewID } from '@app/constants/list-views';
+import { WEB_BASE_PATH } from '@app/constants/routerBase';
 import { getPreferredCalendarPeriodView } from '@app/features/calendar/calendar-preferences';
 import { openCalendarView } from '@app/features/calendar-view/calendar-navigation';
 import {
@@ -248,18 +249,18 @@ export const openEntityInNewTab = ({
   // Build URL for the entity
   let entityPath: string;
   if (entity.type === 'calendar_event') {
-    entityPath = `/app${calendarPath(getPreferredCalendarPeriodView())}`;
+    entityPath = `${WEB_BASE_PATH}${calendarPath(getPreferredCalendarPeriodView())}`;
   } else if (entity.type === 'document') {
     const { fileType, subType } = entity;
     const blockName = fileTypeToBlockName(subType?.type ?? fileType);
-    entityPath = `/app/${blockName}/${entity.id}`;
+    entityPath = `${WEB_BASE_PATH}/${blockName}/${entity.id}`;
   } else if (
     entity.type === 'channel_message' ||
     entity.type === 'channel_thread'
   ) {
-    entityPath = `/app/channel/${entity.channelId}`;
+    entityPath = `${WEB_BASE_PATH}/channel/${entity.channelId}`;
   } else {
-    entityPath = `/app/${entity.type === 'agent_session' ? 'agent' : entity.type}/${entity.id}`;
+    entityPath = `${WEB_BASE_PATH}/${entity.type === 'agent_session' ? 'agent' : entity.type}/${entity.id}`;
   }
 
   // Add location params if present

@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { toast } from '@core/component/Toast/Toast';
 import { ConnectedAppIcon } from '@core/pipedream/ConnectedAppIcon';
 import { createPipedreamCatalogConnect } from '@core/pipedream/catalog';
@@ -128,7 +129,7 @@ export function LeftoverRow(props: {
 
   const remove = (connected: boolean) => {
     const leftover = props.leftover;
-    const ok = connected ? 'Disconnected from Macro' : 'Removed';
+    const ok = connected ? `Disconnected from ${PRODUCT_NAME}` : 'Removed';
     const fail = connected ? 'Failed to disconnect' : 'Failed to remove';
     match(leftover)
       .with({ kind: 'native-mcp' }, (row) => {
@@ -169,7 +170,7 @@ export function LeftoverRow(props: {
 
   const askRemove = (connected: boolean) =>
     setDisconnect({
-      title: connected ? 'Disconnect from Macro' : 'Remove',
+      title: connected ? `Disconnect from ${PRODUCT_NAME}` : 'Remove',
       body: connected
         ? `Disconnect ${props.leftover.title}?`
         : `Remove ${props.leftover.title}?`,
@@ -323,7 +324,7 @@ export function LeftoverRow(props: {
             connectionFailed()
               ? `Last attempt failed · ${item.subtitle}`
               : props.overlaidAppSlug
-                ? 'Agents can use this app when you ask them to. Nothing is copied into Macro.'
+                ? `Agents can use this app when you ask them to. Nothing is copied into ${PRODUCT_NAME}.`
                 : item.subtitle
           }
           categories={leftoverCategories(item, props.overlaidAppSlug)}
@@ -339,7 +340,7 @@ export function LeftoverRow(props: {
           icon={<ConnectedAppIcon appSlug={item.appSlug} class="size-5" />}
           name={item.title}
           kind="mcp"
-          description="Agents can use this app when you ask them to. Nothing is copied into Macro."
+          description={`Agents can use this app when you ask them to. Nothing is copied into ${PRODUCT_NAME}.`}
           categories={['Agent tools']}
           status={status()}
           muted={status() === 'disconnected'}

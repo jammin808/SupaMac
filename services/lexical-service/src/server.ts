@@ -1,4 +1,5 @@
 import './polyfills/prism';
+import { configureAppLinksFromEnv } from './app-links';
 import app from './index';
 
 const PORT = parseInt(process.env.PORT || '8096', 10);
@@ -37,6 +38,12 @@ for (const varName of requiredVars) {
     process.exit(1);
   }
 }
+
+// Links in converted documents follow APP_URL and STATIC_FILE_URL.
+configureAppLinksFromEnv({
+  APP_URL: process.env.APP_URL,
+  STATIC_FILE_URL: process.env.STATIC_FILE_URL,
+});
 
 const server = Bun.serve({
   port: PORT,

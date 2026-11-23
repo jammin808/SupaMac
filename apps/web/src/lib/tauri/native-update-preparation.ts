@@ -1,3 +1,5 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
+
 /** Owned by one Tauri provider; editors register saves while they are mounted. */
 export function createNativeUpdatePreparation(options: {
   isBlocked(): boolean;
@@ -14,12 +16,14 @@ export function createNativeUpdatePreparation(options: {
     async prepare() {
       if (options.isBlocked())
         throw new Error(
-          'Finish your call, upload, or import before restarting Macro.'
+          `Finish your call, upload, or import before restarting ${PRODUCT_NAME}.`
         );
       await Promise.all([...saves].map((save) => save()));
       await options.flush();
       if (options.isBlocked())
-        throw new Error('Finish your current work before restarting Macro.');
+        throw new Error(
+          `Finish your current work before restarting ${PRODUCT_NAME}.`
+        );
     },
   };
 }

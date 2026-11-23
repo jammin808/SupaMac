@@ -1,25 +1,32 @@
 import { MacroError } from '../../utils';
 import type { MacroClient } from '../../utils/client';
+import { webAppBase, webAppLink } from '../../utils/web-app';
 
-/** Hosts a Macro app link may name, besides the client's own web app. */
-const MACRO_HOSTS = ['macro.com', 'dev.macro.com', 'staging.macro.com'];
+/** The path after `basePath`, or undefined for a path outside it. */
+function pathUnder(pathname: string, basePath: string): string | undefined {
+  if (pathname === basePath) return '/';
+  if (!pathname.startsWith(`${basePath}/`)) return undefined;
+  return pathname.slice(basePath.length);
+}
 
 /**
- * A Macro app link, reduced to the app path it opens: a list view such as
- * Tasks or Mail, or an item. Made by `macro.ui.link(url)`; it keeps no origin.
+ * A link into this client's web app, reduced to the app path it opens: a list
+ * view such as Tasks or Mail, or an item. Made by `macro.ui.link(url)`; it
+ * keeps no origin.
  *
  * @mcp-exclude Only `macro.ui.open` takes it, which MCP leaves out.
  */
 export class AppLink {
   private constructor(
     private readonly client: MacroClient,
-    /** The path after `/app`, with its query, such as `/tasks?s0.tasks.tab=mine`. */
+    /** The path after the app's base path, with its query, such as `/tasks?s0.tasks.tab=mine`. */
     readonly path: string,
   ) {}
 
   /**
-   * Parse a Macro app link (`https://macro.com/app/...`). Throws on anything
-   * else: another site, a path outside `/app`, or a link with a fragment.
+   * Parse a link into this client's web app (`<webAppUrl>/app/...`, or under
+   * the base path `webAppUrl` names). Throws on anything else: another site,
+   * a path outside the app, or a link with a fragment.
    */
   static parse(client: MacroClient, url: string): AppLink {
     let parsed: URL;
@@ -29,29 +36,29 @@ export class AppLink {
       throw new MacroError(`Not a Macro app link: ${url}`);
     }
 
-    const own = new URL(client.webAppUrl);
-    const ownHost = own.hostname;
+    const { origin, basePath } = webAppBase(client.webAppUrl);
+    const own = new URL(origin);
     const host = parsed.hostname.toLowerCase().replace(/^www\./, '');
-    const macroHost = host === ownHost || MACRO_HOSTS.includes(host);
-    const appPath =
-      parsed.pathname === '/app' || parsed.pathname.startsWith('/app/');
+    const path = pathUnder(parsed.pathname, basePath);
     const secure =
       parsed.protocol === 'https:' ||
       // A local web app is served over http.
-      (parsed.protocol === 'http:' &&
-        own.protocol === 'http:' &&
-        host === ownHost);
-    if (!macroHost || !appPath || !secure || parsed.hash !== '') {
+      (parsed.protocol === 'http:' && own.protocol === 'http:');
+    if (
+      host !== own.hostname ||
+      path === undefined ||
+      !secure ||
+      parsed.hash !== ''
+    ) {
       throw new MacroError(`Not a Macro app link: ${url}`);
     }
 
-    const path = parsed.pathname.slice('/app'.length) || '/';
     return new AppLink(client, `${path}${parsed.search}`);
   }
 
   /** The link on this client's web app, for a reply. */
   webUrl(): string {
-    return `${this.client.webAppUrl}/app${this.path}`;
+    return webAppLink(this.client.webAppUrl, this.path);
   }
 
   toJSON() {

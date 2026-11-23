@@ -213,9 +213,9 @@ describe('already in Macro', () => {
   const withCopies = entries.map(
     (entry): ImportPlanEntry =>
       entry.id === 'wiki'
-        ? { ...entry, alreadyImported: copy('ana@acme.com') }
+        ? { ...entry, alreadyImported: copy('ana@example.com') }
         : entry.id === 'q3'
-          ? { ...entry, alreadyImported: copy('bo@acme.com') }
+          ? { ...entry, alreadyImported: copy('bo@example.com') }
           : entry
   );
 
@@ -230,7 +230,7 @@ describe('already in Macro', () => {
       planTreeEntries(
         entries.map((entry) =>
           entry.id === 'roadmap'
-            ? { ...entry, alreadyImported: copy('ana@acme.com') }
+            ? { ...entry, alreadyImported: copy('ana@example.com') }
             : entry
         )
       )
@@ -248,7 +248,7 @@ describe('already in Macro', () => {
     expect(volumeLabel(importVolume(withCopies, []))).toBe('40 tasks');
     expect(planCounts(withCopies).pages).toBe(4);
     expect(alreadyInMacroSummary(withCopies)).toBe(
-      '2 already in Macro (imported by ana@acme.com, bo@acme.com)'
+      '2 already in SupaMac (imported by ana@example.com, bo@example.com)'
     );
     expect(alreadyInMacroSummary(entries)).toBe('');
   });
@@ -432,7 +432,7 @@ describe('planTotals', () => {
       id: 'crm',
       title: 'CRM',
       alreadyImported: {
-        by: 'ana@acme.com',
+        by: 'ana@example.com',
         entityId: 'db',
         entityType: 'database',
       },
@@ -442,7 +442,7 @@ describe('planTotals', () => {
       { label: 'Databases', value: '1 (405 rows)' },
       { label: 'Task lists', value: '1 (40 tasks)' },
       { label: 'Skipped', value: '1' },
-      { label: 'Already in Macro', value: '1' },
+      { label: 'Already in SupaMac', value: '1' },
     ]);
   });
 });

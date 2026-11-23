@@ -17,6 +17,8 @@ pub use colleague_joined::ColleagueJoinedMacro;
 
 use askama::Template;
 use macro_env::Environment;
+use macro_env_var::maybe_env_vars;
+use macro_service_urls::AppServiceUrl;
 use macro_user_id::cowlike::CowLike;
 use macro_user_id::email::EmailStr;
 use macro_user_id::email::ReadEmailParts;
@@ -29,6 +31,7 @@ use notification::domain::models::{
     queue_message::EmailContent,
 };
 use serde::{Deserialize, Serialize};
+use std::sync::LazyLock;
 use std::time::Duration;
 use url::Url;
 use utoipa::ToSchema;
@@ -77,8 +80,7 @@ pub struct InviteToMacro {
 
 impl InviteToMacro {
     fn referral_url(&self) -> Url {
-        let env = Environment::new_or_prod();
-        get_url(env, &self.referral_code)
+        get_url(web_app_url(), &self.referral_code)
     }
 }
 
@@ -88,28 +90,82 @@ impl Notification for InviteToMacro {
 
 const MINUTES_PER_WEEK: u64 = 60 * 24 * 7;
 
-fn frontend_host(env: Environment) -> Url {
-    let host = match env {
-        Environment::Production => "https://macro.com".to_string(),
-        Environment::Develop => "https://dev.macro.com".to_string(),
-        Environment::Local => {
-            #[expect(clippy::disallowed_methods, reason = "Only used when running locally")]
-            let port = std::env::var("FRONTEND_PORT").unwrap_or_else(|_| "3000".to_string());
-            format!("http://localhost:{port}")
-        }
-    };
-
-    Url::parse(&host).expect("all the inputs are static, valid values")
+maybe_env_vars! {
+    struct FrontendOrigin;
 }
 
-fn signup_url(env: Environment) -> Url {
-    let mut url = frontend_host(env);
-    url.set_path("/app/signup");
+/// The folder the web app is served from below a bare origin.
+const DEFAULT_APP_PATH: &str = "/app/";
+
+/// The web app's root, ending in `/`, that every link in these emails starts
+/// from. It is read once per process.
+pub fn web_app_url() -> &'static Url {
+    static ROOT: LazyLock<Url> = LazyLock::new(|| {
+        let env = Environment::new_or_prod();
+        let frontend_origin = FrontendOrigin::new();
+        let app_service_url = AppServiceUrl::new_for_environment(env)
+            .unwrap_or_else(|_| AppServiceUrl::default_for_environment(env));
+        web_app_root(
+            env,
+            frontend_origin.as_ref().and_then(FrontendOrigin::value),
+            &app_service_url,
+        )
+    });
+    &ROOT
+}
+
+/// The logo shown at the top of these emails, a file of the web app's bundle.
+pub fn email_logo_url() -> Url {
+    web_app_link(web_app_url(), &["macro-email-logo.png"])
+}
+
+/// The web app's root for a deployment. A stack that names its frontend in
+/// `FRONTEND_ORIGIN`, as the authentication service reads it for redirects,
+/// links there: a self-hosted stack gives the folder its bundle is served
+/// from, and a developer stack a bare origin. A deployment that names none,
+/// or names something that is not a web address, uses the app's typed service
+/// URL. The web app is served at `/app` below a bare origin.
+pub fn web_app_root(env: Environment, frontend_origin: Option<&str>, app_service_url: &str) -> Url {
+    let mut root = frontend_origin
+        .and_then(web_origin)
+        .or_else(|| web_origin(app_service_url))
+        .or_else(|| web_origin(&AppServiceUrl::default_for_environment(env)))
+        .expect("the default app service URL is a web address");
+
+    root.set_query(None);
+    root.set_fragment(None);
+    if root.path() == "/" {
+        root.set_path(DEFAULT_APP_PATH);
+    } else if !root.path().ends_with('/') {
+        let folder = format!("{}/", root.path());
+        root.set_path(&folder);
+    }
+    root
+}
+
+/// Parses an http or https address that paths can be added to.
+fn web_origin(address: &str) -> Option<Url> {
+    Url::parse(address)
+        .ok()
+        .filter(|url| matches!(url.scheme(), "http" | "https") && !url.cannot_be_a_base())
+}
+
+/// A page of the web app below `root`. Each segment is percent-encoded, so a
+/// value from a payload stays one path segment.
+fn web_app_link(root: &Url, segments: &[&str]) -> Url {
+    let mut url = root.clone();
+    if let Ok(mut path) = url.path_segments_mut() {
+        path.pop_if_empty().extend(segments);
+    }
     url
 }
 
-fn get_url(env: Environment, code: &ReferralCode) -> Url {
-    let mut url = signup_url(env);
+fn signup_url(root: &Url) -> Url {
+    web_app_link(root, &["signup"])
+}
+
+fn get_url(root: &Url, code: &ReferralCode) -> Url {
+    let mut url = signup_url(root);
     url.query_pairs_mut()
         .clear()
         .append_pair("referral_code", &code.0)
@@ -180,7 +236,7 @@ pub struct ChannelInviteMetadata {
 
 impl ChannelInviteMetadata {
     fn signup_url(&self) -> Url {
-        signup_url(Environment::new_or_prod())
+        signup_url(web_app_url())
     }
 
     fn sender_display(&self) -> &str {
@@ -356,21 +412,18 @@ pub enum InviteePlan {
 const MAX_BUTTON_TEAM_NAME_CHARS: usize = 24;
 
 impl InviteToTeamMetadata {
-    /// Returns the team invite URL for the current environment.
+    /// Returns the team invite URL in the web app.
     pub fn invite_url(&self) -> Url {
-        let env = Environment::new_or_prod();
-
-        let mut url = frontend_host(env);
         let invite_id = self.team_invite_id.to_string();
         if self.is_agent {
-            url.set_path("/app/signup/agent");
+            let mut url = web_app_link(web_app_url(), &["signup", "agent"]);
             url.query_pairs_mut().append_pair("team_invite", &invite_id);
+            url
         } else {
-            url.set_path("/app/team-invite");
+            let mut url = web_app_link(web_app_url(), &["team-invite"]);
             url.query_pairs_mut().append_pair("id", &invite_id);
+            url
         }
-
-        url
     }
 
     fn inviter_email(&self) -> &str {

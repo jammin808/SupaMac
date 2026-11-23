@@ -9,6 +9,8 @@ import { calendarPath } from '@app/features/calendar-view/calendar-url';
 import { CALENDAR_VIEW_ID } from '@app/features/calendar-view/types';
 import { DEFAULT_EMAIL_TAB } from '@app/features/email-view/constants';
 import { emailTabSearchUpdate } from '@app/features/email-view/email-route';
+import type { NewHomeMode } from '@app/features/new-home/core/new-home-mode';
+import { useNewHomeMode } from '@app/features/new-home/use-new-home-mode';
 import { requestSearchFocus } from '@app/features/next-soup/soup-view/search-controllers';
 import { useRecentViewFlag } from '@app/features/next-soup/use-recent-view-flag';
 import { useUnifiedNotificationsFlag } from '@app/features/notifications-inbox/use-unified-notifications-flag';
@@ -40,6 +42,7 @@ import {
   enableTasksReviews,
   enableWhatsappLinked,
 } from '@core/constant/featureFlags';
+import { SELF_HOSTED } from '@core/constant/servers';
 import { registerHotkey } from '@core/hotkey/hotkeys';
 import { type HotkeyToken, TOKENS } from '@core/hotkey/tokens';
 import type { ValidHotkey } from '@core/hotkey/types';
@@ -55,6 +58,7 @@ import PaperPlaneTiltIcon from '@icon/system/regular/paper-plane-tilt.svg';
 import PlugIcon from '@icon/system/regular/plug.svg';
 import ActivityIcon from '@icon/system/regular/pulse.svg';
 import { ContextMenu } from '@kobalte/core/context-menu';
+import { crmAccessAllowed } from '@service-storage/crm-access-authority';
 import { cn } from '@ui';
 import {
   type Component,
@@ -256,21 +260,25 @@ export function navigateToSidebarView(args: {
 export const GoToHotkeys = () => {
   const { openWithSplit } = useSplitLayout();
 
-  const inviteHotkey = registerHotkey({
-    scopeId: 'global',
-    hotkeyToken: TOKENS.global.inviteTeam,
-    description: () => t('nav.sendInvites'),
-    keyDownHandler: (e) => {
-      e?.preventDefault();
-      setInviteModalOpen(true);
-      return true;
-    },
-  });
+  // A self-hosted instance has no invitation programme to open.
+  const inviteHotkey = SELF_HOSTED
+    ? undefined
+    : registerHotkey({
+        scopeId: 'global',
+        hotkeyToken: TOKENS.global.inviteTeam,
+        description: () => t('nav.sendInvites'),
+        keyDownHandler: (e) => {
+          e?.preventDefault();
+          setInviteModalOpen(true);
+          return true;
+        },
+      });
 
   const activityFeedEnabled = useActivityFeedFlag();
   const recentViewEnabled = useRecentViewFlag();
   const reviews = useFeatureFlag(enableTasksReviews);
   const notificationsEnabled = useUnifiedNotificationsFlag();
+  const homeMode = useNewHomeMode();
   const external = useFeatureFlag(enableWhatsappLinked);
   const links = createMemo((): SidebarItem[] =>
     buildSidebarLinks(
@@ -278,7 +286,9 @@ export const GoToHotkeys = () => {
       recentViewEnabled(),
       reviews().enabled,
       notificationsEnabled(),
-      external().enabled
+      external().enabled,
+      crmAccessAllowed(),
+      homeMode()
     )
   );
 
@@ -287,7 +297,7 @@ export const GoToHotkeys = () => {
   // Send Invites registers in the 'global' scope, which outlives this
   // component, so dispose it on unmount. The per-link nav hotkeys below are
   // disposed by their own effect cleanup.
-  onCleanup(() => inviteHotkey.dispose());
+  onCleanup(() => inviteHotkey?.dispose());
 
   // Register navigation shortcuts in the global GO_TO command scope.
   // This must be reactive because prod feature flags can add links after the
@@ -388,6 +398,18 @@ const NOTIFICATIONS_LINK: SidebarItem = {
   hotkeyToken: TOKENS.sidebar.goTo.notifications,
 };
 
+/** `g h` with New Home on: New Home, on the tab it was left on. */
+const newHomeLink = (label: () => string): SidebarItem => ({
+  id: 'new-home',
+  get label() {
+    return label();
+  },
+  href: '/new-home',
+  icon: HomeIcon,
+  hotkey: 'h',
+  hotkeyToken: TOKENS.sidebar.goTo.home,
+});
+
 const ACTIVITY_LINK: SidebarItem = {
   id: 'activity',
   get label() {
@@ -440,14 +462,17 @@ const EXTERNAL_LINK: SidebarItem = {
  * flag-gated Notifications, Recent, Activity, Calls, Reviews,
  * and External entries in their correct positions. Callers subscribe to the
  * flags and pass them in, so a flag that resolves after mount still rebuilds
- * the list.
+ * the list. With New Home on, `g h` is New Home's alone and Notifications
+ * has no letter: it is a New Home tab.
  */
 export const buildSidebarLinks = (
   showActivity: boolean,
   showRecent: boolean,
   showReviews: boolean,
   showNotifications: boolean,
-  showExternal: boolean
+  showExternal: boolean,
+  canAccessCrm: boolean,
+  homeMode: NewHomeMode | undefined
 ): SidebarItem[] => {
   let links: SidebarItem[] = SIDEBAR_LINKS;
 
@@ -458,7 +483,13 @@ export const buildSidebarLinks = (
 
   // Home leads; Notifications, Recent and Activity follow it in that order.
   let anchorId = 'home';
-  if (showNotifications) {
+  if (homeMode === 'both' || homeMode === 'new-only') {
+    const newHome = newHomeLink(() =>
+      homeMode === 'both' ? t('home.newHome') : t('nav.home')
+    );
+    links = links.map((link) => (link.id === 'home' ? newHome : link));
+    anchorId = 'new-home';
+  } else if (showNotifications) {
     links = links.map((link) => (link.id === 'home' ? homeLink('h') : link));
     insertAfter(anchorId, NOTIFICATIONS_LINK);
     anchorId = 'notifications';
@@ -474,14 +505,16 @@ export const buildSidebarLinks = (
     links = [...links.slice(0, idx + 1), CALLS_LINK, ...links.slice(idx + 1)];
   }
 
-  // Customers sits just after Channels (and Calls when present).
-  const customersAnchorId = ENABLE_CALLS ? 'calls' : 'channels';
-  const customersIdx = links.findIndex((l) => l.id === customersAnchorId);
-  links = [
-    ...links.slice(0, customersIdx + 1),
-    COMPANIES_LINK,
-    ...links.slice(customersIdx + 1),
-  ];
+  if (canAccessCrm) {
+    // Customers sits just after Channels (and Calls when present).
+    const customersAnchorId = ENABLE_CALLS ? 'calls' : 'channels';
+    const customersIdx = links.findIndex((l) => l.id === customersAnchorId);
+    links = [
+      ...links.slice(0, customersIdx + 1),
+      COMPANIES_LINK,
+      ...links.slice(customersIdx + 1),
+    ];
+  }
 
   if (showReviews) {
     // Reviews sits at the end (accessed via More menu but has a hotkey).

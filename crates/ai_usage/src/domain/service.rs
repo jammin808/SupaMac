@@ -1,20 +1,12 @@
 //! The cost service: resolves pricing, records usage, and answers queries.
 
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use chrono::Utc;
 
 use super::counting::AiUsageEnforcement;
 use super::ports::*;
-
-/// The existing Macro-admin policy for usage reporting and price changes.
-fn require_admin(actor: &macro_user_id::user_id::MacroUserIdStr<'_>) -> Result<()> {
-    if actor.email_str().ends_with("@macro.com") {
-        Ok(())
-    } else {
-        Err(UsageError::Forbidden)
-    }
-}
 
 /// Usage paid for by an agent's own API key never counts toward a quota.
 fn counts(enforcement: AiUsageEnforcement, event: &UsageEvent) -> bool {
@@ -30,14 +22,41 @@ fn counts(enforcement: AiUsageEnforcement, event: &UsageEvent) -> bool {
 pub struct UsageServiceImpl<Repo> {
     repo: Repo,
     enforcement: AiUsageEnforcement,
+    /// The only people who may read usage reports or change prices: empty
+    /// unless the host names them, so nobody may by default.
+    admins: Arc<[macro_user_id::user_id::MacroUserIdStr<'static>]>,
 }
 
 impl<Repo> UsageServiceImpl<Repo> {
-    /// Construct the service with prospective quota counting disabled.
+    /// Construct the service with prospective quota counting disabled and no
+    /// admins.
     pub fn new(repo: Repo) -> Self {
         Self {
             repo,
             enforcement: AiUsageEnforcement::Disabled,
+            admins: Arc::from([]),
+        }
+    }
+
+    /// Let `admins` read usage reports and change model prices.
+    #[must_use]
+    pub fn with_admins(
+        mut self,
+        admins: impl IntoIterator<Item = macro_user_id::user_id::MacroUserIdStr<'static>>,
+    ) -> Self {
+        self.admins = admins.into_iter().collect();
+        self
+    }
+
+    fn require_admin(&self, actor: &macro_user_id::user_id::MacroUserIdStr<'_>) -> Result<()> {
+        if self
+            .admins
+            .iter()
+            .any(|admin| admin.as_ref() == actor.as_ref())
+        {
+            Ok(())
+        } else {
+            Err(UsageError::Forbidden)
         }
     }
 
@@ -157,7 +176,7 @@ where
         actor: macro_user_id::user_id::MacroUserIdStr<'static>,
         params: UsageApiParams,
     ) -> Result<UsageSummary> {
-        require_admin(&actor)?;
+        self.require_admin(&actor)?;
         let rows = self.repo.query_usage(&params).await?;
         Ok(summarize(rows))
     }
@@ -169,7 +188,7 @@ where
         model: String,
         pricing: ModelPricing,
     ) -> Result<()> {
-        require_admin(&actor)?;
+        self.require_admin(&actor)?;
         let pricing = pricing.validate()?;
         self.repo.set_pricing(&model, pricing).await
     }

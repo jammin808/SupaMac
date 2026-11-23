@@ -1,6 +1,15 @@
+import { SELF_HOSTED } from '@core/constant/servers';
 import { ToggleSwitch } from '@ui';
 import { Show } from 'solid-js';
 import { BotFormSection } from './BotFormSection';
+
+/**
+ * The hosted service's guide to connecting an agent. A self-hosted instance
+ * has no copy of it, so it shows no link.
+ */
+const AGENT_SETUP_GUIDE_URL = SELF_HOSTED
+  ? undefined
+  : 'https://macro.com/docs/AI/bring-your-own';
 
 export function BotAgentSection(props: {
   checked: boolean;
@@ -29,17 +38,19 @@ export function BotAgentSection(props: {
         />
       </div>
 
-      <Show when={props.checked}>
-        <div class="mt-4 border-t border-edge-muted pt-3">
-          <a
-            class="inline-flex h-7 items-center rounded-md border border-edge-muted px-2 text-xs font-medium text-ink-muted hover:bg-hover hover:text-ink"
-            href="https://macro.com/docs/AI/bring-your-own"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Connecting an agent? View setup guide
-          </a>
-        </div>
+      <Show when={props.checked && AGENT_SETUP_GUIDE_URL}>
+        {(href) => (
+          <div class="mt-4 border-t border-edge-muted pt-3">
+            <a
+              class="inline-flex h-7 items-center rounded-md border border-edge-muted px-2 text-xs font-medium text-ink-muted hover:bg-hover hover:text-ink"
+              href={href()}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Connecting an agent? View setup guide
+            </a>
+          </div>
+        )}
       </Show>
     </BotFormSection>
   );

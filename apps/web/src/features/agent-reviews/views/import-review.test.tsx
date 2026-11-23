@@ -466,7 +466,7 @@ describe('import review', () => {
         shared: true,
         shareable: true,
         alreadyImported: {
-          by: 'ana@acme.com',
+          by: 'ana@example.com',
           entityId: 'doc-wiki',
           entityType: 'md',
         },
@@ -476,7 +476,7 @@ describe('import review', () => {
         decision: 'copy',
         rows: 12,
         alreadyImported: {
-          by: 'bo@acme.com',
+          by: 'bo@example.com',
           entityId: 'db-crm',
           entityType: 'database',
         },
@@ -484,7 +484,7 @@ describe('import review', () => {
       entity('old', null, 'Old', {
         decision: 'copy',
         alreadyImported: {
-          by: 'ana@acme.com',
+          by: 'ana@example.com',
           entityId: 'legacy',
           entityType: 'no-such-type',
         },
@@ -497,15 +497,15 @@ describe('import review', () => {
     expect(screen.getByRole('button', { name: 'Import 1 page' })).toBeTruthy();
 
     const disclosure = screen.getByRole('button', {
-      name: '3 already in Macro (imported by ana@acme.com, bo@acme.com)',
+      name: '3 already in SupaMac (imported by ana@example.com, bo@example.com)',
     });
     expect(disclosure.getAttribute('aria-expanded')).toBe('false');
     expect(screen.queryByRole('link', { name: 'Wiki' })).toBeNull();
 
     fireEvent.click(disclosure);
     expect(disclosure.getAttribute('aria-expanded')).toBe('true');
-    const section = screen.getByRole('region', { name: 'Already in Macro' });
-    expect(within(section).getAllByText('by ana@acme.com')).toHaveLength(2);
+    const section = screen.getByRole('region', { name: 'Already in SupaMac' });
+    expect(within(section).getAllByText('by ana@example.com')).toHaveLength(2);
     expect(within(section).getByText('Old')).toBeTruthy();
     expect(within(section).queryByRole('link', { name: 'Old' })).toBeNull();
     expect(

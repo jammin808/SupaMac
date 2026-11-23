@@ -16,9 +16,7 @@ pub struct CallInvite {
 
 impl CallInvite {
     fn join_url(&self) -> Url {
-        let mut url = frontend_host(Environment::new_or_prod());
-        url.set_path(&format!("/app/meet/join/{}", self.share_token));
-        url
+        web_app_link(web_app_url(), &["meet", "join", &self.share_token])
     }
 
     fn sender_display(&self) -> &str {

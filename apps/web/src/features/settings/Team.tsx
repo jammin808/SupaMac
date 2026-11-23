@@ -1,5 +1,6 @@
 import { ListSkeleton } from '@app/components/view-shell/ListSkeleton';
 import { useFeatureFlag } from '@app/lib/analytics/posthog';
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { t } from '@app/lib/i18n';
 import { enableAgentTeammates } from '@core/constant/featureFlags';
 import { useUserId } from '@core/context/user';
@@ -666,8 +667,9 @@ function InviteHeadsUpStep(props: {
               </Show>
             </div>
             <div class="text-sm text-ink-muted">
-              Invite emails from Macro are easy to miss. Send the invite link in
-              Slack, a text, or your own email so they know to look for it.
+              Invite emails from {PRODUCT_NAME} are easy to miss. Send the
+              invite link in Slack, a text, or your own email so they know to
+              look for it.
             </div>
           </div>
           <Show when={props.emails.length > 1}>

@@ -13,6 +13,7 @@ import type {
 import { formatMessage, lookupMessage, pluralForm } from './dictionary';
 import { browserLanguage, DEFAULT_LANGUAGE, Language } from './languages';
 import en from './locales/en';
+import { withProductName } from './product-name';
 
 const STORAGE_KEY = 'interface-language-v1';
 
@@ -204,8 +205,9 @@ type MessageParams<K extends TranslationKey> = K extends PluralKey
 /**
  * The message for `key` in the interface language, falling back to English,
  * with numbers written for {@link formatLocale}. A plural message picks the
- * form for `params.count`. Reactive: reading it inside JSX or a memo updates
- * when the language changes.
+ * form for `params.count`. The catalogs' name for the product is shown as the
+ * product's own ({@link withProductName}). Reactive: reading it inside JSX or
+ * a memo updates when the language changes.
  */
 export function t<K extends TranslationKey>(
   key: K,
@@ -215,16 +217,13 @@ export function t<K extends TranslationKey>(
     ? undefined
     : lookupMessage(translation(), key);
   const message = translated ?? lookupMessage(en, key) ?? key;
+  const messageLanguage = translated ? language() : DEFAULT_LANGUAGE;
   const template =
     typeof message === 'string'
       ? message
-      : pluralForm(
-          message,
-          Number(params?.count ?? 0),
-          translated ? language() : DEFAULT_LANGUAGE
-        );
+      : pluralForm(message, Number(params?.count ?? 0), messageLanguage);
   return formatMessage(
-    template,
+    withProductName(template, key, messageLanguage),
     params,
     englishOnly ? DEFAULT_LANGUAGE : formatLocale()
   );

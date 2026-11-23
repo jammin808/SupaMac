@@ -130,7 +130,7 @@ async fn provider_sync_cannot_replace_approved_body_envelope_or_sender(
     )
     .execute(&pool)
     .await?;
-    let claim = claim_delivery(&pool, link(), message(), 300)
+    let claim = claim_delivery(&pool, link(), message(), 300, "example.com")
         .await?
         .unwrap();
     let (prepared, sender) = load_delivery_content(&pool, &claim).await?;
@@ -178,7 +178,7 @@ async fn older_graphql_attempt_without_prepared_content_requires_review(
     )
     .execute(&pool)
     .await?;
-    let claim = claim_delivery(&pool, link(), message(), 300)
+    let claim = claim_delivery(&pool, link(), message(), 300, "example.com")
         .await?
         .unwrap();
     let error = load_delivery_content(&pool, &claim).await.unwrap_err();
@@ -199,7 +199,9 @@ async fn older_graphql_attempt_without_prepared_content_requires_review(
 async fn legacy_rest_delivery_still_loads_current_message(pool: PgPool) -> anyhow::Result<()> {
     let link = Uuid::parse_str("00000000-0000-0000-0000-000000000e01").unwrap();
     let message = Uuid::parse_str("00000000-0000-0000-0000-00000000e501").unwrap();
-    let claim = claim_delivery(&pool, link, message, 300).await?.unwrap();
+    let claim = claim_delivery(&pool, link, message, 300, "example.com")
+        .await?
+        .unwrap();
     assert!(claim.approved_snapshot.is_none());
     let (prepared, sender) = load_delivery_content(&pool, &claim).await?;
     assert_eq!(

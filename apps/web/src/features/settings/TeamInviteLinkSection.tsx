@@ -1,3 +1,4 @@
+import { WEB_BASE_PATH } from '@app/constants/routerBase';
 import { toast } from '@core/component/Toast/Toast';
 import { writeClipboardData } from '@core/util/dataTransfer';
 import { fireAndForget } from '@core/util/fireAndForget';
@@ -16,7 +17,7 @@ import { createSignal, Show } from 'solid-js';
 
 /** The page a team invite link opens; see `TeamInviteLinkAcceptance`. */
 export function teamInviteLinkUrl(token: string) {
-  return `${getWebOrigin()}/app/team-invite?link=${encodeURIComponent(token)}`;
+  return `${getWebOrigin()}${WEB_BASE_PATH}/team-invite?link=${encodeURIComponent(token)}`;
 }
 
 async function copyTeamInviteLink(token: string) {

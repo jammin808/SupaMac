@@ -4,23 +4,21 @@
     <meta charset="utf-8" />
     <meta
       name="viewport"
-      content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no, interactive-widget=resizes-visual"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-visual"
     />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="theme-color" content="#FFFFFF" />
-    <meta name="description" content="Macro AI Workspace" />
+    <title>SupaMac</title>
+    <meta name="description" content="SupaMac AI Workspace" />
     <meta name="macro-bundle-build" content="__MACRO_BUNDLE_BUILD__" />
-    <link
-      rel="shortcut icon"
-      href="%ASSETS_PATH%/macro-favicon.svg"
-      type="image/svg+xml"
-    />
-    <link
-      rel="icon"
-      href="%ASSETS_PATH%/macro-favicon.svg"
-      type="image/svg+xml"
-    />
-    <link rel="apple-touch-icon" href="%ASSETS_PATH%/logo192.png" />
+    <!--
+      Icons and the manifest are files in public/, named by their path from the
+      site root: the build rewrites each onto the folder the bundle is served
+      from, so they resolve under a sub-path too.
+    -->
+    <link rel="shortcut icon" href="/macro-favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/macro-favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/logo192.png" />
     <!--
       manifest.json provides metadata used when your web app is installed on a
       user's mobile device or desktop. See https://developers.google.com/web/fundamentals/web-app-manifest/
@@ -127,7 +125,7 @@
         }
         if (localStorage.getItem("macro:login") !== "true") {
           shell.style.background = "var(--bs-page)";
-          shell.innerHTML = `<svg class="bs-mark" viewBox="0 0 24 24"><path d="m6.25 4.038-2.242.879v5.818l-1.756-1.658-2.242.879v6.677c0 .257.106.502.292.678l2.794 2.642 2.244-.879v-5.818l7.084 6.697 2.244-.879v-5.818l7.086 6.698 2.24-.879v-6.677c0-.257-.104-.502-.292-.678l-8.124-7.682-2.244.879v5.818z"/></svg>`;
+          shell.innerHTML = `<svg class="bs-mark" viewBox="0 0 24 24"><path d="M3 3.5A1.5 1.5 0 0 1 4.5 2L19.5 2A1.5 1.5 0 0 1 21 3.5L21 4.9A1.5 1.5 0 0 1 19.5 6.4L8 6.4A0.6 0.6 0 0 0 7.4 7L7.4 9.2A0.6 0.6 0 0 0 8 9.8L9.7 9.8A1.5 1.5 0 0 1 11.2 11.3L11.2 12.7A1.5 1.5 0 0 1 9.7 14.2L4.5 14.2A1.5 1.5 0 0 1 3 12.7Z"/><path d="M21 20.5A1.5 1.5 0 0 1 19.5 22L4.5 22A1.5 1.5 0 0 1 3 20.5L3 19.1A1.5 1.5 0 0 1 4.5 17.6L16 17.6A0.6 0.6 0 0 0 16.6 17L16.6 14.8A0.6 0.6 0 0 0 16 14.2L14.3 14.2A1.5 1.5 0 0 1 12.8 12.7L12.8 11.3A1.5 1.5 0 0 1 14.3 9.8L19.5 9.8A1.5 1.5 0 0 1 21 11.3Z"/></svg>`;
         } else {
           shell.innerHTML = `<div class="bs-rail"></div><div class="bs-content"></div>`;
         }

@@ -1,0 +1,47 @@
+# Keys of the KMS emulator, one per alias the services name
+# (tooling/xtask/crates/xtask_local/src/local/resources.rs).
+#
+# The emulator adds a key from this file only when its store has none with
+# that id, so the fixed ids and the key material from generated.env recreate
+# the same keys on an empty volume: rows encrypted under them stay readable.
+# `{{NAME}}` is replaced with that variable by init-volumes.sh.
+Keys:
+  Symmetric:
+    Aes:
+      - Metadata:
+          KeyId: 686b232b-2288-4653-aae3-44116c7a9c99
+          Description: Cursor and per-agent API keys
+        BackingKeys:
+          - "{{KMS_KEY_CURSOR_API_KEY}}"
+      - Metadata:
+          KeyId: 50ec58ca-6690-421b-b623-1234477b2ed4
+          Description: ChatGPT account connections
+        BackingKeys:
+          - "{{KMS_KEY_CODEX_OAUTH}}"
+      - Metadata:
+          KeyId: 73c7ff4d-8284-41da-91fe-fb94130c7eb8
+          Description: MCP OAuth authorization codes
+        BackingKeys:
+          - "{{KMS_KEY_MCP_OAUTH}}"
+      - Metadata:
+          KeyId: b1324ea8-e4c2-41bc-a1b7-9fca536da809
+          Description: Microsoft refresh tokens
+        BackingKeys:
+          - "{{KMS_KEY_MICROSOFT_TOKEN}}"
+      - Metadata:
+          KeyId: bc83efd8-63d5-4ab0-b6eb-f1362ab4f135
+          Description: WhatsApp session data keys
+        BackingKeys:
+          - "{{KMS_KEY_WHATSAPP_SESSION}}"
+
+Aliases:
+  - AliasName: alias/macro-local-cursor-api-key
+    TargetKeyId: 686b232b-2288-4653-aae3-44116c7a9c99
+  - AliasName: alias/macro-local-codex-oauth
+    TargetKeyId: 50ec58ca-6690-421b-b623-1234477b2ed4
+  - AliasName: alias/macro-local-mcp-oauth
+    TargetKeyId: 73c7ff4d-8284-41da-91fe-fb94130c7eb8
+  - AliasName: alias/macro-local-microsoft-token
+    TargetKeyId: b1324ea8-e4c2-41bc-a1b7-9fca536da809
+  - AliasName: alias/whatsapp-session-service-local
+    TargetKeyId: bc83efd8-63d5-4ab0-b6eb-f1362ab4f135

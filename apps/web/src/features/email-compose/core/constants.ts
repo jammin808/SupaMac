@@ -1,6 +1,7 @@
+import { PRODUCT_NAME } from '@app/constants/product';
 import { match } from 'ts-pattern';
 
-export const MACRO_EMAIL_SIGNATURE = '-- Sent with Macro';
+export const MACRO_EMAIL_SIGNATURE = `-- Sent with ${PRODUCT_NAME}`;
 
 export const MAX_ATTACHMENTS_BYTES_SIZE = 18_000_000;
 // Raw bytes the provider will still deliver once base64 adds about a third:

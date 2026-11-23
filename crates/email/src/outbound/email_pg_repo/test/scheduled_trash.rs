@@ -16,7 +16,7 @@ fn identity() -> (Uuid, Uuid) {
 
 async fn claim(pool: &Pool<Postgres>) -> anyhow::Result<DeliveryClaim> {
     let (link, message) = identity();
-    Ok(claim_delivery(pool, link, message, 300)
+    Ok(claim_delivery(pool, link, message, 300, "example.com")
         .await?
         .expect("fixture has a due scheduled draft"))
 }

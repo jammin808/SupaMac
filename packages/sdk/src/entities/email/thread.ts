@@ -10,6 +10,7 @@ import type {
 import type { EmailFollowupCommand } from '../../../generated/storage/types.gen';
 import { unwrap } from '../../utils';
 import type { MacroClient } from '../../utils/client';
+import { webAppLink } from '../../utils/web-app';
 import type { Calendar } from '../calendar/calendar';
 import { CalendarEvent } from '../calendar/event';
 import type { Channel } from '../channels/channel';
@@ -225,7 +226,7 @@ export class EmailThread extends PropertiedEntity<ThreadDetail> {
    * @readonly
    */
   webUrl(): string {
-    return `${this.client.webAppUrl}/app/mail/${this.id}`;
+    return webAppLink(this.client.webAppUrl, `/mail/${this.id}`);
   }
 
   /** Identity, loaded detail and {@link webUrl}, so serialized handles carry their link. */

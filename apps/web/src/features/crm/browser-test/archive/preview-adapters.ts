@@ -308,6 +308,14 @@ export const storageServiceClient = {
 const deps = {
   client,
   storage: storageServiceClient as unknown as typeof Storage,
+  feedback: {
+    success(text: string) {
+      setMessage(text);
+    },
+    failure(text: string) {
+      setMessage(text);
+    },
+  },
 };
 export const useCrmContext = () => ({
   userId: () => 'user-1',
@@ -335,7 +343,7 @@ export const useCrmContext = () => ({
       .split(' ')
       .map((part) => part[0])
       .join(''),
-  feedback: { success: setMessage, failure: setMessage },
+  feedback: deps.feedback,
   openCreateContact() {},
 });
 Object.assign(window, {

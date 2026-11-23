@@ -93,7 +93,7 @@ export function unreadable(
 export function reloadBanner(page: Page): Locator {
   return page
     .getByRole('alert')
-    .filter({ hasText: 'Update or reload Macro to recover local storage.' });
+    .filter({ hasText: 'Update or reload SupaMac to recover local storage.' });
 }
 
 /**

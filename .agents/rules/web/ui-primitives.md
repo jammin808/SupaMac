@@ -32,6 +32,7 @@ Applies to `apps/web/src/components/ui`, including ports from shadcn-solid.
 - In `InputGroup`, keep the input as the single control and place surrounding
   content in `Addon` slots. Use `align` for visual placement so accessible DOM
   order stays independent of layout.
+- Keep input-group addon clicks on native controls from refocusing the text input, and preserve event bubbling for delegated controls.
 
 ## Button and ButtonGroup
 
@@ -60,8 +61,13 @@ Applies to `apps/web/src/components/ui`, including ports from shadcn-solid.
 - Keep `aria-expanded` on disclosure controls without treating expanded content
   as a selected action. Button highlights an open popup only when the same
   trigger has `aria-haspopup`; use `aria-pressed` for genuine action toggles.
-- Keep Button's visible focus outline suppressed in ordinary color modes and
-  retain its forced-colors indicator. Do not remove other controls' focus styling.
+- Button shows a 2px `button-focus` outline on keyboard focus (`focus-visible`),
+  2px outside the control so it lies on the surrounding surface in every variant
+  (WCAG 2.4.7). Inside a `ButtonGroup` or `InputGroup`, whose frame clips it,
+  the outline is drawn inside the control in the control's text color. Keep the
+  forced-colors indicator, never hide the outline from a caller, and do not
+  remove other controls' focus styling. `--button-focus` stays at 3:1 or more
+  against every built-in theme's surfaces; `themeContrast.test.ts` checks it.
 - Keep Tooltip's assembled and compound APIs on the same implementation and
   clean up closed or detached popups. Do not add document-wide mutation observers
   to track individual triggers.

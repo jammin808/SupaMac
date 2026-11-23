@@ -1,3 +1,4 @@
+import { WEB_BASE_PATH } from '@app/constants/routerBase';
 import {
   clearSignupDraft,
   Onboarding,
@@ -7,6 +8,7 @@ import {
 import { useFeatureFlag } from '@app/lib/analytics/posthog';
 import { LoadingBlock } from '@core/component/LoadingBlock';
 import { enableMicrosoftSignup } from '@core/constant/featureFlags';
+import { SELF_HOSTED } from '@core/constant/servers';
 import { isMobile } from '@core/mobile/isMobile';
 import { isNativeMobilePlatform } from '@core/mobile/isNativeMobilePlatform';
 import { virtualKeyboardVisible } from '@core/mobile/virtualKeyboard';
@@ -25,6 +27,7 @@ import {
 } from './core/post-auth-target';
 import { ssoFallbackNotice } from './core/sso-fallback';
 import { createAppAuthContext } from './create-app-auth-context';
+import { signInMethods } from './sign-in-methods';
 import { AuthView } from './views/auth-view';
 import { MobileWebSignupView } from './views/mobile-web-signup-view';
 
@@ -37,13 +40,20 @@ export function Login(props: { signupMode?: boolean }) {
   const navigate = useNavigate();
   const email = typeof params.email === 'string' ? params.email : undefined;
   const microsoftSignup = useFeatureFlag(enableMicrosoftSignup);
+  const methods = signInMethods();
+  // Onboarding's sign-up slides lead to Continue with Google, so they are for
+  // builds that offer it; the others sign up on the sign-in card.
   const desktopSignup = () =>
-    props.signupMode === true && !isMobile() && !isNativeMobilePlatform();
+    props.signupMode === true &&
+    methods.google &&
+    !isMobile() &&
+    !isNativeMobilePlatform();
   return (
     <AuthProvider value={createAppAuthContext()}>
       <AuthView
         intent={props.signupMode ? 'signup' : 'login'}
-        showApple={getNativeMobilePlatform() === 'ios'}
+        showGoogle={methods.google}
+        showApple={methods.apple && getNativeMobilePlatform() === 'ios'}
         showMicrosoft={microsoftSignup().enabled}
         compact={virtualKeyboardVisible()}
         initialEmail={email}
@@ -57,7 +67,9 @@ export function Login(props: { signupMode?: boolean }) {
           const referral = new URLSearchParams(window.location.search).get(
             'referral'
           );
-          if (referral) window.location.href = `/app?referral=${referral}`;
+          if (referral) {
+            window.location.href = `${WEB_BASE_PATH}?referral=${referral}`;
+          }
         }}
         signupJourney={
           desktopSignup()
@@ -92,6 +104,7 @@ export function AgentSignup() {
     <AuthProvider value={createAppAuthContext()}>
       <AuthView
         intent="agent-signup"
+        showGoogle={signInMethods().google}
         showApple={false}
         compact={virtualKeyboardVisible()}
         token={sessionTokenParam(params.token)}
@@ -156,6 +169,12 @@ function PostLoginRedirect(props: { target: string }) {
 /** Mobile-web visitors get a desktop link instead of signing up on a phone. */
 export function MobileWebSignup() {
   const navigate = useNavigate();
+  // The page mails a sign-up link to any address left on it. A self-hosted
+  // instance admits only the addresses its owner allows, who sign in instead.
+  if (SELF_HOSTED) {
+    onMount(() => navigate('/login', { replace: true }));
+    return <LoadingBlock />;
+  }
   return (
     <AuthProvider value={createAppAuthContext()}>
       <MobileWebSignupView

@@ -204,6 +204,8 @@ function Fixture() {
         <Match when={true}>
           <AuthView
             intent={page === 'signup' ? 'signup' : 'login'}
+            // `?google=off` is a self-hosted instance with no Google sign-in.
+            showGoogle={params.google !== 'off'}
             showApple={params.apple !== undefined}
             // On, as in dev builds; `?microsoft=off` is the production default.
             showMicrosoft={params.microsoft !== 'off'}
@@ -212,13 +214,15 @@ function Fixture() {
             token={sessionTokenParam(params.token)}
             ssoFallbackNotice={ssoFallbackNotice(params.sso_error)}
             signupJourney={
-              page === 'signup'
+              page === 'signup' && params.google !== 'off'
                 ? (slots) => <SignupJourney {...slots} />
                 : undefined
             }
             onSignIn={() => location.assign(`${location.pathname}?page=login`)}
             pending={
-              page === 'signup' ? () => <OnboardingPendingView /> : undefined
+              page === 'signup' && params.google !== 'off'
+                ? () => <OnboardingPendingView />
+                : undefined
             }
             signedIn={(user) => <SignedIn user={user()} />}
           />

@@ -538,7 +538,7 @@ describe('Input slots', () => {
     ));
     const users = editorMocks.mentionUsers?.() ?? [];
     expect(
-      users.filter((user) => user.name === 'Macro').map((user) => user.id)
+      users.filter((user) => user.name === 'SupaMac').map((user) => user.id)
     ).toEqual([MACRO_NEW_PRINCIPAL_ID]);
     expect(users.map((user) => user.id)).toEqual(
       expect.arrayContaining(['bot|owned', 'bot|team'])
@@ -548,12 +548,12 @@ describe('Input slots', () => {
   it('offers a single Macro mention aimed at the agent bot', () => {
     render(() => <ChannelInput input={baseInput} />);
     expect(
-      editorMocks.mentionUsers?.().filter((user) => user.name === 'Macro')
+      editorMocks.mentionUsers?.().filter((user) => user.name === 'SupaMac')
     ).toEqual([
       {
         id: MACRO_NEW_PRINCIPAL_ID,
-        name: 'Macro',
-        email: 'Macro',
+        name: 'SupaMac',
+        email: 'SupaMac',
       },
     ]);
   });

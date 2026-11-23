@@ -85,6 +85,26 @@ impl PresignedUploadUrlPort for S3UploadUrlAdapter {
         .await
     }
 
+    // The key holds its owner's user id, so no argument is recorded.
+    #[tracing::instrument(skip_all, err)]
+    async fn get_document_storage_presigned_url(
+        &self,
+        key: &str,
+        expires_in_seconds: u64,
+    ) -> anyhow::Result<String> {
+        let presigned_url = self
+            .client
+            .get_object()
+            .bucket(&self.document_storage_bucket)
+            .key(key)
+            .presigned(PresigningConfig::expires_in(Duration::from_secs(
+                expires_in_seconds,
+            ))?)
+            .await?;
+
+        Ok(macro_aws_config::transform_aws_url(presigned_url.uri()))
+    }
+
     #[tracing::instrument(skip(self), err)]
     async fn copy_object(&self, source_key: &str, destination_key: &str) -> anyhow::Result<()> {
         if macro_aws_config::is_local_aws() {
@@ -180,3 +200,6 @@ async fn put_presigned_url(
 
     Ok(macro_aws_config::transform_aws_url(presigned_url.uri()))
 }
+
+#[cfg(test)]
+mod test;

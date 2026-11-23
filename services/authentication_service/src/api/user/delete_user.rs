@@ -35,20 +35,14 @@ pub async fn handler(
 ) -> Result<Response, Response> {
     let user_context = &authorization.authorization.user.user_context;
     let user_id = &*user_context.user_id;
-    // This may seem dumb, but if you delete this account it will delete my fusionauth account and
-    // we will then be locked out of fusionauth. So this is a way to prevent any accidental fuck
-    // ups from occurring.
-    if user_context.user_id == "macro|hutch@macro.com" {
-        return Err((StatusCode::FORBIDDEN, "you cannot delete hutch").into_response());
-    }
     // Perform a logout for the user
     // Remove access token cookie
-    let mut access_token_cookie = create_access_token_cookie("");
+    let mut access_token_cookie = create_access_token_cookie("", ctx.session_cookie_same_site);
     access_token_cookie.set_expires(Some(time::OffsetDateTime::now_utc()));
     cookies.add(access_token_cookie);
 
     // Remove refresh token cookie
-    let mut refresh_token_cookie = create_refresh_token_cookie("");
+    let mut refresh_token_cookie = create_refresh_token_cookie("", ctx.session_cookie_same_site);
     refresh_token_cookie.set_expires(Some(time::OffsetDateTime::now_utc()));
     cookies.add(refresh_token_cookie);
 

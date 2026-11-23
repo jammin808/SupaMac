@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { fireAndForget } from '@core/util/fireAndForget';
 import UsersThree from '@icon/system/regular/users-three.svg';
 import { Button, Input, ToggleSwitch, Tooltip } from '@ui';
@@ -182,7 +183,7 @@ export function ShareTabView(props: {
             label={
               anonymityLocked()
                 ? 'People have responded, so this can’t change.'
-                : 'Nobody in Macro, you included, sees who gave which response.'
+                : `Nobody in ${PRODUCT_NAME}, you included, sees who gave which response.`
             }
             class="self-start"
           >

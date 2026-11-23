@@ -7,7 +7,7 @@ mod result;
 mod server;
 
 pub(crate) use address_policy::is_public;
-pub use address_policy::{AddressPolicy, RefusedAddress};
+pub use address_policy::{AddressPolicy, PrivateAddressesOutsideLocal, RefusedAddress};
 pub use aes_key::{AesKey, AesKeyError};
 pub use call_tool_result::CallToolResultExt;
 pub use consts::*;

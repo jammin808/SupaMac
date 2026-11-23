@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import type { PartialDictionary, PluralMessage } from './dictionary';
+import type {
+  PartialDictionary,
+  PluralMessage,
+  TranslationKey,
+} from './dictionary';
 import { formatMessage, lookupMessage, pluralForm } from './dictionary';
 import {
   browserLanguage,
@@ -8,6 +12,7 @@ import {
   resolveInterfaceLanguage,
 } from './languages';
 import en from './locales/en';
+import { KEPT_CATALOG_NAME, withProductName } from './product-name';
 
 const translations = import.meta.glob<{ default: PartialDictionary }>(
   './locales/*.ts',
@@ -23,6 +28,32 @@ function translationFor(code: Language): PartialDictionary {
 type Message = string | PluralMessage;
 
 const PLACEHOLDER = /\{\{\s*(\w+)\s*\}\}/g;
+
+/** The name the catalogs call the product by, in any inflection or case. */
+const CATALOG_NAME = /macro/i;
+
+/**
+ * Names that contain the catalog name and are not it, each with the reason
+ * it stays as written.
+ */
+const OTHER_NAMES = [
+  {
+    name: /macrod/gi,
+    reason: 'The command-line program people install and run under this name.',
+  },
+];
+
+/** Every message of a catalog as `namespace.message` and its text. */
+function messagesOf(catalog: PartialDictionary): [TranslationKey, Message][] {
+  const all: [TranslationKey, Message][] = [];
+  for (const [namespace, messages] of Object.entries(catalog)) {
+    for (const [message, text] of Object.entries(messages ?? {})) {
+      if (text === undefined) continue;
+      all.push([`${namespace}.${message}` as TranslationKey, text]);
+    }
+  }
+  return all;
+}
 
 function texts(message: Message): string[] {
   return typeof message === 'string'
@@ -172,6 +203,87 @@ describe('translations', () => {
       expect(stray).toEqual([]);
       expect(mismatched).toEqual([]);
       expect(wrongForms).toEqual([]);
+    }
+  );
+});
+
+describe('the product name', () => {
+  it('replaces the catalog name as a whole word, before placeholders are filled', () => {
+    expect(withProductName('Ask Macro', 'channelComposer.askMacro', 'en')).toBe(
+      'Ask SupaMac'
+    );
+    expect(
+      withProductName(
+        'Picked for you, and Macro’s templates. Open {{name}} in Macro.',
+        'routineSuggestions.discoverHint',
+        'en'
+      )
+    ).toBe(
+      'Picked for you, and SupaMac’s templates. Open {{name}} in SupaMac.'
+    );
+    expect(
+      withProductName(
+        'Macroの新しいバージョン',
+        'nav.updateWebDescription',
+        'ja'
+      )
+    ).toBe('SupaMacの新しいバージョン');
+    expect(
+      withProductName('Learn how to use MacroD', 'tutorials.macrodTitle', 'en')
+    ).toBe('Learn how to use MacroD');
+  });
+
+  it('inflects the product name as the language inflected the catalog name', () => {
+    expect(
+      withProductName('Macron uusi versio', 'nav.updateWebDescription', 'fi')
+    ).toBe('SupaMacin uusi versio');
+    expect(
+      withProductName(
+        'Osaa Macrosta ei voitu ladata',
+        'nav.updateWebFailedLoadDescription',
+        'fi'
+      )
+    ).toBe('Osaa SupaMacista ei voitu ladata');
+    expect(
+      withProductName(
+        'Macros skrivbordsapp',
+        'nav.updateBundleDescription',
+        'sv'
+      )
+    ).toBe('SupaMacs skrivbordsapp');
+  });
+
+  it('keeps the catalog name only in messages that name something else', () => {
+    const english = new Map(messagesOf(en));
+    for (const [key, reason] of Object.entries(KEPT_CATALOG_NAME)) {
+      const message = english.get(key as TranslationKey);
+      expect(message, key).toBeDefined();
+      expect(reason, key).toBeTruthy();
+      for (const text of texts(message ?? '')) {
+        expect(text, key).toMatch(CATALOG_NAME);
+        expect(withProductName(text, key as TranslationKey, 'en')).toBe(text);
+      }
+    }
+  });
+
+  it.each(LANGUAGES.map(({ code }) => code))(
+    '%s shows the catalog name in no other message',
+    (code) => {
+      const shown: string[] = [];
+      for (const [key, message] of messagesOf(translationFor(code))) {
+        if (key in KEPT_CATALOG_NAME) continue;
+        for (const text of texts(message)) {
+          const resolved = withProductName(text, key, code);
+          const withoutOtherNames = OTHER_NAMES.reduce(
+            (rest, { name }) => rest.replace(name, ''),
+            resolved
+          );
+          if (CATALOG_NAME.test(withoutOtherNames)) {
+            shown.push(`${key}: ${resolved}`);
+          }
+        }
+      }
+      expect(shown).toEqual([]);
     }
   );
 });

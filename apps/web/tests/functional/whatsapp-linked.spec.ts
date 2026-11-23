@@ -49,6 +49,10 @@ type LinkedServer = {
   backfill: { state: string; imported: number } | null;
   /** History the owner's phone sent so far, older than everything shown. */
   imported: unknown[];
+  /** Reads of the latest page so far. */
+  latestReads: number;
+  /** When set, every read of the latest page after the first waits for it. */
+  heldRefresh?: Promise<void>;
   requests: string[];
   additions: ExternalChatAdd[];
   passkeyAnswers: unknown[];
@@ -118,6 +122,7 @@ function server(): LinkedServer {
     connects: 0,
     backfill: null,
     imported: [],
+    latestReads: 0,
     chats: [
       {
         jid: '14155550199@s.whatsapp.net',
@@ -348,7 +353,11 @@ async function mount(page: Page, state: LinkedServer, query = '') {
               },
             },
           });
-        if (suffix === '/messages')
+        if (suffix === '/messages') {
+          if (!url.searchParams.has('before')) {
+            state.latestReads += 1;
+            if (state.latestReads > 1) await state.heldRefresh;
+          }
           return route.fulfill({
             json: {
               nextCursor: url.searchParams.has('before')
@@ -381,6 +390,7 @@ async function mount(page: Page, state: LinkedServer, query = '') {
                     ]),
             },
           });
+        }
         if (suffix === '/sends' && method === 'POST') {
           const body: ExternalChatSendReply = route.request().postDataJSON();
           state.outgoing.push(body);
@@ -696,7 +706,7 @@ test('links WhatsApp by QR, then adds a shareable WhatsApp chat', async ({
   await groups
     .getByRole('listitem')
     .filter({ hasText: 'Launch War Room' })
-    .getByRole('button', { name: 'Add to Macro' })
+    .getByRole('button', { name: 'Add to SupaMac' })
     .click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(groups.getByText('Launch War Room')).toHaveCount(0);
@@ -773,7 +783,7 @@ for (const mobile of [false, true]) {
         .getByRole('searchbox', { name: 'Search WhatsApp chats' })
         .fill('555 0003');
       await expect(contacts.getByRole('listitem')).toHaveCount(1);
-      await contacts.getByRole('button', { name: 'Add to Macro' }).click();
+      await contacts.getByRole('button', { name: 'Add to SupaMac' }).click();
       await expect(contacts).toHaveCount(0);
       expect(state.additions).toEqual([
         { provider: 'whatsapp', remoteId: phoneJid('5550003'), kind: 'direct' },
@@ -912,7 +922,7 @@ test('a refused add says why, on that group', async ({ page }) => {
     .getByRole('list', { name: 'Groups' })
     .getByRole('listitem')
     .filter({ hasText: 'Launch War Room' });
-  await row.getByRole('button', { name: 'Add to Macro' }).click();
+  await row.getByRole('button', { name: 'Add to SupaMac' }).click();
   await expect(row.getByRole('alert')).toHaveText(
     'Your WhatsApp is disconnected. Reconnect it, then add the chat.'
   );
@@ -926,7 +936,7 @@ test('External lists groups in Macro with unread counts and read-only tags', asy
   state.chats[2].added = { id: 'group-shared', name: 'Launch War Room' };
   const unexpected = await mount(page, state, '?view=in-macro');
   const nav = page.getByRole('navigation', {
-    name: 'WhatsApp chats in Macro',
+    name: 'WhatsApp chats in SupaMac',
   });
   const design = nav.getByRole('button', { name: /design-crit/ });
   await expect(design.getByLabel('2 unread messages')).toBeVisible();
@@ -997,7 +1007,7 @@ test('chats sort into direct messages, groups and communities on the page and in
   const here = new URL(page.url());
   await page.goto(`${here.origin}${here.pathname}?view=in-macro`);
   const nav = page.getByRole('navigation', {
-    name: 'WhatsApp chats in Macro',
+    name: 'WhatsApp chats in SupaMac',
   });
   await expect(
     nav.getByRole('navigation', { name: 'Groups' }).getByRole('button')
@@ -1082,7 +1092,7 @@ test('a browser hands WhatsApp’s passkey step to Macro desktop by pairing id',
   const dialog = page.getByRole('dialog');
   await expect(dialog.getByText('Confirm on your desktop')).toBeVisible();
   await expect(
-    dialog.getByRole('link', { name: 'Continue in Macro desktop' })
+    dialog.getByRole('link', { name: 'Continue in SupaMac desktop' })
   ).toHaveAttribute('href', 'macro:///external?whatsappPairing=pairing-1');
   expect(state.passkeyAnswers).toEqual([]);
 });
@@ -1786,7 +1796,7 @@ for (const mobile of [false, true]) {
         .poll(() => state.requests)
         .toContain(`DELETE external-chats/${CHAT_ID}`);
       await expect(
-        page.getByText('Syncing stopped. Its history stays in Macro.')
+        page.getByText('Syncing stopped. Its history stays in SupaMac.')
       ).toBeVisible();
       expect(
         await page.evaluate(
@@ -1830,10 +1840,10 @@ test('the owner shares through direct people access without creating a channel',
   await page.getByRole('button', { name: 'Share', exact: true }).click();
   const dialog = page.getByRole('dialog');
   await expect(
-    dialog.getByRole('textbox', { name: 'Macro email address' })
+    dialog.getByRole('textbox', { name: 'SupaMac email address' })
   ).toBeVisible();
   await dialog
-    .getByRole('textbox', { name: 'Macro email address' })
+    .getByRole('textbox', { name: 'SupaMac email address' })
     .fill('ana@example.test');
   await dialog.getByRole('button', { name: 'Add person' }).click();
   await expect
@@ -1989,7 +1999,7 @@ for (const mobile of [false, true]) {
       state.files = { [GROUP_PICTURE]: picture('#2f7d6d') };
       const unexpected = await mount(page, state, '?view=in-macro');
       const nav = page.getByRole('navigation', {
-        name: 'WhatsApp chats in Macro',
+        name: 'WhatsApp chats in SupaMac',
       });
       await expect(
         nav
@@ -2000,6 +2010,165 @@ for (const mobile of [false, true]) {
         nav.getByRole('button', { name: /Launch War Room/ }).locator('img')
       ).toHaveCount(0);
       await screenshot(page, 'pictures-external');
+      expect(unexpected).toEqual([]);
+    });
+  });
+}
+
+for (const [device, viewport] of [
+  ['phone', { width: 390, height: 844 }],
+  ['tablet', { width: 820, height: 1180 }],
+] as const) {
+  test.describe(`${device} timeline end`, () => {
+    test.use({ viewport, isMobile: true, hasTouch: true });
+
+    test('the last message stays above the floating composer', async ({
+      page,
+    }) => {
+      const state = server();
+      // Enough history that the timeline scrolls.
+      state.imported = Array.from({ length: 30 }, (_, index) => ({
+        ...incomingMessage,
+        id: `message-history-${index}`,
+        body: `Earlier message ${index}`,
+        sentAt: new Date(Date.UTC(2026, 9, 20, 8, index)).toISOString(),
+        reactions: [],
+        attachments: [],
+      }));
+      const unexpected = await mount(page, state, `?chat=${CHAT_ID}`);
+      const composer = page.getByRole('textbox', {
+        name: 'Message Design Crit',
+      });
+      await expect(composer).toBeVisible();
+      const timeline = page.getByRole('log', { name: 'WhatsApp messages' });
+      await expect(
+        timeline.getByText('Looking now. Thanks, Ana!')
+      ).toBeVisible();
+      // Room between the last message and the top of the bottom chrome.
+      const clearance = () =>
+        page.evaluate(() => {
+          const last = [
+            ...document.querySelectorAll('[role="log"] [data-message-id]'),
+          ].at(-1);
+          const chrome = document.querySelector(
+            '[data-float-region="accessory"]'
+          );
+          if (!last || !chrome) return Number.NaN;
+          return (
+            chrome.getBoundingClientRect().top -
+            last.getBoundingClientRect().bottom
+          );
+        });
+      await expect.poll(clearance).toBeGreaterThanOrEqual(0);
+
+      // A draft growing to several lines raises the composer; the timeline
+      // follows it.
+      const accessory = page.locator('[data-float-region="accessory"]');
+      const before = (await accessory.boundingBox())?.height ?? 0;
+      await composer.click();
+      await page.keyboard.type('One');
+      for (const line of ['Two', 'Three', 'Four']) {
+        await page.keyboard.press('Enter');
+        await page.keyboard.type(line);
+      }
+      await expect
+        .poll(async () => (await accessory.boundingBox())?.height ?? 0)
+        .toBeGreaterThan(before + 40);
+      await expect.poll(clearance).toBeGreaterThanOrEqual(0);
+      expect(unexpected).toEqual([]);
+    });
+  });
+}
+
+/** WhatsApp messages from Ana, oldest first, a minute apart from `start`. */
+function earlierMessages(prefix: string, count: number, start: number) {
+  return Array.from({ length: count }, (_, index) => ({
+    ...incomingMessage,
+    id: `message-${prefix}-${index}`,
+    body: `${prefix} message ${index}`,
+    sentAt: new Date(start + index * 60_000).toISOString(),
+    reactions: [],
+    attachments: [],
+  }));
+}
+
+/** The on-screen top of a message row. */
+const rowTop = (page: Page, id: string) =>
+  page
+    .locator(`[data-message-id="${id}"]`)
+    .evaluate((row) => row.getBoundingClientRect().top);
+
+for (const mobile of [false, true]) {
+  test.describe(`${mobile ? 'mobile' : 'desktop'} history above the reader`, () => {
+    test.use({
+      viewport: mobile
+        ? { width: 390, height: 844 }
+        : { width: 1440, height: 900 },
+      isMobile: mobile,
+      hasTouch: mobile,
+    });
+
+    test('imported history keeps the message being read in place', async ({
+      page,
+    }) => {
+      const state = server();
+      state.imported = earlierMessages('Earlier', 30, Date.UTC(2026, 9, 21, 8));
+      // The phone's next batch lands on the next read, once released.
+      let release = () => {};
+      state.heldRefresh = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const unexpected = await mount(page, state, `?chat=${CHAT_ID}`);
+      const timeline = page.getByRole('log', { name: 'WhatsApp messages' });
+      await expect(
+        timeline.getByText('Looking now. Thanks, Ana!')
+      ).toBeVisible();
+
+      await timeline.hover();
+      await page.mouse.wheel(0, -500);
+      const reading = timeline.locator(
+        '[data-message-id="message-Earlier-20"]'
+      );
+      await expect(reading).toBeInViewport();
+      const top = await rowTop(page, 'message-Earlier-20');
+
+      state.imported = [
+        ...earlierMessages('Imported', 10, Date.UTC(2026, 9, 19, 8)),
+        ...state.imported,
+      ];
+      await expect.poll(() => state.latestReads).toBeGreaterThan(1);
+      release();
+      await expect(timeline.getByText('Imported message 9')).toBeAttached();
+      await expect
+        .poll(() => rowTop(page, 'message-Earlier-20'))
+        .toBeCloseTo(top, 0);
+      expect(unexpected).toEqual([]);
+    });
+
+    test('an earlier page keeps the message being read in place', async ({
+      page,
+    }) => {
+      const state = server();
+      state.imported = earlierMessages('Earlier', 30, Date.UTC(2026, 9, 21, 8));
+      const unexpected = await mount(page, state, `?chat=${CHAT_ID}`);
+      const timeline = page.getByRole('log', { name: 'WhatsApp messages' });
+      await expect(
+        timeline.getByText('Looking now. Thanks, Ana!')
+      ).toBeVisible();
+
+      await timeline.hover();
+      await page.mouse.wheel(0, -10_000);
+      const more = page.getByRole('button', { name: 'Load earlier messages' });
+      await expect(more).toBeInViewport();
+      const top = await rowTop(page, 'message-Earlier-0');
+
+      await more.click();
+      await expect(
+        timeline.getByText('Previous day discussion')
+      ).toBeAttached();
+      await expect
+        .poll(() => rowTop(page, 'message-Earlier-0'))
+        .toBeCloseTo(top, 0);
       expect(unexpected).toEqual([]);
     });
   });

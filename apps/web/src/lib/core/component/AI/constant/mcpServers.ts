@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { SLACK_PIPEDREAM_SLUGS } from '@core/pipedream/slugs';
 import IconDatadog from '@icon/mcp-datadog.svg';
 import IconGithub from '@icon/mcp-github.svg';
@@ -64,7 +65,7 @@ export type QuickConnectServer = (typeof QUICK_CONNECT_SERVERS)[number];
  * presets absent from {@link QUICK_CONNECT_SERVERS} are dropped automatically.
  */
 const FEATURED_SERVER_TAGLINES: [name: string, tagline: string][] = [
-  ['Linear', 'Create and update issues without leaving Macro.'],
+  ['Linear', `Create and update issues without leaving ${PRODUCT_NAME}.`],
   ['Slack', 'Search conversations and post updates to channels.'],
   ['Notion', 'Search your pages, databases, and wikis.'],
   ['PostHog', 'Query product analytics and user insights.'],

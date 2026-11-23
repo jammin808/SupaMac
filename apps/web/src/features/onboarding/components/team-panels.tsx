@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import CheckIcon from '@icon/system/regular/check.svg';
 import LinkIcon from '@icon/system/regular/link.svg';
 import { Button } from '@ui';
@@ -28,8 +29,8 @@ export function OnTeamPanel(props: {
           when={(props.invited ?? 0) > 0}
           fallback={
             <p class="max-w-xs text-xs text-ink-muted leading-snug">
-              Your team is set up — everything your teammates bring into Macro
-              is shared with you.
+              Your team is set up — everything your teammates bring into{' '}
+              {PRODUCT_NAME} is shared with you.
             </p>
           }
         >

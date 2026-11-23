@@ -58,7 +58,7 @@ it('renders absent setup as generic setup without a step detail', () => {
 it.each<{ step: SetupStep; label: string; position: number }>([
   { step: 'creating', label: 'Creating the computer', position: 1 },
   { step: 'booting', label: 'Starting up', position: 2 },
-  { step: 'connecting', label: 'Connecting to Macro', position: 3 },
+  { step: 'connecting', label: 'Connecting to SupaMac', position: 3 },
 ])(
   'renders $step as one of the three setup phases',
   ({ step, label, position }) => {
@@ -90,6 +90,18 @@ it('keeps an unrecognized runtime step generic without exposing raw text', () =>
     label: 'Setting up',
     detail: undefined,
     tone: 'progress',
+  });
+});
+
+describe('unhealthy', () => {
+  it('reads as not responding, and can still be turned off', () => {
+    const computer: ComputerStatus = { ...waiting, status: 'unhealthy' };
+    expect(computerStatusLabel(computer)).toEqual({
+      label: 'Not responding',
+      detail: "It's back once it reconnects; SupaMac restarts it if it doesn't",
+      tone: 'failure',
+    });
+    expect(canTogglePower(computer)).toBe(true);
   });
 });
 
@@ -128,7 +140,7 @@ describe('offersFailure', () => {
   it('sends plan problems to Billing without a retry', () => {
     expect(offersFailure(failure('NO_PAID_PLAN'))).toEqual({
       message:
-        'Computers need a paid Macro plan. Your team does not have one yet.',
+        'Computers need a paid SupaMac plan. Your team does not have one yet.',
       remedy: 'billing',
     });
     expect(offersFailure(failure('TEAM_ON_TRIAL'))).toEqual({
@@ -151,7 +163,8 @@ describe('offersFailure', () => {
       remedy: 'retry',
     });
     expect(offersFailure(failure('BILLING_PROVIDER_FAILED'))).toEqual({
-      message: "Macro's billing provider didn't answer. Try again in a moment.",
+      message:
+        "SupaMac's billing provider didn't answer. Try again in a moment.",
       remedy: 'retry',
     });
     expect(offersFailure(failure('TIMED_OUT'))).toEqual({
@@ -159,7 +172,7 @@ describe('offersFailure', () => {
       remedy: 'retry',
     });
     expect(offersFailure(failure('NETWORK_ERROR'))).toEqual({
-      message: "Couldn't reach Macro. Check your connection and try again.",
+      message: "Couldn't reach SupaMac. Check your connection and try again.",
       remedy: 'retry',
     });
     expect(offersFailure(failure('SERVER_ERROR'))).toEqual({

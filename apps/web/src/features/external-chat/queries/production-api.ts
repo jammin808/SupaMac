@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { staticFileIdEndpoint } from '@core/constant/servers';
 import type { ResultError } from '@core/util/result';
 import { throwOnErr } from '@core/util/result';
@@ -185,7 +186,7 @@ function writeFailure(
         ),
         () => ({
           kind: 'refused',
-          reason: "This chat can't be in Macro, so nothing was sent.",
+          reason: `This chat can't be in ${PRODUCT_NAME}, so nothing was sent.`,
         })
       )
       .with(P.union('conflict', 'CONFLICT'), () => ({

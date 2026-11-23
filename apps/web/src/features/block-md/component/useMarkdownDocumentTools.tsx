@@ -2,6 +2,7 @@ import {
   ChatWithAgentIcon,
   openChatWithAgent,
 } from '@app/features/chat/ChatWithAgentButton';
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { t } from '@app/lib/i18n';
 import type { BlockTool } from '@components/app/block-tool';
 import type { FileOperation } from '@components/app/split-layout/components/SplitFileMenu';
@@ -139,7 +140,7 @@ export function useMarkdownDocumentTools() {
       action: () => setMarkdownWideMode((wide) => !wide),
     },
     askMacro: {
-      label: 'Ask Macro',
+      label: `Ask ${PRODUCT_NAME}`,
       icon: ChatWithAgentIcon,
       action: () => openChatWithAgent(chatEntity()),
     },

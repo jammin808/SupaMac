@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { openExternalUrl } from '@core/util/url';
 import CalendarBlank from '@icon/system/regular/calendar-blank.svg';
 import CalendarCheck from '@icon/system/regular/calendar-check.svg';
@@ -179,7 +180,10 @@ export function CalendarInviteCard(props: {
       );
   const fallbackStatus = () =>
     match(props.actions?.resolution?.kind)
-      .with('disconnected', () => 'Connect a calendar to respond from Macro.')
+      .with(
+        'disconnected',
+        () => `Connect a calendar to respond from ${PRODUCT_NAME}.`
+      )
       .with(
         'ambiguous',
         () =>

@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { MobileDrawer } from '@components/app/mobile/MobileDrawer';
 import type { SplitFileMenuActionGroups } from '@components/app/split-layout/context';
 import { useSplitPanelOrThrow } from '@components/app/split-layout/layoutUtils';
@@ -22,7 +23,10 @@ export function SpreadsheetDraftMenu(props: {
   const groups = createMemo<SplitFileMenuActionGroups>(() => ({
     entity: [],
     sender: [],
-    macro: [{ label: 'Ask Macro', icon: Sparkle, action: props.onAsk }],
+    macro: [
+      { label: `Ask ${PRODUCT_NAME}`, icon: Sparkle, action: props.onAsk },
+    ],
+    notifications: [],
     sharing: [{ label: 'Share', icon: Share, action: props.onShare }],
     file: props.onRename
       ? [{ label: 'Rename', icon: Rename, action: props.onRename }]

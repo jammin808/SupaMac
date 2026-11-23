@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { z } from 'zod';
 import { searchFiltersSchema } from '../../next-soup/core/search-filters';
 import { formatRecipientTerms } from './recipients';
@@ -25,7 +26,7 @@ export const intentLabels: Record<Intent, string> = {
 };
 export const actionLabels: Record<Intent, string> = {
   ai: 'Ask AI',
-  search: 'Search Macro',
+  search: `Search ${PRODUCT_NAME}`,
   email: 'Send email',
   note: 'Create note',
   task: 'Create task',

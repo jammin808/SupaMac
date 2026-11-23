@@ -21,7 +21,7 @@ use crate::domain::session_task::TaskPullRequests;
 pub struct TaskPullRequestsTool {
     /// The task to look up.
     #[schemars(
-        description = "Macro task id, MACRO-<id> reference, or task link, e.g. https://macro.com/app/task/<id>"
+        description = "Macro task id, MACRO-<id> reference, or task link whose path ends in /app/task/<id>"
     )]
     pub task: String,
 }

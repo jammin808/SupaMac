@@ -1,3 +1,5 @@
+import { PRODUCT_NAME } from '@app/constants/product';
+import { SELF_HOSTED } from '@core/constant/servers';
 import GoogleIcon from '@icon/macro-google.svg';
 import MicrosoftIcon from '@icon/microsoft-color.svg';
 import CheckIcon from '@icon/system/regular/check.svg';
@@ -78,9 +80,7 @@ export function GoogleAccountsStep(props: GoogleAccountsStepProps) {
         </h1>
         <p class="mt-7 max-w-[440px] font-[Inter_Variable] text-sm font-normal leading-6 text-ink-muted max-[359px]:text-[13px] sm:text-[15px] [text-wrap:balance]">
           <Switch
-            fallback={
-              'Connect through Google to read, send, and organize email and manage your calendars in Macro. Agents ask for your approval before sending email. Your password stays with Google, and you can disconnect anytime.'
-            }
+            fallback={`Connect through Google to read, send, and organize email and manage your calendars in ${PRODUCT_NAME}. Agents ask for your approval before sending email. Your password stays with Google, and you can disconnect anytime.`}
           >
             <Match when={withMicrosoft()}>
               {/* Fixed breaks: line 2 is 60–80% of line 1, and line 1 is no
@@ -96,9 +96,10 @@ export function GoogleAccountsStep(props: GoogleAccountsStepProps) {
               </span>
             </Match>
             <Match when={personal()}>
-              Add a personal account for email and calendar in Macro. This is
-              optional; your Macro sign-in stays the same. Agents ask for
-              approval before sending email, and you can disconnect anytime.
+              Add a personal account for email and calendar in {PRODUCT_NAME}.
+              This is optional; your {PRODUCT_NAME} sign-in stays the same.
+              Agents ask for approval before sending email, and you can
+              disconnect anytime.
             </Match>
           </Switch>
         </p>
@@ -205,44 +206,48 @@ export function GoogleAccountsStep(props: GoogleAccountsStepProps) {
         </p>
       </Show>
 
-      <section
-        aria-label="Privacy assurances"
-        class="mt-9 grid w-full grid-cols-1 gap-6 border-t border-edge-muted pt-6 min-[360px]:grid-cols-3 min-[360px]:gap-3 sm:gap-6"
-      >
-        <div data-privacy-item class="flex min-w-0 flex-col items-center">
-          <LockIcon class="size-5 text-ink-muted" aria-hidden="true" />
-          <h2 class="mt-3 text-xs font-medium leading-5 text-ink">
-            Zero retention
-          </h2>
-          <p class="mt-1 text-[11px] leading-[1.6] text-ink-extra-muted sm:text-xs">
-            Agreements with
-            <br />
-            OpenAI &amp; Anthropic
-          </p>
-        </div>
-        <div data-privacy-item class="flex min-w-0 flex-col items-center">
-          <ShieldIcon class="size-5 text-ink-muted" aria-hidden="true" />
-          <h2 class="mt-3 text-xs font-medium leading-5 text-ink">
-            Audited security
-          </h2>
-          <p class="mt-1 text-[11px] leading-[1.6] text-ink-extra-muted sm:text-xs">
-            SOC 2 · ISO 27001
-            <br />
-            CASA Tier 2
-          </p>
-        </div>
-        <div data-privacy-item class="flex min-w-0 flex-col items-center">
-          <HandIcon class="size-5 text-ink-muted" aria-hidden="true" />
-          <h2 class="mt-3 text-xs font-medium leading-5 text-ink">
-            Never sold
-          </h2>
-          <p class="mt-1 text-[11px] leading-[1.6] text-ink-extra-muted sm:text-xs">
-            No generalized
-            <br />
-            AI model training.
-          </p>
-        </div>
-      </section>
+      {/* The hosted service's own agreements and audits; none of them
+          describes a self-hosted instance. */}
+      <Show when={!SELF_HOSTED}>
+        <section
+          aria-label="Privacy assurances"
+          class="mt-9 grid w-full grid-cols-1 gap-6 border-t border-edge-muted pt-6 min-[360px]:grid-cols-3 min-[360px]:gap-3 sm:gap-6"
+        >
+          <div data-privacy-item class="flex min-w-0 flex-col items-center">
+            <LockIcon class="size-5 text-ink-muted" aria-hidden="true" />
+            <h2 class="mt-3 text-xs font-medium leading-5 text-ink">
+              Zero retention
+            </h2>
+            <p class="mt-1 text-[11px] leading-[1.6] text-ink-extra-muted sm:text-xs">
+              Agreements with
+              <br />
+              OpenAI &amp; Anthropic
+            </p>
+          </div>
+          <div data-privacy-item class="flex min-w-0 flex-col items-center">
+            <ShieldIcon class="size-5 text-ink-muted" aria-hidden="true" />
+            <h2 class="mt-3 text-xs font-medium leading-5 text-ink">
+              Audited security
+            </h2>
+            <p class="mt-1 text-[11px] leading-[1.6] text-ink-extra-muted sm:text-xs">
+              SOC 2 · ISO 27001
+              <br />
+              CASA Tier 2
+            </p>
+          </div>
+          <div data-privacy-item class="flex min-w-0 flex-col items-center">
+            <HandIcon class="size-5 text-ink-muted" aria-hidden="true" />
+            <h2 class="mt-3 text-xs font-medium leading-5 text-ink">
+              Never sold
+            </h2>
+            <p class="mt-1 text-[11px] leading-[1.6] text-ink-extra-muted sm:text-xs">
+              No generalized
+              <br />
+              AI model training.
+            </p>
+          </div>
+        </section>
+      </Show>
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { t } from '@app/lib/i18n';
+import { writeClipboardData } from '@core/util/dataTransfer';
 import { thrownResultErrorHasCode } from '@core/util/result';
 import { Show } from 'solid-js';
 import { ContactCompanyProperty } from '../components/contact-company-property';
@@ -28,7 +29,8 @@ function editError(error: unknown): string {
 
 /** Key editor state by record identity so navigation cannot reuse an old draft. */
 export function ContactEmailField(props: { contact: CrmContact }) {
-  const mutation = useCrmContext().editContactEmail();
+  const context = useCrmContext();
+  const mutation = context.editContactEmail();
   // The one address on the company's domain is what links the contact to it.
   const companyEmail = () => {
     const linking = props.contact.companyDomainEmails;
@@ -56,6 +58,17 @@ export function ContactEmailField(props: { contact: CrmContact }) {
               email,
               change: change === 'add' && !listed ? 'primary' : change,
             });
+          }}
+          copy={async (email) => {
+            const copied = await writeClipboardData({ 'text/plain': email });
+            if (copied) {
+              context.feedback.success(t('entityActions.toastCopied'));
+            } else {
+              context.feedback.failure(
+                t('entityActions.toastCopyFailed', { count: 1 })
+              );
+            }
+            return copied;
           }}
         />
       )}
@@ -85,9 +98,11 @@ export function ContactCompanyField(props: {
     <Show when={props.contact.id} keyed>
       {(_id) => (
         <ContactCompanyProperty
-          editable={props.contact.personalEmail === true && independent()}
+          editable={
+            independent() &&
+            (props.contact.personalEmail === true || !props.contact.companyId)
+          }
           removable={independent()}
-          relinkable={props.contact.personalEmail === true}
           lockedReason={
             props.contact.companyDomain
               ? t('crm.contactCompanyLinkedByEmail')

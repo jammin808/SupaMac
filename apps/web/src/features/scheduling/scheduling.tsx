@@ -1,4 +1,5 @@
 import { useViewControlHotkeys } from '@app/components/view-shell';
+import { WEB_BASE_PATH } from '@app/constants/routerBase';
 import { openChatWithInput } from '@app/features/chat/ChatWithAgentButton';
 import { createSearchParams, useBeforeLeave } from '@app/lib/split-router';
 import {
@@ -30,7 +31,7 @@ export function schedulingLink(
   profile: Pick<SchedulingProfile, 'id'>,
   slug?: string
 ) {
-  return `${getWebOrigin()}/app/book/${encodeURIComponent(profile.id)}${slug ? `/${encodeURIComponent(slug)}` : ''}`;
+  return `${getWebOrigin()}${WEB_BASE_PATH}/book/${encodeURIComponent(profile.id)}${slug ? `/${encodeURIComponent(slug)}` : ''}`;
 }
 
 function SchedulingHost(props: ParentProps) {

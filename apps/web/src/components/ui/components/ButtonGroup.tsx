@@ -37,7 +37,7 @@ export type ButtonGroupProps = Omit<ComponentProps<'div'>, 'size'> & {
 
 /** Layout only; Button owns the frame's colors, border, and optional finish. */
 export const buttonGroupVariants =
-  'inline-flex items-stretch justify-center rounded-full border data-[orientation=horizontal]:flex-row data-[orientation=vertical]:flex-col has-[[data-slot=input-group-control]:focus-visible]:ring-2 has-[[data-slot=input-group-control]:focus-visible]:ring-button-focus';
+  'inline-flex items-stretch justify-center rounded-full border data-[orientation=horizontal]:flex-row data-[orientation=vertical]:flex-col has-[[data-slot=input-group-control]:focus-visible]:ring-2 has-[[data-slot=input-group-control]:focus-visible]:ring-edge-focus';
 export const buttonGroupDividerVariants =
   'shrink-0 self-stretch bg-divider data-[orientation=horizontal]:w-px data-[orientation=vertical]:h-px';
 
@@ -113,9 +113,13 @@ function GroupButton<T extends ValidComponent = 'button'>(
       finish={group ? 'flat' : local.finish}
       class={cn(
         group && 'self-stretch rounded-none border-0 shadow-none',
-        group?.orientation === 'horizontal' && 'h-auto touch:min-h-0',
+        // End segments take the frame's corners so their inset focus outline
+        // follows the frame instead of being cut off by it.
+        group?.orientation === 'horizontal' &&
+          'h-auto touch:min-h-0 first:rounded-s-[inherit] last:rounded-e-[inherit]',
         group && variant() === group.variant && 'bg-transparent',
-        group?.orientation === 'vertical' && 'w-full',
+        group?.orientation === 'vertical' &&
+          'w-full first:rounded-t-[inherit] last:rounded-b-[inherit]',
         local.class
       )}
     />

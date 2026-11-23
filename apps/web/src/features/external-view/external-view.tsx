@@ -1,5 +1,6 @@
 import { ViewShell, ViewSidebar } from '@app/components/view-shell';
 import { TutorialSidebarItem } from '@app/features/video-tutorials';
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { SplitRouter, useNavigate, useParams } from '@app/lib/split-router';
 import { externalChatRoute, externalRoute } from '@app/routes/routes';
 import { useSplitDisplayName } from '@components/app/split-layout/layoutUtils';
@@ -126,7 +127,7 @@ export function ExternalView() {
               id="external-chats"
               class="px-2 pt-4 pb-1 text-xs font-semibold tracking-tight text-ink-extra-muted"
             >
-              In Macro
+              In {PRODUCT_NAME}
             </h2>
             <For each={PROVIDERS}>{(provider) => inMacroChats(provider)}</For>
           </section>
@@ -145,7 +146,10 @@ export function ExternalView() {
           resizable
         >
           <ViewShell.Aside>
-            <ViewSidebar.Root aria-label="External navigation">
+            <ViewSidebar.Root
+              reorderId="external"
+              aria-label="External navigation"
+            >
               <ViewSidebar.Header>
                 <div class="flex min-w-0 items-center gap-1">
                   <ViewSidebar.CloseButton class="shrink-0" />
@@ -153,12 +157,18 @@ export function ExternalView() {
                 </div>
               </ViewSidebar.Header>
               <ViewSidebar.Content>
-                <ViewSidebar.Nav aria-label="External apps">
-                  <For each={PROVIDERS}>
-                    {(provider) => {
-                      const open = () => !folded().includes(provider);
-                      return (
-                        <>
+                <For each={PROVIDERS}>
+                  {(provider) => {
+                    const open = () => !folded().includes(provider);
+                    return (
+                      <ViewSidebar.Section
+                        id={`provider:${provider}`}
+                        label={providerIdentity(provider).label}
+                        headerless
+                      >
+                        <ViewSidebar.Nav
+                          aria-label={providerIdentity(provider).label}
+                        >
                           <ViewSidebar.TreeItem
                             active={!params.chatId}
                             label={providerIdentity(provider).label}
@@ -181,11 +191,11 @@ export function ExternalView() {
                           <ViewSidebar.Branch open={open()}>
                             {inMacroChats(provider)}
                           </ViewSidebar.Branch>
-                        </>
-                      );
-                    }}
-                  </For>
-                </ViewSidebar.Nav>
+                        </ViewSidebar.Nav>
+                      </ViewSidebar.Section>
+                    );
+                  }}
+                </For>
               </ViewSidebar.Content>
             </ViewSidebar.Root>
           </ViewShell.Aside>

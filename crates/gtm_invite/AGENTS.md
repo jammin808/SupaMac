@@ -13,7 +13,11 @@ checkout.
 - `src/domain/ports.rs` + `src/domain/models.rs`: the repo port and link model.
 - `src/inbound/axum_router/`: one file per route (`create_link`, `get_offer`,
   `redeem_link`, `resolve_link`, `revoke_link`, `list_links`); `gtm_macro_staff.rs`
-  gates routes to Macro staff.
+  gates routes to Macro staff. This instance has none
+  (`MacroUserId::is_macro_staff` is false for every account), so creating,
+  listing and revoking links refuse every caller. The create, list and revoke
+  logic is kept as upstream wrote it and is unreachable here; its tests cover
+  the refusals, not those paths.
 - `src/outbound/pg_gtm_invite_repo.rs`: the Postgres adapter.
 
 ## Scope

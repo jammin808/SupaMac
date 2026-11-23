@@ -28,8 +28,9 @@ fn service(repo: MockGtmInviteRepo) -> GtmInviteServiceImpl<MockGtmInviteRepo> {
     }
 }
 
-fn staff() -> MacroUserIdStr<'static> {
-    MacroUserIdStr::try_from_email("valentina@macro.com").unwrap()
+/// An address at the upstream staff domain, which grants nothing here.
+fn upstream_staff() -> MacroUserIdStr<'static> {
+    MacroUserIdStr::try_from_email("someone@macro.com").unwrap()
 }
 
 fn outsider() -> MacroUserIdStr<'static> {
@@ -61,7 +62,7 @@ fn active_link() -> InviteLink {
         recipient_email: None,
         note: None,
         promo_code: "1MF".parse().unwrap(),
-        created_by: staff(),
+        created_by: upstream_staff(),
         created_at: now - Duration::hours(1),
         expires_at: now + Duration::hours(TTL_HOURS - 1),
         revoked_at: None,
@@ -96,49 +97,23 @@ fn converted(link: InviteLink) -> InviteLink {
 // -- create_link --
 
 #[tokio::test]
-async fn create_link_rejects_non_staff_without_touching_the_repo() {
+async fn create_link_refuses_every_caller_without_touching_the_repo() {
     let svc = service(MockGtmInviteRepo::new());
 
-    let result = svc.create_link(&outsider(), create_request()).await;
+    for caller in [outsider(), upstream_staff()] {
+        let result = svc.create_link(&caller, create_request()).await;
 
-    assert!(matches!(result, Err(GtmInviteError::Forbidden)));
+        assert!(matches!(result, Err(GtmInviteError::Forbidden)));
+    }
 }
 
-#[tokio::test]
-async fn create_link_generates_a_token_and_stamps_the_offer() {
-    let mut repo = MockGtmInviteRepo::new();
-    repo.expect_insert_link()
-        .times(1)
-        .returning(|_| Box::pin(async { Ok(()) }));
-    let svc = service(repo);
+#[test]
+fn generated_tokens_are_full_length_and_distinct() {
+    let first = InviteToken::generate();
+    let second = InviteToken::generate();
 
-    let link = svc.create_link(&staff(), create_request()).await.unwrap();
-
-    assert_eq!(link.token.as_str().len(), INVITE_TOKEN_LENGTH);
-    assert_eq!(
-        link.expires_at - link.created_at,
-        Duration::hours(TTL_HOURS)
-    );
-    assert_eq!(link.promo_code.as_str(), "1MF");
-    assert_eq!(link.created_by.as_ref(), staff().as_ref());
-    assert_eq!(link.first_name, "Ada");
-    assert_eq!(link.recipient_email.as_deref(), Some("ada@startup.io"));
-    assert_eq!(link.status(Utc::now()), InviteLinkStatus::Active);
-}
-
-#[tokio::test]
-async fn create_link_generates_distinct_tokens() {
-    let mut repo = MockGtmInviteRepo::new();
-    repo.expect_insert_link()
-        .times(2)
-        .returning(|_| Box::pin(async { Ok(()) }));
-    let svc = service(repo);
-
-    let first = svc.create_link(&staff(), create_request()).await.unwrap();
-    let second = svc.create_link(&staff(), create_request()).await.unwrap();
-
-    assert_ne!(first.token, second.token);
-    assert_ne!(first.id, second.id);
+    assert_eq!(first.as_str().len(), INVITE_TOKEN_LENGTH);
+    assert_ne!(first, second);
 }
 
 #[test]
@@ -183,100 +158,29 @@ fn normalize_trims_and_lowercases_input() {
 // -- list_links --
 
 #[tokio::test]
-async fn list_links_only_mine_scopes_to_the_caller() {
-    let mut repo = MockGtmInviteRepo::new();
-    repo.expect_list_links()
-        .withf(|filter| {
-            filter
-                .created_by
-                .as_ref()
-                .is_some_and(|creator| creator.as_ref() == staff().as_ref())
-        })
-        .times(1)
-        .returning(|_| Box::pin(async { Ok(vec![]) }));
-    let svc = service(repo);
-
-    svc.list_links(&staff(), true).await.unwrap();
-}
-
-#[tokio::test]
-async fn list_links_for_everyone_has_no_creator_filter() {
-    let mut repo = MockGtmInviteRepo::new();
-    repo.expect_list_links()
-        .withf(|filter| filter.created_by.is_none())
-        .times(1)
-        .returning(|_| Box::pin(async { Ok(vec![]) }));
-    let svc = service(repo);
-
-    svc.list_links(&staff(), false).await.unwrap();
-}
-
-#[tokio::test]
-async fn list_links_rejects_non_staff() {
+async fn list_links_refuses_every_caller() {
     let svc = service(MockGtmInviteRepo::new());
 
-    let result = svc.list_links(&outsider(), false).await;
+    for caller in [outsider(), upstream_staff()] {
+        for only_mine in [true, false] {
+            let result = svc.list_links(&caller, only_mine).await;
 
-    assert!(matches!(result, Err(GtmInviteError::Forbidden)));
+            assert!(matches!(result, Err(GtmInviteError::Forbidden)));
+        }
+    }
 }
 
 // -- revoke_link --
 
 #[tokio::test]
-async fn revoke_link_refuses_a_redeemed_link() {
-    let link = redeemed_by(active_link(), prospect());
-    let mut repo = MockGtmInviteRepo::new();
-    repo.expect_get_link_by_id().returning(move |_| {
-        let link = link.clone();
-        Box::pin(async move { Ok(Some(link)) })
-    });
-    let svc = service(repo);
+async fn revoke_link_refuses_every_caller_without_touching_the_repo() {
+    let svc = service(MockGtmInviteRepo::new());
 
-    let result = svc.revoke_link(&staff(), Uuid::now_v7()).await;
+    for caller in [outsider(), upstream_staff()] {
+        let result = svc.revoke_link(&caller, Uuid::now_v7()).await;
 
-    assert!(matches!(result, Err(GtmInviteError::BadRequest(_))));
-}
-
-#[tokio::test]
-async fn revoke_link_marks_an_active_link_revoked() {
-    let link = active_link();
-    let id = link.id;
-    let mut repo = MockGtmInviteRepo::new();
-    let mut lookups = 0;
-    let after = InviteLink {
-        revoked_at: Some(Utc::now()),
-        ..link.clone()
-    };
-    repo.expect_get_link_by_id().times(2).returning(move |_| {
-        lookups += 1;
-        let link = if lookups == 1 {
-            link.clone()
-        } else {
-            after.clone()
-        };
-        Box::pin(async move { Ok(Some(link)) })
-    });
-    repo.expect_revoke_link()
-        .withf(move |revoke_id, _| *revoke_id == id)
-        .times(1)
-        .returning(|_, _| Box::pin(async { Ok(true) }));
-    let svc = service(repo);
-
-    let revoked = svc.revoke_link(&staff(), id).await.unwrap();
-
-    assert_eq!(revoked.status(Utc::now()), InviteLinkStatus::Revoked);
-}
-
-#[tokio::test]
-async fn revoke_link_reports_missing_links() {
-    let mut repo = MockGtmInviteRepo::new();
-    repo.expect_get_link_by_id()
-        .returning(|_| Box::pin(async { Ok(None) }));
-    let svc = service(repo);
-
-    let result = svc.revoke_link(&staff(), Uuid::now_v7()).await;
-
-    assert!(matches!(result, Err(GtmInviteError::NotFound)));
+        assert!(matches!(result, Err(GtmInviteError::Forbidden)));
+    }
 }
 
 // -- resolve_link --

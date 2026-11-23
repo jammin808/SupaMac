@@ -171,6 +171,12 @@ pub fn resolve(
                 "OTEL_EXPORTER_OTLP_ENDPOINT".into(),
                 "http://otel-collector:4317".into(),
             );
+            // Macro computers export OTLP/HTTP to the telemetry intake their
+            // enrollment names; on the compose network that is the collector.
+            env.insert(
+                "OVERRIDE_TELEMETRY_INTAKE_URL".into(),
+                "http://otel-collector:4318".into(),
+            );
             // Forwarded to the hosted Grafana, a machine's stacks share one
             // `host.name`: the instance tells them apart.
             let existing = env.get("OTEL_RESOURCE_ATTRIBUTES").map(String::as_str);
@@ -286,6 +292,14 @@ fn apply_dev_overrides(instance: &Instance, env: &mut BTreeMap<String, String>) 
         "COMPOSE_PROJECT_NAME".to_string(),
         instance.project_name().to_string(),
     );
+    // run-dev serves a developer's browser the way run-local does, so it keeps
+    // the relaxations `LocalEnv` opts the local stack in to.
+    for flag in [
+        "DEV_DANGEROUS_CROSS_SITE_COOKIES",
+        "DEV_DANGEROUS_PRIVATE_WEBHOOK_ENDPOINTS",
+    ] {
+        env.insert(flag.to_string(), "true".to_string());
+    }
     // run-dev must not point at local infra.
     env.remove("LOCAL_AWS_URL");
     env.remove("SMTP_HOST");

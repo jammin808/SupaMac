@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { createMemo, createSignal } from 'solid-js';
 import { createStore } from 'solid-js/store';
 import type {
@@ -141,7 +142,7 @@ export function createStageEditor(input: {
     resetMutation.mutate(undefined, {
       onSuccess: () => {
         setShowResetModal(false);
-        input.onSuccess('Stages reset to Macro defaults');
+        input.onSuccess(`Stages reset to ${PRODUCT_NAME} defaults`);
       },
     });
   };

@@ -38,6 +38,10 @@ backend.
 - `MacroUserId::eq` only compares the underlying string (`user_id`), not the
   derived email offsets — don't add fields to the struct without checking
   whether `PartialEq`/`Debug` need to account for them.
+- `is_macro_staff` is false for every account: this instance has no upstream
+  staff, so the paths that call it refuse everyone. Never grant a power by
+  email domain; give the feature a list of accounts the host names (as
+  `SystemStatusServiceImpl::with_staff` does).
 - `features = ["sqlx"]` / `["schema"]` are additive, feature-gated impls
   (`sqlx::Type`, `utoipa::ToSchema`) — most callers only need the default.
 

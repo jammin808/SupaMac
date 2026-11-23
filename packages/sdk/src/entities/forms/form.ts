@@ -22,6 +22,7 @@ import type {
 } from '../../../generated/storage/types.gen';
 import { MacroError, unwrap } from '../../utils';
 import type { MacroClient } from '../../utils/client';
+import { webAppLink } from '../../utils/web-app';
 import type { Channel } from '../channels/channel';
 import { shareWithChannel } from '../channels/share';
 import type { DatabaseColumn } from '../databases/column';
@@ -749,7 +750,7 @@ export class Form extends MacroEntity<FormDetail> {
    * @readonly
    */
   webUrl(): string {
-    return `${this.client.webAppUrl}/app/form/${this.id}`;
+    return webAppLink(this.client.webAppUrl, `/form/${this.id}`);
   }
 
   /** Identity, loaded detail and {@link webUrl}, so serialized handles carry their link. */
@@ -763,6 +764,6 @@ export class Form extends MacroEntity<FormDetail> {
    * @readonly
    */
   respondUrl(): string {
-    return `${this.client.webAppUrl}/app/form/${this.id}/respond`;
+    return webAppLink(this.client.webAppUrl, `/form/${this.id}/respond`);
   }
 }

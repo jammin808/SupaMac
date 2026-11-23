@@ -1,0 +1,6 @@
+# AWS CLI settings of the init-aws job. Path-style addressing, because the
+# object store is one host and a bucket is no DNS name.
+[default]
+region = us-east-1
+s3 =
+    addressing_style = path

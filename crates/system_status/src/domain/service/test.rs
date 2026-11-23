@@ -8,7 +8,7 @@ use crate::domain::{
 };
 
 fn staff() -> MacroUserIdStr<'static> {
-    MacroUserIdStr::parse_from_str("macro|oncall@macro.com").unwrap()
+    MacroUserIdStr::parse_from_str("macro|oncall@example.com").unwrap()
 }
 
 fn degraded(message: &str) -> SystemStatus {
@@ -19,7 +19,8 @@ fn degraded(message: &str) -> SystemStatus {
 
 #[tokio::test]
 async fn current_status_is_operational_before_any_update() {
-    let service = SystemStatusServiceImpl::new(FakeRepo::default(), FakeBroadcaster::default());
+    let service = SystemStatusServiceImpl::new(FakeRepo::default(), FakeBroadcaster::default())
+        .with_staff([staff()]);
 
     let current = service.current_status().await.unwrap();
 
@@ -35,7 +36,8 @@ async fn current_status_is_operational_before_any_update() {
 
 #[tokio::test]
 async fn set_status_stores_it_as_current_and_broadcasts_it() {
-    let service = SystemStatusServiceImpl::new(FakeRepo::default(), FakeBroadcaster::default());
+    let service = SystemStatusServiceImpl::new(FakeRepo::default(), FakeBroadcaster::default())
+        .with_staff([staff()]);
 
     let update = service
         .set_status(&staff(), degraded("Search is slow"))
@@ -53,7 +55,8 @@ async fn set_status_stores_it_as_current_and_broadcasts_it() {
 
 #[tokio::test]
 async fn newest_update_wins_and_history_keeps_every_update() {
-    let service = SystemStatusServiceImpl::new(FakeRepo::default(), FakeBroadcaster::default());
+    let service = SystemStatusServiceImpl::new(FakeRepo::default(), FakeBroadcaster::default())
+        .with_staff([staff()]);
 
     service
         .set_status(&staff(), degraded("Search is slow"))
@@ -89,7 +92,8 @@ async fn set_status_succeeds_when_the_broadcast_fails() {
             fail: true,
             ..FakeBroadcaster::default()
         },
-    );
+    )
+    .with_staff([staff()]);
 
     service
         .set_status(&staff(), degraded("Search is slow"))
@@ -104,7 +108,8 @@ async fn set_status_succeeds_when_the_broadcast_fails() {
 
 #[tokio::test]
 async fn non_staff_cannot_set_status_or_read_history() {
-    let service = SystemStatusServiceImpl::new(FakeRepo::default(), FakeBroadcaster::default());
+    let service = SystemStatusServiceImpl::new(FakeRepo::default(), FakeBroadcaster::default())
+        .with_staff([staff()]);
     let outsider = MacroUserIdStr::parse_from_str("macro|someone@example.com").unwrap();
 
     let set = service
@@ -114,6 +119,27 @@ async fn non_staff_cannot_set_status_or_read_history() {
 
     assert!(matches!(set, Err(SystemStatusError::Forbidden)));
     assert!(matches!(history, Err(SystemStatusError::Forbidden)));
+    assert!(service.repo.updates.lock().unwrap().is_empty());
+    assert!(service.broadcaster.sent.lock().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn without_named_staff_nobody_sets_status_or_reads_history() {
+    let service = SystemStatusServiceImpl::new(FakeRepo::default(), FakeBroadcaster::default());
+
+    // No email domain makes its holder staff.
+    for caller in [
+        staff(),
+        MacroUserIdStr::parse_from_str("macro|oncall@macro.com").unwrap(),
+    ] {
+        let set = service
+            .set_status(&caller, degraded("Search is slow"))
+            .await;
+        let history = service.history(&caller).await;
+
+        assert!(matches!(set, Err(SystemStatusError::Forbidden)));
+        assert!(matches!(history, Err(SystemStatusError::Forbidden)));
+    }
     assert!(service.repo.updates.lock().unwrap().is_empty());
     assert!(service.broadcaster.sent.lock().unwrap().is_empty());
 }

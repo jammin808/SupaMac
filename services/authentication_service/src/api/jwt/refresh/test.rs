@@ -32,6 +32,7 @@ const TWO_HOURS: u64 = 7200;
 struct RefreshState {
     auth_client: Arc<FusionAuthClient>,
     jwt: JwtValidationArgs,
+    same_site: cookie::SameSite,
 }
 
 fn now() -> u64 {
@@ -106,6 +107,7 @@ async fn post_refresh(fusionauth: &MockServer, access_token: &str) -> (StatusCod
         .with_state(RefreshState {
             auth_client: Arc::new(auth_client),
             jwt: JwtValidationArgs::new_testing(),
+            same_site: cookie::SameSite::Strict,
         })
         .oneshot(
             Request::builder()

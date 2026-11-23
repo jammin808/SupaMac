@@ -16,6 +16,7 @@ import {
   macroCallUrl,
 } from '@app/features/calendar/utils/macro-call-link';
 import { formatCalendarTime } from '@app/features/calendar/utils/time-format';
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { useSplitPanelOrThrow } from '@components/app/split-layout/layoutUtils';
 import { IS_MAC } from '@core/constant/isMac';
 import { registerHotkey } from '@core/hotkey/hotkeys';
@@ -102,7 +103,8 @@ function meetingLinkForEvent(
     description,
     location: details?.location,
   });
-  if (macro) return { url: macro, kind: 'macro', label: 'Macro call' };
+  if (macro)
+    return { url: macro, kind: 'macro', label: `${PRODUCT_NAME} call` };
 
   const googleContent =
     googleMeetUrlInText(details?.location) ?? googleMeetUrlInText(description);
@@ -116,7 +118,11 @@ function meetingLinkForEvent(
   if (!conference) return undefined;
   const macroConference = calendarMacroCallUrl({ conferenceUrl: conference });
   if (macroConference) {
-    return { url: macroConference, kind: 'macro', label: 'Macro call' };
+    return {
+      url: macroConference,
+      kind: 'macro',
+      label: `${PRODUCT_NAME} call`,
+    };
   }
   const google = new URL(conference).hostname === 'meet.google.com';
   return {
@@ -927,7 +933,7 @@ function CalendarSearchControl(props: {
                                       >
                                         <VideoCameraIcon class="size-3.5" />
                                         {link().kind === 'macro'
-                                          ? 'Macro'
+                                          ? PRODUCT_NAME
                                           : link().kind === 'google'
                                             ? 'Meet'
                                             : 'Join'}

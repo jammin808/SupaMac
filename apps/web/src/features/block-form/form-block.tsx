@@ -1,4 +1,5 @@
 import { ListSkeleton } from '@app/components/view-shell/ListSkeleton';
+import { WEB_BASE_PATH } from '@app/constants/routerBase';
 /**
  * App-facing entry for the `form` block. It reads the legacy block state once
  * (id, params, split) and hands identity, capabilities and host actions to
@@ -77,7 +78,7 @@ function FormBlockContent(props: {
   const [tab, changeTab] = createSignal<FormTab>(props.initialTab ?? 'build');
   // Shared links open on the web, even from the desktop app (whose own
   // router base is `/`), so the base is the web app's.
-  const link = () => respondLink(`${getWebOrigin()}/app/`, formId);
+  const link = () => respondLink(`${getWebOrigin()}${WEB_BASE_PATH}/`, formId);
   // Sharing a form hands out its respond link; editors copy theirs apart.
   const copyEntityLink = useCopyLink();
   const copyRespondLink = () =>

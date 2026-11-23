@@ -54,7 +54,7 @@ event contract (schema, sanitization, delivery semantics).
   (`finish_in_flight_locked`): Stripe runs a key at most once, answers a
   finished request with its saved result and a running one with 409. Only a
   409 or other unknown answer refuses with `ItemChangeInFlight`. Callers
-  keep one key per intent across retries (e.g. `computer-remove:{effect}:{n}`
+  keep one key per intent across retries (e.g. `computer-remove:{computer}:{effect}:{n}`; keys must be unique across every environment sharing the Stripe account, so they carry a computer or other global id, never only a per-database sequence number
   moves to `n+1` only once `n` definitely did not apply), so a retry replays
   its own change rather than being refused by it. A trialing subscription never
   gains a computer item (`SubscriptionTrialing`); its own replay sends the stored endpoint and exact
@@ -74,6 +74,14 @@ event contract (schema, sanitization, delivery semantics).
   `traced(stripe_span!("stripe.<object>.<verb>", <object>_id = …), …)`.
 - `src/inbound/axum_router.rs` / `src/inbound/toolset.rs`: HTTP routes and AI
   tool surface.
+- `src/domain/contacts_enqueuer.rs` (`ContactsEnqueuer`, adapter
+  `outbound/contacts_enqueuer.rs`): the contacts side effects of membership,
+  best-effort after the change commits. A join also enqueues legacy edges
+  joiner ↔ teammates. Joins and removals send `directory_changed` both ways
+  (the roster re-reads the member; the member re-reads the roster), and team
+  deletion sends every member the whole roster. Teammates are computed from the
+  roster, so nothing is written; a roster over 500 is sent as unknown.
+  `authentication_service` wires it through the `contacts-list-writes` gate.
 - `src/outbound/team_repo.rs`: the Postgres repository; reads use the supplied pool.
 - `src/domain/team_repo.rs`: reuse `get_user_teams` for viewer teams and `get_all_team_members` for team membership, including owners.
 

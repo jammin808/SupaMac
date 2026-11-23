@@ -17,12 +17,19 @@ pub enum AddressPolicy {
 }
 
 impl AddressPolicy {
-    /// Local development reaches local servers; every deployed environment
-    /// is public-only.
-    pub fn for_environment(environment: Environment) -> Self {
+    /// Public addresses only, unless a local environment opted in to private
+    /// ones (`DEV_DANGEROUS_PRIVATE_MCP_ADDRESSES`). The opt-in is refused in
+    /// every deployed environment.
+    pub fn for_opt_in(
+        environment: Environment,
+        private_addresses: bool,
+    ) -> Result<Self, PrivateAddressesOutsideLocal> {
+        if !private_addresses {
+            return Ok(Self::PublicOnly);
+        }
         match environment {
-            Environment::Local => Self::AnyAddress,
-            Environment::Develop | Environment::Production => Self::PublicOnly,
+            Environment::Local => Ok(Self::AnyAddress),
+            Environment::Develop | Environment::Production => Err(PrivateAddressesOutsideLocal),
         }
     }
 
@@ -33,6 +40,11 @@ impl AddressPolicy {
         }
     }
 }
+
+/// The private-address opt-in was set in a deployed environment.
+#[derive(Debug, thiserror::Error)]
+#[error("DEV_DANGEROUS_PRIVATE_MCP_ADDRESSES is only allowed when ENVIRONMENT=local")]
+pub struct PrivateAddressesOutsideLocal;
 
 /// The URL names a host the policy refuses.
 #[derive(Debug, thiserror::Error)]

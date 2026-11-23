@@ -1,6 +1,8 @@
+import { WEB_BASE_PATH } from '@app/constants/routerBase';
 import { useAiUsageLimitState } from '@core/constant/AiUsageLimitState';
 import { DEV_MODE_ENV, LOCAL_ONLY } from '@core/constant/featureFlags';
 import { useSettingsState } from '@core/constant/SettingsState';
+import { SELF_HOSTED } from '@core/constant/servers';
 import { fireAndForget } from '@core/util/fireAndForget';
 import { getWebOrigin } from '@core/util/webOrigin';
 import {
@@ -36,7 +38,7 @@ export function Usage() {
   const previewing = usagePreview.active;
   const available = () => !usagePreview.beforeLaunch();
   // Stripe can't return to the native app's own origin.
-  const returnUrl = `${getWebOrigin()}/app/settings/usage`;
+  const returnUrl = `${getWebOrigin()}${WEB_BASE_PATH}/settings/usage`;
   const usageSummary = () => {
     const snapshot = usagePreview.withPreview(
       summary.isSuccess ? summary.data : undefined,
@@ -135,8 +137,9 @@ export function Usage() {
       if (!available()) return;
       window.location.href = url;
     },
+    // A self-hosted instance has no plans page to open.
     openPlans: () => {
-      if (available()) openSettings('Billing');
+      if (available() && !SELF_HOSTED) openSettings('Billing');
     },
     existingUsageBilling: {
       pending: () => overage.isPending,

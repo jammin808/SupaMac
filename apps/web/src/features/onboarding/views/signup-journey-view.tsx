@@ -1,4 +1,6 @@
+import { PRODUCT_NAME } from '@app/constants/product';
 import { LOCAL_ONLY } from '@core/constant/featureFlags';
+import { SELF_HOSTED } from '@core/constant/servers';
 import { fireAndForget } from '@core/util/fireAndForget';
 import { type JSX, onCleanup, Show } from 'solid-js';
 import { BypassButton } from '../components/bypass-button';
@@ -60,7 +62,7 @@ export function SignupJourneyView(props: {
           ? undefined
           : () => {
               if (props.showingEmail) props.onBackFromEmail();
-              else goTo(previousSignupStep(journey.step()));
+              else goTo(previousSignupStep(journey.step(), journey.steps));
             }
       }
       heroFooter={
@@ -77,15 +79,20 @@ export function SignupJourneyView(props: {
         </Show>
       }
       explainer={
-        journey.step() === 'security' || journey.step() === 'work' ? (
+        // The trust details and sign-up terms are the hosted service's own;
+        // they say nothing about a self-hosted instance. A plain SELF_HOSTED
+        // test, which the compiler leaves unwrapped, folds them out of its
+        // bundle.
+        SELF_HOSTED ? undefined : journey.step() === 'security' ||
+          journey.step() === 'work' ? (
           <OnboardingTrustDetails
             topic={journey.step() === 'security' ? 'security' : 'google'}
             microsoft={journey.step() === 'work' && !!props.onMicrosoft}
             legal={
               journey.step() === 'work' ? (
                 <>
-                  Your work email becomes your Macro sign-in. By continuing, you
-                  agree to our{' '}
+                  Your work email becomes your {PRODUCT_NAME} sign-in. By
+                  continuing, you agree to our{' '}
                   <a href="/terms" class="underline underline-offset-2">
                     terms
                   </a>{' '}
@@ -107,10 +114,10 @@ export function SignupJourneyView(props: {
           fallback={
             <StoryStageView
               step={storyStep() ?? 'security'}
-              onNext={() => goTo(nextSignupStep(journey.step()))}
+              onNext={() => goTo(nextSignupStep(journey.step(), journey.steps))}
               onWorkspaceContinue={(color) => {
                 journey.setAccent(color);
-                goTo('vision');
+                goTo(nextSignupStep('welcome', journey.steps));
               }}
             />
           }

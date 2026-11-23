@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { fetchEmailConnectionProviders } from '@queries/auth/outlook-link';
 import {
   Button,
@@ -46,8 +47,8 @@ export function EmailProviderDialog(
             </Show>
           </Dialog.Description>
           <p class="text-ink-muted text-sm/tight">
-            Macro connects an account's email and calendar together, so keep the
-            email permissions checked on the provider's screen.
+            {PRODUCT_NAME} connects an account's email and calendar together, so
+            keep the email permissions checked on the provider's screen.
           </p>
           <Button
             variant="secondary"

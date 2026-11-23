@@ -17,6 +17,18 @@ and backend document transformations.
 Keep runtime code independent of the web app and browser-only modules. The web
 composer imports the URL matcher from this package; do not duplicate it.
 
+Links into the app (exported mentions, snapshots, booking links) and the
+static-file host that video links embed from come from `utils/app-links.ts`.
+A host that knows its addresses calls `configureAppLinks({ appUrl,
+staticFileUrl })` at startup: the self-hosted web bundle does it in
+`initializeLexical` from its origin, `WEB_BASE_PATH` and `SERVER_HOSTS`, and the
+services that convert Markdown on the server do it from their configuration.
+Without it links follow the page (its origin under `/app`), no host's static
+files count as the app's, and outside a page no app URL is invented: a booking
+link that is not the app's is saved with an empty URL, which the editor that
+loads it rebuilds. No upstream host is trusted by default. Build new app links
+with `appLinkUrl`, never a host or `/app` literal.
+
 ## Checks
 
 - From `apps/web`: `bun run test --project lexical-core`.
@@ -67,3 +79,5 @@ element transformers only on top-level nodes, so `listItemImage` exports it as
 an indented line, and the image importers attach an indented image line after a
 list to its last item. Add it to any new transformer set that has image
 transformers.
+
+Creation-time markdown snapshots write explicit root pins as `pending:<definitionId>`; omit initial pins to preserve the blank golden snapshot and implicit defaults.

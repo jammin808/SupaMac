@@ -1,3 +1,4 @@
+import { WEB_BASE_PATH } from '@app/constants/routerBase';
 import ResetIcon from '@icon/system/regular/arrow-clockwise.svg';
 import HomeIcon from '@icon/system/regular/house.svg';
 import { Telemetry } from '@macro-inc/observability';
@@ -42,7 +43,7 @@ export function FatalError(props: FatalErrorProps) {
               <Button
                 variant="secondary"
                 onClick={() => {
-                  window.location.href = window.location.origin + '/app';
+                  window.location.href = window.location.origin + WEB_BASE_PATH;
                 }}
               >
                 <HomeIcon class="size-4" /> Home

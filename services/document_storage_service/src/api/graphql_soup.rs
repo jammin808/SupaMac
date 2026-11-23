@@ -23,6 +23,7 @@ use macro_authorization::{
     MacroUserAuthentication, OptionalMacroAuthorizationExtractor, UserOrInternalService,
     UserOrInternalServiceAuthorization,
 };
+use macro_cors::AllowedUpgradeOrigin;
 use macro_user_id::user_id::MacroUserIdStr;
 use uuid::Uuid;
 
@@ -97,6 +98,7 @@ fn graphql_response(result: async_graphql::Response) -> Response {
 }
 
 async fn subscription_handler(
+    _origin: AllowedUpgradeOrigin,
     State(state): State<ApiContext>,
     Cached(auth): Cached<
         OptionalMacroAuthorizationExtractor<AuthorizationService, UserOrInternalService>,

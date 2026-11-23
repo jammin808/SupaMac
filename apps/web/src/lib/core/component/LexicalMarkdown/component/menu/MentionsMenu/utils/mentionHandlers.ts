@@ -1,7 +1,9 @@
+import { WEB_BASE_PATH } from '@app/constants/routerBase';
 import { toast } from '@core/component/Toast/Toast';
 import type { EntityItem } from '@core/context/quickAccess';
 import { trackMention } from '@core/signal/mention';
 import type { DateOption } from '@core/util/dateSearch/useDateSearch';
+import { getCopiedLinkOrigin } from '@core/util/webOrigin';
 import type { ChannelEntity, CrmCompanyEntity, EmailEntity } from '@entity';
 import { Telemetry } from '@macro-inc/observability';
 import { match } from 'ts-pattern';
@@ -176,10 +178,7 @@ async function handleGroupMentionItem(
 }
 
 function buildBookingUrl(profileId: string, slug: string): string {
-  const hostname = window.location.hostname;
-  const cleanHost =
-    hostname === 'localhost' ? 'dev.macro.com' : hostname.replace('www.', '');
-  return `https://${cleanHost}/app/book/${encodeURIComponent(profileId)}/${encodeURIComponent(slug)}`;
+  return `${getCopiedLinkOrigin()}${WEB_BASE_PATH}/book/${encodeURIComponent(profileId)}/${encodeURIComponent(slug)}`;
 }
 
 /**

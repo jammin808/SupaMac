@@ -1,13 +1,15 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import { toast } from '@core/component/Toast/Toast';
 import { fireAndForget } from '@core/util/fireAndForget';
 import { ThrownResultError } from '@core/util/result';
 import ArrowLeftIcon from '@icon/system/regular/arrow-left.svg';
+import KeyIcon from '@icon/system/regular/key.svg';
 import {
   useCursorApiKeyStatusQuery,
   useDisconnectCursorApiKey,
   useSaveCursorApiKey,
 } from '@queries/auth/cursor-api-key';
-import { ApiKeyInput, Button, confirmDialog } from '@ui';
+import { Button, confirmDialog, SecretInput } from '@ui';
 import { createSignal, Show } from 'solid-js';
 import cursorApiKeysScreenshot from './assets/cursor-api-keys.png';
 import { CursorDefaultModel } from './components/cursor-default-model';
@@ -70,7 +72,7 @@ export function CursorConnectPage(props: { onClose: () => void }) {
     if (disconnect.isPending) return;
     const confirmed = await confirmDialog({
       title: 'Disconnect Cursor?',
-      body: "Remove your Cursor connection from Macro? This removes Macro's copy of the API key but does not revoke it in Cursor.",
+      body: `Remove your Cursor connection from ${PRODUCT_NAME}? This removes ${PRODUCT_NAME}'s copy of the API key but does not revoke it in Cursor.`,
       confirmLabel: 'Disconnect',
       tone: 'danger',
     });
@@ -87,7 +89,7 @@ export function CursorConnectPage(props: { onClose: () => void }) {
     <SettingsPage
       title={connected() ? 'Cursor' : 'Connect Cursor'}
       showTitleInSheet
-      description="Run agents on your own Cursor subscription. Sessions run in Cursor Cloud and stream into Macro."
+      description={`Run agents on your own Cursor subscription. Sessions run in Cursor Cloud and stream into ${PRODUCT_NAME}.`}
       actions={
         <Button variant="ghost" size="sm" onClick={props.onClose}>
           <ArrowLeftIcon class="size-3 touch:size-6 shrink-0 pointer-events-none" />
@@ -124,8 +126,8 @@ export function CursorConnectPage(props: { onClose: () => void }) {
               </SetupStep>
               <SetupStep number={2} title="Paste your API key">
                 <p>
-                  Macro stores it encrypted and only uses it to start and follow
-                  your Cursor sessions.
+                  {PRODUCT_NAME} stores it encrypted and only uses it to start
+                  and follow your Cursor sessions.
                 </p>
                 <Show
                   when={loaded()}
@@ -147,12 +149,14 @@ export function CursorConnectPage(props: { onClose: () => void }) {
                         >
                           API key
                         </label>
-                        <ApiKeyInput
+                        <SecretInput
                           ref={focusOnMount}
                           id="cursor-api-key"
                           aria-describedby="cursor-api-key-help"
                           size="lg"
-                          prefix={CURSOR_KEY_PREFIX}
+                          autocomplete="new-password"
+                          icon={<KeyIcon />}
+                          placeholder={`${CURSOR_KEY_PREFIX}…`}
                           value={apiKey()}
                           disabled={saveKey.isPending}
                           onValueChange={setApiKey}

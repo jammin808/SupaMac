@@ -7,6 +7,7 @@ import type {
 } from '../../../generated/storage/types.gen';
 import type { MacroClient } from '../../utils/client';
 import { MacroApiError, MacroError, unwrap } from '../../utils/unwrap';
+import { webAppLink } from '../../utils/web-app';
 import {
   DocumentEditRefusedError,
   EditOutcomeUnknownError,
@@ -320,7 +321,7 @@ export class Spreadsheet extends Document {
    * @readonly
    */
   override webUrl(): string {
-    return `${this.client.webAppUrl}/app/spreadsheet/${this.id}`;
+    return webAppLink(this.client.webAppUrl, `/spreadsheet/${this.id}`);
   }
 
   /** A handle to a native spreadsheet by document id. */

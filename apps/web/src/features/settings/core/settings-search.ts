@@ -1,9 +1,13 @@
+import { PRODUCT_NAME } from '@app/lib/constants/product';
 import type { SettingsTab } from '@core/constant/SettingsState';
 import type {
   SettingsTabGroup,
   SettingsTabItem,
 } from '@core/constant/settingsTabsConfig';
-import { NOTIFICATION_EVENT_GROUPS } from '../../notifications/notification-event-catalog';
+import {
+  AGENT_PINGS_EVENT_TYPE,
+  NOTIFICATION_EVENT_GROUPS,
+} from '../../notifications/notification-event-catalog';
 import { settingsTarget } from './settings-target';
 
 type Setting = {
@@ -13,6 +17,8 @@ type Setting = {
   keywords: string;
   /** Listed only with `enable-macro-computers` on. */
   macroComputers?: true;
+  /** The notification event this setting toggles. */
+  eventType?: string;
 };
 export type SettingsSearchResult = Setting & {
   id: string;
@@ -62,6 +68,7 @@ const SETTINGS: Setting[] = [
       target: group.label,
       keywords: `${group.label} ${event.description}`,
       macroComputers: event.macroComputers,
+      eventType: event.type,
     }))
   ),
   {
@@ -334,7 +341,7 @@ const SETTINGS: Setting[] = [
   },
   {
     tab: 'Agent',
-    title: 'Connect to the Macro MCP server',
+    title: `Connect to the ${PRODUCT_NAME} MCP server`,
     keywords: 'claude chatgpt external client url setup',
   },
   {
@@ -411,6 +418,8 @@ export function searchSettings(
     emailRowStyle?: boolean;
     outlook?: boolean;
     macroComputers?: boolean;
+    /** Whether search lists the Agent pings notification setting. */
+    agentNotifications?: boolean;
   } = {}
 ): SettingsSearchResult[] {
   const tokens = words(query);
@@ -433,7 +442,9 @@ export function searchSettings(
         (options.emailRowStyle !== false ||
           setting.title !== 'Email row style') &&
         (options.outlook !== false || setting.title !== 'Outlook') &&
-        (options.macroComputers !== false || !setting.macroComputers)
+        (options.macroComputers !== false || !setting.macroComputers) &&
+        (options.agentNotifications !== false ||
+          setting.eventType !== AGENT_PINGS_EVENT_TYPE)
     ).map((setting) => ({
       ...setting,
       target: settingsTarget(setting.target),
