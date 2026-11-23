@@ -297,6 +297,14 @@ says who made each change and whether an agent acted for them:
   is told on Telegram. Documents can carry instructions; only the owner
   decides.
 
+Row history names an agent only when the assistant writes through its own
+tools. A program the assistant runs in code mode, or a routine's code step,
+uses the owner's credentials and is recorded as the owner. So a status set in
+SupaMac counts as **confirmed in SupaMac**, not as confirmed on Telegram, and
+the next Telegram summary lists every detail confirmed or rejected in SupaMac
+since the last one, so a change the owner did not make shows up. Only a Review
+button press is certain to be the owner.
+
 Before acting on a Review button the service re-reads the detail; if it
 changed in SupaMac, the button reports its current state instead.
 
