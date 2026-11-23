@@ -1,5 +1,8 @@
+import { sleep } from 'bun';
 import { describe, expect, test } from 'bun:test';
-import { dirname } from 'node:path';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { extract } from '../../src/text/extract';
 import { extractInSandbox } from '../../src/text/sandbox';
@@ -154,5 +157,33 @@ describe('extractInSandbox', () => {
       { limits: { maxBytes: 1024 }, entry: fixture('crash') }
     );
     expect(!outcome.ok && outcome.refusal.kind).toBe('too_large');
+  });
+
+  test('kills what the child started and left behind: its whole process group goes with it', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'jobs-sandbox-'));
+    try {
+      const pidFile = join(dir, 'left.pid');
+      const outcome = await extractInSandbox(
+        new TextEncoder().encode(pidFile),
+        { name: 'notes.txt' },
+        { entry: fixture('leave-behind') }
+      );
+      expect(outcome.ok).toBe(false);
+      const pid = Number(readFileSync(pidFile, 'utf8'));
+      expect(pid).toBeGreaterThan(0);
+      const running = (): boolean => {
+        const stat = `/proc/${pid}/stat`;
+        if (!existsSync(stat)) return false;
+        const state = readFileSync(stat, 'utf8')
+          .slice(readFileSync(stat, 'utf8').lastIndexOf(')') + 2)
+          .charAt(0);
+        return state !== 'Z' && state !== 'X';
+      };
+      const end = Date.now() + 3000;
+      while (running() && Date.now() < end) await sleep(20);
+      expect(running()).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

@@ -16,6 +16,7 @@ const TextPageSchema = z.object({
   kind: z.enum(['text', 'scan', 'history']),
   date: z.string().optional(),
   from: z.string().optional(),
+  unsure: z.string().optional(),
   lines: z.array(z.string()),
 });
 
@@ -165,4 +166,28 @@ export function requestLimits(request: WorkerRequest): Limits {
     Object.entries(request.limits).filter(([, v]) => v !== undefined)
   );
   return { ...LIMITS, ...set };
+}
+
+/** The header that carries a request to the extraction container, as base64 JSON. */
+export const REQUEST_HEADER = 'x-extract-request';
+
+/** Encodes a request for REQUEST_HEADER. */
+export function encodeRequest(request: WorkerRequest): string {
+  return Buffer.from(JSON.stringify(request), 'utf8').toString('base64');
+}
+
+/** Reads REQUEST_HEADER; undefined when it is missing or does not validate. */
+export function decodeRequest(
+  header: string | null | undefined
+): WorkerRequest | undefined {
+  if (header === null || header === undefined || header.length > 8192)
+    return undefined;
+  try {
+    const parsed = WorkerRequestSchema.safeParse(
+      JSON.parse(Buffer.from(header, 'base64').toString('utf8'))
+    );
+    return parsed.success ? parsed.data : undefined;
+  } catch {
+    return undefined;
+  }
 }

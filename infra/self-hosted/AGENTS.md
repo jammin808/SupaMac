@@ -65,7 +65,7 @@ on the box. The Pulumi stacks next to it are upstream's AWS and are not used.
   the local stack's queue catalogue and `compose.yaml`. `sh -n` on
   `ops/scripts/*.sh`; Biome through `bun run --cwd infra lint`.
 - `docker build -f infra/self-hosted/ops/Dockerfile .` from the repository
-  root: validates both Caddy files and runs the tests.
+  root: validates the Caddy files and runs the tests.
 
 ## Gotchas
 
@@ -108,15 +108,22 @@ on the box. The Pulumi stacks next to it are upstream's AWS and are not used.
   `SUPAMAC_JOBS_MAIL_PORT`), because `jobs-egress`'s allow-list is made
   from them and the proxy gets no secret.
 - The `jobs` network is internal and isolated (`x-isolated`: no address on
-  its bridge, Docker Engine 28 or later): a jobs container reaches the
-  gateway and `jobs-egress` and nothing else, the VPS's own listeners
-  included. Set `HTTPS_PROXY` there, never `HTTP_PROXY`: Bun sends an
-  `http://` URL to an `HTTP_PROXY` as a plain request, which the proxy
-  refuses, and the gateway is plain HTTP.
-- The jobs service calls the gateway on port 8081, which serves `/dss` and
-  GET under `/local-storage` only and trusts no `X-Forwarded-For`. A route
-  the service starts to use goes into that site of the Caddyfile too; never
-  point it at port 8080, which trusts any private caller's header.
+  its bridge, Docker Engine 28 or later): a jobs container reaches
+  `jobs-gateway` and `jobs-egress` and nothing else, the VPS's own
+  listeners included. Never put the main gateway on it: its `/unfurl` and
+  `/image-proxy` fetch any address. Set `HTTPS_PROXY` there, never
+  `HTTP_PROXY`: Bun sends an `http://` URL to an `HTTP_PROXY` as a plain
+  request, which the proxy refuses, and the jobs gateway is plain HTTP.
+- The jobs service calls `jobs-gateway` on port 8081
+  (`ops/config/jobs-gateway/Caddyfile`), which serves `/dss` and GET under
+  `/local-storage` only and trusts no `X-Forwarded-For`. A route the
+  service starts to use goes there; its deny rules repeat the main
+  gateway's word for word (`ops/src/jobs-gateway.test.ts`).
+- The jobs service parses no file itself: `jobs-extract` does, with no env
+  file, no volume and a network (`jobs-extract`) shared with `jobs` alone.
+  Never give it `jobs.env`, the state volume or another network: a health
+  check or `docker exec` in `jobs` carries every jobs secret, so no parser
+  may run beside it.
 - The ops image's base is Postgres's, which declares a volume at
   `/var/lib/postgresql`. A read-only container of the ops image mounts a
   tmpfs there, or Docker gives it a writable anonymous volume.

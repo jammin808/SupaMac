@@ -20,9 +20,12 @@ RUN cargo install sqlx-cli --version 0.9.1 --locked \
 # A config that does not parse fails the build, not the deployment.
 FROM caddy:2-alpine@sha256:003a97808e781aa9f7e75cc2f43d34d461099031faf5e20faefb9f61126836f0 AS caddy-check
 COPY infra/self-hosted/ops/config/gateway/Caddyfile /check/gateway/Caddyfile
+COPY infra/self-hosted/ops/config/jobs-gateway/Caddyfile /check/jobs-gateway/Caddyfile
 COPY infra/self-hosted/ops/config/router/Caddyfile /check/router/Caddyfile
 RUN SUPAMAC_UI_ORIGIN=https://example.com \
       caddy validate --adapter caddyfile --config /check/gateway/Caddyfile \
+    && SUPAMAC_UI_ORIGIN=https://example.com \
+      caddy validate --adapter caddyfile --config /check/jobs-gateway/Caddyfile \
     && caddy validate --adapter caddyfile --config /check/router/Caddyfile \
     && touch /check/passed
 

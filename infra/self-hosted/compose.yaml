@@ -793,15 +793,15 @@ services:
       traefik.http.middlewares.supamac-api-headers.headers.referrerPolicy: no-referrer
     volumes:
       - config:/supamac:ro
-    # `jobs`: the jobs service reaches SupaMac through this container only,
-    # on port 8081, which serves it the storage API and object downloads and
-    # takes no X-Forwarded-For from it (ops/config/gateway/Caddyfile).
-    networks: [internal, traefik, jobs]
+    # Not on `jobs`: the jobs service has a gateway of its own
+    # (jobs-gateway), so nothing in a jobs container reaches this one's
+    # public routes.
+    networks: [internal, traefik]
     depends_on:
       init-volumes:
         condition: service_completed_successfully
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/healthz && wget -q -O /dev/null http://127.0.0.1:8081/healthz"]
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/healthz"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -1253,8 +1253,9 @@ services:
   # orders (docs/supamac/jobs.md)
   # ==========================================================================
 
-  # Works in SupaMac as its own account, through the gateway, and reaches the
-  # internet only through jobs-egress: the `jobs` network has no route out.
+  # Works in SupaMac as its own account, through jobs-gateway, and reaches
+  # the internet only through jobs-egress: the `jobs` network has no route
+  # out. Files are parsed in jobs-extract, which holds none of its secrets.
   jobs:
     <<: *container
     profiles: [jobs]
@@ -1269,7 +1270,8 @@ services:
     # Wiring only, no secret. A name set here wins over jobs.env, so none of
     # these is read from that file.
     environment:
-      JOBS_SUPAMAC_URL: http://gateway:8081/dss
+      JOBS_SUPAMAC_URL: http://jobs-gateway:8081/dss
+      JOBS_EXTRACT_URL: http://jobs-extract:8090
       JOBS_WEB_APP_URL: ${SUPAMAC_UI_ORIGIN}${SUPAMAC_UI_PATH:-}
       JOBS_STATE_DIR: /var/lib/supamac-jobs
       JOBS_HEALTH_PORT: "8080"
@@ -1278,33 +1280,34 @@ services:
       JOBS_MAIL_HOST: ${SUPAMAC_JOBS_MAIL_HOST:-}
       JOBS_MAIL_PORT: ${SUPAMAC_JOBS_MAIL_PORT:-993}
       # HTTPS and the mailbox go through the proxy; plain HTTP, which is the
-      # gateway alone, does not. No HTTP_PROXY: the proxy refuses plain
-      # requests.
+      # jobs gateway and the extraction container alone, does not. No
+      # HTTP_PROXY: the proxy refuses plain requests.
       HTTPS_PROXY: http://jobs-egress:3128
-      NO_PROXY: gateway,localhost,127.0.0.1
+      NO_PROXY: jobs-gateway,jobs-extract,localhost,127.0.0.1
       # The root is read-only: no transpiler cache.
       BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0"
     user: "65534:65534"
     read_only: true
     tmpfs:
-      # Scratch space for the text extraction's child process.
-      - /tmp:size=64m,mode=1777
+      - /tmp:size=16m,mode=1777
       # The ops image's base declares a volume here, which Docker would
       # otherwise give this container as a writable anonymous volume.
       - /var/lib/postgresql:size=4k,mode=0555
     volumes:
       - jobs_state:/var/lib/supamac-jobs
-    networks: [jobs]
+    networks: [jobs, jobs-extract]
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
-    # The service, its extraction child and the health check, each a Bun
-    # process with a thread per core and a few more.
-    pids_limit: 256
+    # The service and the health check, each a Bun process with a thread per
+    # core and a few more. No parser runs here.
+    pids_limit: 128
     depends_on:
       # Hands the state volume to uid 65534.
       init-volumes:
         condition: service_completed_successfully
-      gateway:
+      jobs-gateway:
+        condition: service_healthy
+      jobs-extract:
         condition: service_healthy
       # What the service calls behind the gateway: it exits when the Jobs
       # database cannot be verified at start.
@@ -1316,7 +1319,9 @@ services:
       # 503 while any of its loops (the ways in, the folder, edit and
       # resume polls, the Status tick) has not succeeded for five
       # intervals. The body of /health and the service's log say which;
-      # with SupaMac down the Status row cannot.
+      # with SupaMac down the Status row cannot. Like any exec, the check
+      # carries the container's environment, jobs.env's secrets included,
+      # which is why no file is ever parsed in this container.
       test: ["CMD", "bun", "-e", "fetch('http://127.0.0.1:8080/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
       interval: 30s
       timeout: 10s
@@ -1329,11 +1334,82 @@ services:
     # that runs longer than this is cut, and asked again at the next start.
     stop_grace_period: 5m
     # An estimate, not measured under load: one source at a time. Loaded and
-    # idle the service holds about 85 MB; its extraction child up to 384 MB,
-    # read every 25 ms and so able to pass that before it is stopped; the
-    # source and its copy for the child up to 50 MB; the health check's Bun
-    # about 25 MB.
+    # idle the service holds about 85 MB; a source, its copy for the
+    # extraction container and the answer up to 150 MB; the health check's
+    # Bun about 25 MB.
+    mem_limit: 320m
+
+  # Where the jobs service's files are parsed (ops/jobs/src/text/
+  # extract-server.ts): no env_file, no state volume, and no network but the
+  # one it shares with `jobs`, which has no route out. A parser made to run
+  # code reaches no key, no saved state and no other host, and whatever it
+  # starts is killed after each file.
+  jobs-extract:
+    <<: *container
+    profiles: [jobs]
+    image: ${SUPAMAC_OPS_IMAGE}
+    command: ["bun", "/opt/supamac/jobs/src/text/extract-server.ts"]
+    # PID 1 reaps what the sweep kills.
+    init: true
+    environment:
+      JOBS_EXTRACT_PORT: "8090"
+      JOBS_EXTRACT_SWEEP: "on"
+      BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0"
+    user: "65534:65534"
+    read_only: true
+    tmpfs:
+      # Scratch space for the parser.
+      - /tmp:size=64m,mode=1777
+      # Over the volume the ops image's base declares (see `jobs`).
+      - /var/lib/postgresql:size=4k,mode=0555
+    networks: [jobs-extract]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    # The server, its child and the health check, each a Bun process with a
+    # thread per core and a few more.
+    pids_limit: 192
+    healthcheck:
+      test: ["CMD", "bun", "-e", "fetch('http://127.0.0.1:8090/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    # An estimate, not measured: the server about 40 MB, a source and its
+    # copy for the child up to 130 MB (64 MiB is the most read), the child up
+    # to 384 MB, read every 25 ms and so able to pass that before it is
+    # stopped, and the health check's Bun about 25 MB.
     mem_limit: 640m
+
+  # The jobs service's own door to SupaMac (ops/config/jobs-gateway/
+  # Caddyfile): port 8081 only, the storage API and GET of the objects it
+  # links to, no X-Forwarded-For taken from the caller. The main gateway is
+  # not on `jobs`, so its public routes (/unfurl, /image-proxy, /auth) are
+  # out of the jobs containers' reach.
+  jobs-gateway:
+    <<: *container
+    profiles: [jobs]
+    image: caddy:2-alpine@sha256:003a97808e781aa9f7e75cc2f43d34d461099031faf5e20faefb9f61126836f0
+    command: ["caddy", "run", "--config", "/supamac/config/jobs-gateway/Caddyfile", "--adapter", "caddyfile"]
+    environment:
+      SUPAMAC_UI_ORIGIN: ${SUPAMAC_UI_ORIGIN}
+    labels: *config-label
+    volumes:
+      - config:/supamac:ro
+    networks: [internal, jobs]
+    depends_on:
+      init-volumes:
+        condition: service_completed_successfully
+      # What the service calls through it: the service exits when the Jobs
+      # database cannot be verified at start.
+      document-storage-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8081/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    mem_limit: 64m
 
   # The jobs service's way out: an HTTP CONNECT proxy that opens tunnels to
   # the listed host:port pairs only, and to none that resolves to a private
@@ -1416,9 +1492,11 @@ networks:
   # For the containers that call the outside: AI providers, the SMTP
   # provider, fetched links and images.
   egress:
-  # The jobs service, its egress proxy and the gateway. No route out: the
+  # The jobs service, its egress proxy and its gateway. No route out: the
   # proxy is the jobs service's only way to the internet.
   jobs: *isolated
+  # The jobs service and its extraction container, and nothing else.
+  jobs-extract: *isolated
   # The network of the VPS's Traefik.
   traefik:
     external: true

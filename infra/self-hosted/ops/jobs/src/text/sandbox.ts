@@ -7,14 +7,19 @@
 //   environment (so none of the service's secrets), no .env loading, no
 //   package auto-install, and its working directory beside the worker. It
 //   gets the bytes on stdin and the hint and limits as JSON in its arguments.
-// - The child runs as the service's own user, so the service's environment
-//   is out of its reach through /proc only because the service has made
-//   itself not dumpable (seal.ts, in main). It still shares the service's
-//   network and state volume.
-// - The child is killed (SIGKILL) when it runs past `timeoutMs`, when its
-//   resident memory passes `memoryLimitBytes` (read from /proc every
-//   `pollMs`), or when its stdout grows past four times the input plus 16 MiB.
-//   Each is a typed failure; so is a non-zero exit and an answer that does not
+// - The child runs as its parent's user. In the stack the parent is the
+//   extraction container's server (extract-server.ts), which holds no
+//   secret, no state volume and no route out; the service itself parses in a
+//   child only when JOBS_EXTRACT_URL is unset (development), and then the
+//   child shares its user, network and state volume and is kept from its
+//   environment only by the seal (seal.ts).
+// - The child leads a process group of its own (`detached`, setsid), and the
+//   whole group is killed (SIGKILL) when the child runs past `timeoutMs`,
+//   when its resident memory passes `memoryLimitBytes` (read from /proc every
+//   `pollMs`), when its stdout grows past four times the input plus 16 MiB,
+//   and again once it has exited, so no process it started outlives the call
+//   unless it left the group (extract-server.ts sweeps those). Each stop is a
+//   typed failure; so is a non-zero exit and an answer that does not
 //   validate. The call always settles: it never waits on a child that hangs.
 // - Without /proc (not Linux) memory is bounded only by the timeout.
 // - stderr is drained so the child never blocks on it, and is never shown:
@@ -140,12 +145,14 @@ export async function extractInSandbox(
     stdin: new Blob([bytes]),
     stdout: 'pipe',
     stderr: 'pipe',
+    detached: true,
   });
 
   let stopped: StopReason | undefined;
   const stop = (reason: StopReason): void => {
     if (stopped !== undefined) return;
     stopped = reason;
+    killGroup(child.pid);
     child.kill('SIGKILL');
   };
   const timer = setTimeout(() => stop('timeout'), timeoutMs);
@@ -198,5 +205,16 @@ export async function extractInSandbox(
   } finally {
     clearTimeout(timer);
     clearInterval(poll);
+    // Whatever the child started and left behind in its group.
+    killGroup(child.pid);
+  }
+}
+
+/** Kills every process of the group `pid` leads; nothing when it is empty. */
+export function killGroup(pid: number): void {
+  try {
+    process.kill(-pid, 'SIGKILL');
+  } catch {
+    // ESRCH: the group is empty, which is the usual end.
   }
 }
