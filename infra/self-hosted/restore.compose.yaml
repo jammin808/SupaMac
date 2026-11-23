@@ -84,6 +84,7 @@ services:
       - kms_data:/volumes/kms
       - sync_state:/volumes/sync-state
       - agent_git:/volumes/agent-git
+      - jobs_state:/volumes/jobs-state
     depends_on:
       postgres:
         condition: service_healthy
@@ -111,6 +112,9 @@ volumes:
   agent_git:
     external: true
     name: supamac_agent_git
+  jobs_state:
+    external: true
+    name: supamac_jobs_state
   backups:
     external: true
     name: supamac_backups

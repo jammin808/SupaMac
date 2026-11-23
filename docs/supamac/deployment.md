@@ -10,9 +10,13 @@ working instructions are in
   the operator's site. See [static publishing](static-publishing.md).
 - **The backend** is one Docker Compose project on one server, published at
   `https://<api host>` (`SUPAMAC_API_HOST`) through the Traefik that server
-  already runs. One gateway container is the only thing reachable from
-  outside. The API host shares a registrable domain with the UI, because
+  already runs, on Docker Engine 28 or later. One gateway container is the
+  only thing reachable from outside. The API host shares a registrable domain with the UI, because
   session cookies are strict, and is chosen before the first start.
+- **The jobs service**, optional (the `jobs` profile), reads job invites,
+  production packs and purchase orders into a Jobs database; see
+  [jobs](jobs.md). It works in SupaMac as its own account through the
+  gateway, and reaches the internet only through its own egress proxy.
 - **Nothing runs in the upstream company's cloud.** Postgres, Redis, Kafka,
   an object store and stand-ins for the AWS queue, table and key services run
   on the server, with their data on Docker volumes.
@@ -32,6 +36,12 @@ returns sign-in codes in its responses.
 4. Add the SMTP provider's login and any AI keys on the server, and deploy
    again.
 5. Publish the web bundle and sign in.
+6. Optionally, the jobs service, once someone can sign in: its own SupaMac
+   account and API key, its settings in `/etc/supamac/jobs.env` on the
+   server, the mailbox's host in the deploy tool, `jobs` added to the
+   profiles, and deploy again. The steps are the design's
+   [Setup](jobs.md#setup) and the stack's README,
+   [The jobs profile](../../infra/self-hosted/README.md#the-jobs-profile).
 
 Sign-in is by a code sent to an allow-listed address. There is no password
 sign-in and no Google sign-in in this deployment.
@@ -39,7 +49,8 @@ sign-in and no Google sign-in in this deployment.
 ## Upgrading
 
 An upgrade is a new set of images and a new web bundle, all built from one
-commit. The order matters:
+commit. The jobs service is part of the ops image and moves with it. The
+order matters:
 
 1. **Take a backup.** Restart the `backup` container: it makes a backup as
    it starts. Wait for `backup <time> complete` in its log, and keep the copy
@@ -199,7 +210,8 @@ stack's README lists what was run under
 [After the snapshot of 2026-11-21](../../infra/self-hosted/README.md#after-the-snapshot-of-2026-11-21).
 
 Not verified: a real server, Traefik, a real domain and a real SMTP
-provider; the `email` and `search` profiles; the AI assistant answering
+provider; the `email`, `search` and `jobs` profiles (the jobs service and its
+proxy are tested with fakes only); the AI assistant answering
 (the rehearsal had no provider key); restore on a started stack; anything
 under load. Signing out revokes the session's refresh token; an access token
 copied before sign-out still works until it expires, within the hour. No

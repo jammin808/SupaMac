@@ -46,6 +46,12 @@ jobs:
           bun test tooling/supamac
           bun test infra/self-hosted/ops/src
           bun node_modules/typescript-native/bin/tsc --noEmit --strict --skipLibCheck --types bun --target es2022 --module esnext --moduleResolution bundler tooling/supamac/*.ts
+      - name: Test and type-check the jobs service
+        run: |
+          bun install --frozen-lockfile --ignore-scripts
+          bun test
+          bun run check
+        working-directory: infra/self-hosted/ops/jobs
   dependencies:
     name: Live dependency advisories
     runs-on: ubuntu-24.04

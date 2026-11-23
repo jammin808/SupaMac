@@ -1,6 +1,7 @@
 # The one public door of the backend. Traefik terminates TLS for
-# <api host> (SUPAMAC_API_HOST) and forwards every request here; this file
-# decides which service, if any, a path reaches.
+# <api host> (SUPAMAC_API_HOST) and forwards every request to :8080; this
+# file decides which service, if any, a path reaches. :8081 is the jobs
+# service's own door, on the `jobs` network (compose.yaml).
 #
 # The route table follows the local stack's proxy
 # (tooling/xtask/crates/xtask_local/src/local/proxy.rs and inventory.rs), so
@@ -10,13 +11,16 @@
 {
 	admin off
 	auto_https off
-	servers {
+	servers :8080 {
 		# Traefik is the only caller, from a private address. `strict` reads
 		# X-Forwarded-For from the right, so an address a client wrote into
 		# the header can never be taken for the client's own.
 		trusted_proxies static private_ranges
 		trusted_proxies_strict
 	}
+	# :8081 trusts no caller's X-Forwarded-For: the jobs container also has
+	# a private address, and the services must see that address, never one
+	# it wrote into the header.
 }
 
 # Forward to one service. The services take the rightmost X-Forwarded-For
@@ -40,36 +44,56 @@
 	}
 }
 
+# The deny rules of both doors, imported first in each `route`.
+(deny) {
+	# A request carrying the shared internal key and a user id is
+	# authorized as that user on every service. Nothing outside the
+	# compose network may present either, also not a wrong one.
+	request_header -X-Internal-*
+	request_header -X-Document-Storage-Service-*
+
+	# Internal routes are for calls between services. The services mount
+	# them on their public listener, and some mount their whole router a
+	# second time under their own prefix, so the match is on any position
+	# in the path.
+	@internal path */internal */internal/*
+	respond @internal 404
+
+	# Swagger UI and the OpenAPI documents list every route, internal
+	# ones included, to anyone who asks.
+	@api_docs path */docs */docs/* */api-doc */api-doc/*
+	respond @api_docs 404
+
+	# GET on the GraphQL path is the GraphiQL IDE. Queries are POST, and
+	# subscriptions use the /ws path below it.
+	@graphiql {
+		method GET
+		path */soup/graphql
+	}
+	respond @graphiql 404
+}
+
+# Presigned object URLs, below the /local-storage prefix. The services sign
+# them for the in-network name, so the object store must see that Host or
+# the signature fails. This reaches the object store alone: the queue, table
+# and key services share the in-network endpoint and must never be reachable
+# from here.
+(objects) {
+	# The store's own admin, metrics and health API.
+	respond /minio/* 404
+
+	import object_headers
+	reverse_proxy minio:9000 {
+		header_up Host localstack:4566
+	}
+}
+
 :8080 {
 	# `route` keeps the order written here: deny rules run before any routing.
 	route {
 		respond /healthz 200
 
-		# A request carrying the shared internal key and a user id is
-		# authorized as that user on every service. Nothing outside the
-		# compose network may present either, also not a wrong one.
-		request_header -X-Internal-*
-		request_header -X-Document-Storage-Service-*
-
-		# Internal routes are for calls between services. The services mount
-		# them on their public listener, and some mount their whole router a
-		# second time under their own prefix, so the match is on any position
-		# in the path.
-		@internal path */internal */internal/*
-		respond @internal 404
-
-		# Swagger UI and the OpenAPI documents list every route, internal
-		# ones included, to anyone who asks.
-		@api_docs path */docs */docs/* */api-doc */api-doc/*
-		respond @api_docs 404
-
-		# GET on the GraphQL path is the GraphiQL IDE. Queries are POST, and
-		# subscriptions use the /ws path below it.
-		@graphiql {
-			method GET
-			path */soup/graphql
-		}
-		respond @graphiql 404
+		import deny
 
 		# Object uploads go through /local-storage and may be large; an API
 		# request body is JSON. Sizes are decimal: 32MB is 32,000,000 bytes.
@@ -162,22 +186,44 @@
 			}
 		}
 
-		# Presigned object URLs. The services sign them for the in-network
-		# name, so the object store must see that Host or the signature
-		# fails. This route reaches the object store alone: the queue, table
-		# and key services share the in-network endpoint and must never be
-		# reachable from here.
 		handle_path /local-storage/* {
-			# The store's own admin, metrics and health API.
-			respond /minio/* 404
-
 			request_body {
 				max_size 1GB
 			}
-			import object_headers
-			reverse_proxy minio:9000 {
-				header_up Host localstack:4566
-			}
+			import objects
+		}
+
+		handle {
+			respond 404
+		}
+	}
+}
+
+# The jobs service's door. It works through the storage API and downloads
+# the objects that API links to, and reaches nothing else here: not
+# /unfurl or /image-proxy, which fetch any address and would be a way
+# around its egress proxy. The upload API takes up to 25 MiB.
+:8081 {
+	route {
+		respond /healthz 200
+
+		import deny
+
+		request_body {
+			max_size 32MB
+		}
+
+		handle_path /dss/* {
+			import service document-storage-service:8080
+		}
+
+		@object_read {
+			method GET
+			path /local-storage/*
+		}
+		handle @object_read {
+			uri strip_prefix /local-storage
+			import objects
 		}
 
 		handle {

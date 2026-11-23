@@ -1,12 +1,14 @@
 #!/bin/sh
-# Prepares the volumes third-party containers start from. Runs first on every
-# deployment and leaves the same state however often it runs.
+# Prepares the volumes third-party containers and the jobs service start
+# from. Runs first on every deployment and leaves the same state however
+# often it runs.
 set -eu
 
 image=/opt/supamac
 config_volume=/volumes/config
 kms_seed_volume=/volumes/kms-seed
 dynamodb_volume=/volumes/dynamodb
+jobs_state_volume=/volumes/jobs-state
 
 # The config volume holds this image's config and scripts and nothing else,
 # so a file dropped from the image is also gone from the volume.
@@ -42,4 +44,11 @@ done
 # Docker made for root.
 chown 1000:1000 "$dynamodb_volume"
 
-echo "config volume, KMS seed and DynamoDB volume are ready"
+# The jobs service runs as uid 65534 with a read-only root: its state volume
+# is the one place it writes, and nobody else's. Only the volume itself is
+# handed over; what is in it the service wrote, or a restore put back with
+# its owners.
+chown 65534:65534 "$jobs_state_volume"
+chmod 700 "$jobs_state_volume"
+
+echo "config volume, KMS seed, DynamoDB and jobs state volumes are ready"

@@ -9,10 +9,14 @@
 #   through the `config` volume, which `init-volumes` fills from the ops image.
 # - No secret, and none read from the deploy tool: every `${SUPAMAC_...}`
 #   below is a name, an address or an image reference. Secrets come from the
-#   two files in /etc/supamac on the VPS.
+#   files in /etc/supamac on the VPS: generated.env and secrets.env for the
+#   stack, jobs.env for the jobs service alone.
 # - Every Rust service runs with ENVIRONMENT=local, the only mode that works
 #   off the upstream company's AWS account and domain, and with no
 #   DEV_DANGEROUS_* variable set.
+# - A network without a route out is `*isolated`: internal, and with no
+#   address on its bridge, so that nothing on it reaches the VPS's own
+#   listeners. That gateway mode needs Docker Engine 28 or later.
 name: supamac
 
 x-logging: &logging
@@ -343,6 +347,7 @@ services:
       - config:/volumes/config
       - kms_seed:/volumes/kms-seed
       - dynamodb_data:/volumes/dynamodb
+      - jobs_state:/volumes/jobs-state
     mem_limit: 128m
 
   init-fusionauth-db:
@@ -788,12 +793,15 @@ services:
       traefik.http.middlewares.supamac-api-headers.headers.referrerPolicy: no-referrer
     volumes:
       - config:/supamac:ro
-    networks: [internal, traefik]
+    # `jobs`: the jobs service reaches SupaMac through this container only,
+    # on port 8081, which serves it the storage API and object downloads and
+    # takes no X-Forwarded-For from it (ops/config/gateway/Caddyfile).
+    networks: [internal, traefik, jobs]
     depends_on:
       init-volumes:
         condition: service_completed_successfully
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/healthz"]
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/healthz && wget -q -O /dev/null http://127.0.0.1:8081/healthz"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -1068,6 +1076,7 @@ services:
       - kms_data:/volumes/kms:ro
       - sync_state:/volumes/sync-state:ro
       - agent_git:/volumes/agent-git:ro
+      - jobs_state:/volumes/jobs-state:ro
     networks: [internal]
     depends_on:
       migrate:
@@ -1239,6 +1248,124 @@ services:
     # beside the queue workers.
     mem_limit: 768m
 
+  # ==========================================================================
+  # Profile `jobs`: details from job invites, production packs and purchase
+  # orders (docs/supamac/jobs.md)
+  # ==========================================================================
+
+  # Works in SupaMac as its own account, through the gateway, and reaches the
+  # internet only through jobs-egress: the `jobs` network has no route out.
+  jobs:
+    <<: *container
+    profiles: [jobs]
+    image: ${SUPAMAC_OPS_IMAGE}
+    command: ["bun", "/opt/supamac/jobs/src/main.ts"]
+    # Its own file and nothing else: generated.env holds the internal service
+    # key and the database URL, and the service refuses to start with either.
+    # Optional, so the stack deploys without it.
+    env_file:
+      - path: ${SUPAMAC_SECRETS_DIR:-/etc/supamac}/jobs.env
+        required: false
+    # Wiring only, no secret. A name set here wins over jobs.env, so none of
+    # these is read from that file.
+    environment:
+      JOBS_SUPAMAC_URL: http://gateway:8081/dss
+      JOBS_WEB_APP_URL: ${SUPAMAC_UI_ORIGIN}${SUPAMAC_UI_PATH:-}
+      JOBS_STATE_DIR: /var/lib/supamac-jobs
+      JOBS_HEALTH_PORT: "8080"
+      # The mailbox's address is also an entry of the proxy's allow-list, so
+      # both containers take it from the deploy tool. Blank turns mail off.
+      JOBS_MAIL_HOST: ${SUPAMAC_JOBS_MAIL_HOST:-}
+      JOBS_MAIL_PORT: ${SUPAMAC_JOBS_MAIL_PORT:-993}
+      # HTTPS and the mailbox go through the proxy; plain HTTP, which is the
+      # gateway alone, does not. No HTTP_PROXY: the proxy refuses plain
+      # requests.
+      HTTPS_PROXY: http://jobs-egress:3128
+      NO_PROXY: gateway,localhost,127.0.0.1
+      # The root is read-only: no transpiler cache.
+      BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0"
+    user: "65534:65534"
+    read_only: true
+    tmpfs:
+      # Scratch space for the text extraction's child process.
+      - /tmp:size=64m,mode=1777
+      # The ops image's base declares a volume here, which Docker would
+      # otherwise give this container as a writable anonymous volume.
+      - /var/lib/postgresql:size=4k,mode=0555
+    volumes:
+      - jobs_state:/var/lib/supamac-jobs
+    networks: [jobs]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    # The service, its extraction child and the health check, each a Bun
+    # process with a thread per core and a few more.
+    pids_limit: 256
+    depends_on:
+      # Hands the state volume to uid 65534.
+      init-volumes:
+        condition: service_completed_successfully
+      gateway:
+        condition: service_healthy
+      # What the service calls behind the gateway: it exits when the Jobs
+      # database cannot be verified at start.
+      document-storage-service:
+        condition: service_healthy
+      jobs-egress:
+        condition: service_healthy
+    healthcheck:
+      # 503 while any of its loops (the ways in, the folder, edit and
+      # resume polls, the Status tick) has not succeeded for five
+      # intervals. The body of /health and the service's log say which;
+      # with SupaMac down the Status row cannot.
+      test: ["CMD", "bun", "-e", "fetch('http://127.0.0.1:8080/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      # It listens once the Jobs database is verified, or made on the first
+      # start.
+      start_period: 120s
+    # Stop waits for an extraction in flight, whose reply streams for
+    # minutes, so that a deploy does not pay for the same source twice. One
+    # that runs longer than this is cut, and asked again at the next start.
+    stop_grace_period: 5m
+    # An estimate, not measured under load: one source at a time. Loaded and
+    # idle the service holds about 85 MB; its extraction child up to 384 MB,
+    # read every 25 ms and so able to pass that before it is stopped; the
+    # source and its copy for the child up to 50 MB; the health check's Bun
+    # about 25 MB.
+    mem_limit: 640m
+
+  # The jobs service's way out: an HTTP CONNECT proxy that opens tunnels to
+  # the listed host:port pairs only, and to none that resolves to a private
+  # address (ops/src/egress-proxy.ts). It gets no secret.
+  jobs-egress:
+    <<: *container
+    profiles: [jobs]
+    image: ${SUPAMAC_OPS_IMAGE}
+    command: ["bun", "/opt/supamac/src/egress-proxy.ts"]
+    environment:
+      JOBS_EGRESS_ALLOW: api.anthropic.com:443,api.telegram.org:443${SUPAMAC_JOBS_MAIL_HOST:+,${SUPAMAC_JOBS_MAIL_HOST}:${SUPAMAC_JOBS_MAIL_PORT:-993}}
+      JOBS_EGRESS_PORT: "3128"
+      BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0"
+    user: "65534:65534"
+    read_only: true
+    # Over the volume the ops image's base declares (see `jobs`).
+    tmpfs:
+      - /var/lib/postgresql:size=4k,mode=0555
+    networks: [jobs, egress]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 64
+    healthcheck:
+      test: ["CMD", "bun", "-e", "fetch('http://127.0.0.1:3128/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    # About 30 MB idle, measured outside a container; the health check runs a
+    # second Bun beside it.
+    mem_limit: 128m
+
 # Named outright, not after the project: the deploy tool may name the project
 # as it likes, a renamed project must find its data again, and
 # restore.compose.yaml mounts these by name.
@@ -1271,14 +1398,27 @@ volumes:
     name: supamac_backups
   opensearch_data:
     name: supamac_opensearch_data
+  jobs_state:
+    name: supamac_jobs_state
+
+# An internal network has no route out, and in the `isolated` gateway mode
+# (Docker Engine 28 or later) its bridge has no address either, so its
+# containers cannot reach anything listening on the VPS itself.
+x-isolated: &isolated
+  internal: true
+  driver_opts:
+    com.docker.network.bridge.gateway_mode_ipv4: isolated
+    com.docker.network.bridge.gateway_mode_ipv6: isolated
 
 networks:
   # No route out: the stores and everything that only talks to them.
-  internal:
-    internal: true
+  internal: *isolated
   # For the containers that call the outside: AI providers, the SMTP
   # provider, fetched links and images.
   egress:
+  # The jobs service, its egress proxy and the gateway. No route out: the
+  # proxy is the jobs service's only way to the internet.
+  jobs: *isolated
   # The network of the VPS's Traefik.
   traefik:
     external: true

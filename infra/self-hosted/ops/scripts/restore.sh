@@ -1,5 +1,5 @@
 #!/bin/sh
-# Puts one backup folder back: both databases, every object and the four
+# Puts one backup folder back: both databases, every object and the five
 # state volumes. Everything they hold now is replaced. An object comes back
 # with its bytes and the content type its key's extension stands for, which
 # is none for a key without one: the backup holds no object metadata.
@@ -8,6 +8,11 @@
 # databases are dropped and the volumes are emptied underneath whatever uses
 # them. Afterwards deploy the main project again, which reapplies migrations
 # newer than the backup and the bucket settings.
+#
+# A folder without jobs-state.tar.gz was written before backups held the
+# jobs state, and so before the jobs service: its database has no Jobs
+# database for the state to pin. Its jobs state is restored empty, and the
+# log says so. Every other part is required.
 set -eu
 
 name=${1:?usage: restore.sh <backup folder name, as backup.sh logged it>}
@@ -47,8 +52,12 @@ for bucket in "$source"/objects/*/; do
   mc mirror --quiet --overwrite --remove "$source/objects/$bucket" "store/$bucket"
 done
 
-for volume in dynamodb kms sync-state agent-git; do
+for volume in dynamodb kms sync-state agent-git jobs-state; do
   find "/volumes/$volume" -mindepth 1 -delete
+  if [ "$volume" = jobs-state ] && [ ! -e "$source/$volume.tar.gz" ]; then
+    echo "$source holds no $volume.tar.gz, as a backup from before the jobs service: the jobs state is restored empty"
+    continue
+  fi
   tar -C "/volumes/$volume" -xzf "$source/$volume.tar.gz"
 done
 

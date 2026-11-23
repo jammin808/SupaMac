@@ -1,6 +1,6 @@
 #!/bin/sh
 # One backup of everything that is not rebuildable: both databases, every
-# object, and the four volumes that hold state of their own. Writes
+# object, and the five volumes that hold state of their own. Writes
 # /backups/<UTC time>/ and keeps the newest BACKUP_KEEP of them.
 #
 # Not here, because each is rebuilt or refilled: Redis, Kafka, the queue
@@ -19,7 +19,8 @@ state_of() {
 }
 
 # A volume is copied while its service runs. The sync service and DynamoDB
-# Local keep SQLite files. A copy during which no file changed is the volume
+# Local keep SQLite files; the jobs service replaces its state file whole
+# beside spooled sources. A copy during which no file changed is the volume
 # as it stood at one moment, which SQLite opens as it would after its process
 # stopped there; a copy that overlaps a write may be no state it ever had.
 # So the copy is taken again, up to five times, until nothing changed during
@@ -61,8 +62,11 @@ pg_dump --format=custom --file="$work/fusionauth.dump" "${DATABASE_URL%/*}/fusio
 export MC_HOST_store="http://$MINIO_ROOT_USER:$MINIO_ROOT_PASSWORD@minio:9000"
 mc mirror --quiet store "$work/objects"
 
-# The KMS keys can also be recreated from generated.env.
-for volume in dynamodb kms sync-state agent-git; do
+# The KMS keys can also be recreated from generated.env. The jobs state
+# holds the Telegram link, the pinned ids of the Jobs database, the saved
+# model replies and what the checks know of each detail: nothing else has
+# them. Without the jobs profile its volume is empty and copied all the same.
+for volume in dynamodb kms sync-state agent-git jobs-state; do
   copy_volume "$volume"
 done
 

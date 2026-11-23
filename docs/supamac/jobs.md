@@ -1,6 +1,9 @@
 # Jobs: details from invites, production packs and purchase orders
 
-**Status: design, reviewed once. Nothing described here is built yet.**
+**Status: built and tested with fakes; not yet run against a live stack.**
+The service is `infra/self-hosted/ops/jobs`; how the stack runs it, and what
+of that has been checked, is in the stack's README
+([The jobs profile](../../infra/self-hosted/README.md#the-jobs-profile)).
 
 The owner receives job invites, production packs and purchase orders by email
 and as attachments. This feature reads them as they arrive and keeps the
@@ -101,14 +104,17 @@ limit, so it can check quotes against what it read:
 | Kind | Text | Notes |
 |---|---|---|
 | PDF | per page, in reading order, by line | A page with little or no text layer, or with invisible text over an image, counts as a scan |
-| Scan, photo, image (JPEG, PNG, WebP, HEIC converted) | none | Read by the model from the image; every detail needs review |
+| Scan, photo, image (JPEG, PNG, WebP) | none | Read by the model from the image; every detail needs review |
 | Word (`.docx`) | paragraphs; tables cell by cell | Hidden text and deleted tracked changes are dropped |
 | Excel (`.xlsx`), CSV | each cell as `<column header>: <value>`, with the row's first cell | Hidden sheets, rows and columns are dropped; numbers keep their display format |
 | Email | the HTML part as text, else the plain part | Quoted history and forwarded messages become pages of their own, each with its own date |
 | Calendar file (`.ics`) | as text | |
+| Plain text | as written | How a forwarded message's text arrives; a `.eml` file or a `message/rfc822` part is read as an email |
 
 Accepted attachment types are exactly these; anything else is recorded as
-skipped and never parsed. A zip-based file (docx, xlsx) is refused above 500
+skipped and never parsed. HEIC and HEIF photos are skipped with advice to
+send them as JPEG (on an iPhone: Settings, Camera, Formats, Most Compatible)
+or as a screenshot: the service has no image decoder to convert them. A zip-based file (docx, xlsx) is refused above 500
 entries or 50 MB unpacked, counted while unpacking. A PDF over 600 pages, or a
 file over 25 MiB, is processed from its page text only, and the Sources row
 says so. Telegram bots cannot receive files over 20 MB; the bot says to email
@@ -347,15 +353,26 @@ Confirmed unconfirmed. **These answers are not checked by the service.**
   stack's internal key or database URL is in its environment. It runs as a
   non-root user with a read-only root, no capabilities, no new privileges, a
   process and memory limit, and one state volume. It reaches SupaMac through
-  the gateway, never a service directly, and the internet only through an
-  egress proxy that allows `api.anthropic.com`, `api.telegram.org` and the
-  mailbox host.
+  the gateway, never a service directly, on a port of its own that serves
+  the storage API and its object links and nothing else, and that takes no
+  `X-Forwarded-For` from it, so the services see its own address. It
+  reaches the internet only through an egress proxy (`jobs-egress`,
+  `infra/self-hosted/ops/src/egress-proxy.ts`) on a network with no other
+  way out, whose bridge has no address, so nothing listening on the server
+  itself is reachable either. The proxy opens a tunnel only for
+  `CONNECT` to `api.anthropic.com:443`, `api.telegram.org:443` and the
+  mailbox's host and port, resolves the name itself and refuses one whose
+  address is private, loopback or link-local; it gets no secret.
 - **Documents are data.** Extraction has no tools; questions have only the
   three read-only tools; nothing the service does sends mail, accepts work,
   shares, or deletes.
-- **Hostile files.** Parsing runs in a child process with limits, on the type
-  allow-list above; PDF.js runs with `isEvalSupported: false`; XML is parsed
-  with entities off.
+- **Hostile files.** Parsing runs in a child process with limits and an
+  empty environment, on the type allow-list above; PDF.js runs with
+  `isEvalSupported: false`; XML is parsed with entities off. The child runs
+  as the service's user, and the service makes itself not dumpable before it
+  starts any, so a parser that is made to run code cannot read the
+  service's environment, which holds its keys, or its memory through
+  `/proc`. It still shares the service's network and state volume.
 - **Spending.** A dedicated Anthropic key (in its own Console workspace with a
   monthly limit is best), token counting before each request, `max_tokens` on
   every request, a cap on tool rounds per question, and
@@ -371,7 +388,8 @@ Confirmed unconfirmed. **These answers are not checked by the service.**
 
 ## Settings
 
-`/etc/supamac/jobs.env`, read only by the jobs container:
+`/etc/supamac/jobs.env`, read only by the jobs container, each setting
+saved with `add_secret jobs` (the stack's README, Adding third-party keys):
 
 | Setting | What |
 |---|---|
@@ -381,15 +399,25 @@ Confirmed unconfirmed. **These answers are not checked by the service.**
 | `JOBS_MONTHLY_LIMIT_USD` | The AI spend at which the service stops |
 | `JOBS_AI_FALLBACKS` | `on` unless set: a request the model declines is answered by a fallback model |
 | `JOBS_AI_FALLBACK_MODELS` | The fallback models the spending check counts (each one can bill); fewer hold back less of the limit |
+| `JOBS_AI_PRICES` | Optional: the prices the cost and the monthly limit are computed with, as JSON from model id to `{"input", "output", "cacheRead", "cacheWrite", "cacheWrite1h"}` in USD per million tokens (`cacheWrite1h` is twice `input` unless given). It replaces the built-in table, which prices the default model and its fallbacks; a model it does not list is priced at the highest price it holds. Set it when `JOBS_AI_MODEL` names another model or the prices change |
 | `JOBS_TELEGRAM_BOT_TOKEN` | From BotFather |
 | `JOBS_TELEGRAM_OWNER_ID` | Optional: the owner's numeric Telegram id, instead of the link code |
-| `JOBS_MAIL_HOST`, `JOBS_MAIL_PORT`, `JOBS_MAIL_USER`, `JOBS_MAIL_PASSWORD` | The jobs mailbox |
+| `JOBS_MAIL_USER`, `JOBS_MAIL_PASSWORD` | The jobs mailbox's login |
 | `JOBS_MAIL_AUTHSERV_ID` | The provider's name in its `Authentication-Results` headers |
 | `JOBS_MAIL_ALLOWED_SENDERS` | The addresses whose forwards are read |
 | `JOBS_OWNER_EMAIL` | The owner's SupaMac account, to share the database and folders with |
 | `JOBS_TIME_ZONE` | `Europe/London` unless set |
 
 A way in whose settings are missing is off; the Status row says which.
+
+The mailbox's host and port are not in `jobs.env`: they are the deploy
+variables `SUPAMAC_JOBS_MAIL_HOST` and `SUPAMAC_JOBS_MAIL_PORT` (993 unless
+set), which `compose.yaml` hands to the service as `JOBS_MAIL_HOST` and
+`JOBS_MAIL_PORT` and to the egress proxy as its third allowed pair, so the
+proxy needs no file of secrets. `compose.yaml` also sets the wiring:
+`JOBS_SUPAMAC_URL` (`http://gateway:8081/dss`), `JOBS_WEB_APP_URL` (the UI's
+origin and folder), `JOBS_STATE_DIR`, `JOBS_HEALTH_PORT`, `HTTPS_PROXY` and
+`NO_PROXY`. A name set there wins over `jobs.env`.
 
 ## Setup
 
@@ -400,8 +428,9 @@ A way in whose settings are missing is off; the Status row says which.
 2. Create the bot with BotFather and turn its group joins off.
 3. Add the mailbox address to the sign-up allow-list, sign in to SupaMac as it
    (the sign-in code arrives in that mailbox), and create an API key.
-4. Put the settings in `jobs.env`, add `jobs` to `COMPOSE_PROFILES`, and
-   redeploy.
+4. Put the settings in `jobs.env` with `add_secret jobs`; in the deploy
+   tool set `SUPAMAC_JOBS_MAIL_HOST` (and `SUPAMAC_JOBS_MAIL_PORT` unless it
+   is 993) and add `jobs` to `COMPOSE_PROFILES`; redeploy.
 5. Open **Jobs setup** in the shared Job sources folder: it lists a check of
    each setting (SupaMac key, mailbox login, Telegram, Anthropic) and the link
    code. Send `/start <code>` to the bot.
@@ -409,21 +438,33 @@ A way in whose settings are missing is off; the Status row says which.
 
 ## Operations
 
-- **State**: the `jobs_state` volume holds the Telegram link and offset, the
+- **State**: the `jobs_state` volume (`supamac_jobs_state`) holds the Telegram link and offset, the
   pinned ids, the last table versions, the saved model replies, the attempt
   counts, and what the checks need about each detail and source that has no
   column (its source's own date, whether it came from quoted history, a note
-  or the owner, when the owner decided, the page kind, the day quote). It is in the backup and restore scripts. The dedupe keys
-  also live in Sources rows, so they survive in the database backup.
+  or the owner, when the owner decided, the page kind, the day quote). It is
+  in the backup and restore scripts; a backup from before the service
+  restores it empty. The dedupe keys also live in Sources rows, so they
+  survive in the database backup.
 - **Restarts**: every Processing source resumes from what its rows show;
   details of one source are written in one statement; a Telegram update is
   acknowledged only after it is handled, and its id is recorded so a repeat is
-  ignored.
-- **Health**: `/health` for the compose healthcheck; the Status row; a Telegram
-  note (at most hourly) when the mailbox, Telegram, SupaMac or Anthropic stops
-  answering, and another when it recovers.
-- **Memory**: 512 MB limit as an estimate, one source at a time; measured at
-  the next rehearsal.
+  ignored. A stop waits for an extraction in flight, and compose gives it
+  five minutes: one still streaming then is cut, and its source is asked
+  again, and paid for again, at the next start. The service starts once the
+  storage service behind the gateway is healthy.
+- **Health**: `/health` for the compose healthcheck: 503 while any loop (the
+  ways in, the folder, edit and resume polls, the Status tick) has not
+  succeeded for five of its intervals, with each loop's last success and
+  error in its body; the Status row, which cannot be written while SupaMac
+  is down, when the body and the service's log say which loop failed; a
+  Telegram note (at most hourly) when the mailbox, Telegram, SupaMac or
+  Anthropic stops answering, and another when it recovers.
+- **Memory**: 640 MB limit as an estimate, one source at a time: about 85 MB
+  for the service, up to 384 MB for its extraction child (read every 25 ms,
+  so it can pass that before it is stopped), the source and its copy for the
+  child, and the health check's own process; 128 MB for the egress proxy.
+  Measured at the next rehearsal.
 - **Cost**: computed per source from its token counts and the configured
   prices, and totalled monthly on the Status row. As an estimate, at $4 per
   million input and $20 per million output tokens: a 40-page pack sent as text
@@ -437,6 +478,8 @@ A way in whose settings are missing is off; the Status row says which.
   shares beyond the owner, or deletes; a rejected detail stays, marked Rejected.
 - It does not read the owner's inbox, only what is forwarded or sent.
 - It has no OCR: details from scans and photos always wait for review.
+- It does not convert HEIC or HEIF photos: it skips them and asks for a JPEG
+  or a screenshot.
 - On this stack a `.docx` cannot be dropped into Job intake from the browser,
   and a `.docx` original cannot be opened in SupaMac: forward Word files by
   email or Telegram; their text document is the source, and the original stays

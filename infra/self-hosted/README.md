@@ -16,9 +16,14 @@ Read that list before relying on any part of this.
 
 ## What it assumes about the VPS
 
-- Docker with Compose, driven through a tool that takes a Compose file and a
-  list of environment variables and shows container logs. No shell is needed
-  to deploy; the owner needs a root terminal once, to add third-party keys.
+- Docker Engine 28 or later with Compose, driven through a tool that takes
+  a Compose file and a list of environment variables and shows container
+  logs. No shell is needed to deploy; the owner needs a root terminal once,
+  to add third-party keys. Engine 28 is the first with the `isolated`
+  gateway mode the networks without a route out use (their bridge gets no
+  address, so their containers cannot reach anything listening on the VPS
+  itself); it also has the fix for CVE-2024-29018, by which containers on
+  such a network could send DNS queries out.
 - A Traefik container that is already there, with the Docker provider and
   `exposedByDefault=false`, an entrypoint `websecure` on 443, a certificate
   resolver named `mytlschallenge`, attached to the Docker network
@@ -62,6 +67,13 @@ The Rust services, the sync service and the two Bun services also sit on a
 second network, `egress`, which can reach the internet: AI providers, the
 SMTP provider, fetched links. The stores cannot.
 
+With the `jobs` profile, the jobs service sits on a third network, `jobs`,
+which has no route out. Its only neighbours there are the gateway, whose
+port 8081 serves it SupaMac's storage API as its own account and nothing
+else, and `jobs-egress`, a CONNECT proxy that is also on `egress` and opens
+tunnels to `api.anthropic.com:443`, `api.telegram.org:443` and the jobs
+mailbox's host and port, and nowhere else ([The jobs profile](#the-jobs-profile)).
+
 ### Files
 
 | File | What it is |
@@ -70,7 +82,7 @@ SMTP provider, fetched links. The stores cannot.
 | `compose.yaml` | The stack. |
 | `restore.compose.yaml` | One-shot project that puts a backup back. |
 | `example.env` | The variables the operator supplies, with placeholders. |
-| `ops/` | The ops image: config files, scripts, the sqlx CLI with the migrations, the upload relay and the clock. |
+| `ops/` | The ops image: config files, scripts, the sqlx CLI with the migrations, the upload relay, the clock, the jobs egress proxy, and the jobs service (`ops/jobs`). |
 | `images/` | Dockerfiles of the other images the fork builds for this stack. |
 
 ### Profiles
@@ -80,6 +92,7 @@ SMTP provider, fetched links. The stores cannot.
 | default | Sign-in, documents, tasks, CRM and contacts, notifications, static files, upload finalizer, connection gateway, collaborative editing, the AI assistant, reminders, backups | 12.2 GB |
 | `email` | Email service and workers, calendar service, the email schedules | 1.6 GB |
 | `search` | OpenSearch and the search indexer | 2.3 GB |
+| `jobs` | The jobs service and its egress proxy: details of job invites, production packs and purchase orders ([`docs/supamac/jobs.md`](../../docs/supamac/jobs.md)) | 0.8 GB |
 
 A limit is the most a container may use before the kernel stops it, not
 memory set aside for it. The limits are estimates from the settings and the
@@ -100,7 +113,12 @@ Traefik and one other small application take, as a guess, 2 GB, which leaves
 14 GB. If every container reached its limit at once, the default profile
 with `email` would stay inside that (13.8 GB), the default profile with
 `search` would be just over it (14.4 GB), and with both it would not
-(16.0 GB). Idle, the default profile used 3.3 GB in the rehearsal. No
+(16.0 GB). The `jobs` profile adds 0.8 GB: beside the default profile alone
+it fits (12.9 GB), beside the default profile and `email` it is just over
+(14.5 GB). Its service's limit, 640 MB, is an estimate that leaves room for
+its extraction child to pass the 384 MB it is allowed before it is stopped
+(`compose.yaml` says how it adds up). Idle, the default profile used 3.3 GB
+in the rehearsal. No
 limit was lowered to make more fit: nothing has been measured under load,
 and the limits with most to give are the stores', where a stop for want of
 memory costs most. Until there are measurements, running `search` on such a
@@ -160,8 +178,9 @@ In the deploy tool, with the Compose file. None of these is a secret.
 | `SUPAMAC_OWNER_EMAILS` | Comma-separated accounts that get the paid-plan roles. Optional. |
 | `SUPAMAC_MAIL_DOMAIN` | Domain mail is sent from, if not `SUPAMAC_DOMAIN`. The relay refuses any other sender domain. |
 | `SUPAMAC_SERVICES_IMAGE`, `SUPAMAC_OPS_IMAGE`, `SUPAMAC_SYNC_IMAGE`, `SUPAMAC_LEXICAL_IMAGE`, `SUPAMAC_AI_EDITING_IMAGE` | Image references. |
-| `COMPOSE_PROFILES` | `email`, `search` or both. Optional. With both, the limits add up to more than a 16 GB server that also runs another application has left; until they are measured, [Profiles](#profiles) says what that risks. |
+| `COMPOSE_PROFILES` | `email`, `search`, `jobs`, comma-separated. Optional. With `email` and `search`, the limits add up to more than a 16 GB server that also runs another application has left; until they are measured, [Profiles](#profiles) says what that risks. |
 | `SUPAMAC_SEARCH_IMAGE` | Needed with the `search` profile. |
+| `SUPAMAC_JOBS_MAIL_HOST`, `SUPAMAC_JOBS_MAIL_PORT` | With the `jobs` profile: the jobs mailbox's IMAP host and port (default 993). The egress proxy allows exactly this pair, so the jobs service reads it from here and not from `jobs.env`. Without a host the service reads no mail. |
 | `SUPAMAC_BACKUP_KEEP` | Daily backups kept, default 7. |
 
 On the VPS, in `/etc/supamac` (mode 700, files mode 600, owned by root):
@@ -170,8 +189,9 @@ On the VPS, in `/etc/supamac` (mode 700, files mode 600, owned by root):
 | --- | --- | --- |
 | `generated.env` | the bootstrap project, once | Every internal secret: database, Redis and object-store credentials, the shared internal service key, the session signing secret, FusionAuth's API key, client secret and admin password, the token key pair, webhook verification secrets, the KMS key material. Also stand-in values for the AI provider keys. |
 | `secrets.env` | the owner | Third-party credentials. Its values win over `generated.env`. |
+| `jobs.env` | the owner, with `add_secret jobs` | The jobs service's keys and settings ([`docs/supamac/jobs.md`](../../docs/supamac/jobs.md#settings)). Only the jobs service reads it, and it reads neither of the other two. Optional: the stack deploys without it, and a jobs service started without it exits naming the first missing setting. |
 
-The deploy tool never reads either file; the containers do, through
+The deploy tool never reads these files; the containers do, through
 `env_file`. A value that spans lines, such as a PEM key, is stored on one
 line in double quotes with `\n` between its lines; Compose turns that back
 into line breaks, so the service receives the PEM as it is.
@@ -184,12 +204,21 @@ the file.
 
 ```bash
 add_secret() {
-  local file=/etc/supamac/secrets.env name value
+  local file name value
+  case ${1:-secrets} in
+    secrets) file=/etc/supamac/secrets.env ;;
+    jobs) file=/etc/supamac/jobs.env ;;
+    *) echo 'The file is secrets (the default) or jobs.'; return 1 ;;
+  esac
   read -rp 'Variable name: ' name
   read -rsp 'Value (it is not shown): ' value
   echo
   if [[ ! $name =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
     echo 'That is not a variable name.'
+    return 1
+  fi
+  if [[ $file == */jobs.env && $name =~ ^(JOBS_(MAIL_HOST|MAIL_PORT|STATE_DIR|SUPAMAC_URL|WEB_APP_URL|HEALTH_PORT)|HTTPS?_PROXY|NO_PROXY)$ ]]; then
+    echo "compose.yaml sets ${name} for the jobs service, so the file's value would not be read."
     return 1
   fi
   if [[ -z $value || $value == *"'"* ]]; then
@@ -198,16 +227,19 @@ add_secret() {
   fi
   (
     umask 077
+    touch "$file"
     sed -i "/^${name}=/d" "$file"
     printf "%s='%s'\n" "$name" "$value" >> "$file"
   )
-  echo "Saved ${name}. Redeploy the project for it to take effect."
+  echo "Saved ${name} in ${file}. Redeploy the project for it to take effect."
 }
 add_secret
 ```
 
-Run `add_secret` again for each further variable. Entering a name a second
-time replaces its value. Then deploy the stack again.
+Run `add_secret` again for each further variable, and `add_secret jobs` for
+a setting of the jobs service, which goes to `jobs.env` (made, mode 600, if
+it is missing). Entering a name a second time replaces its value. Then deploy
+the stack again.
 
 | Variable | For |
 | --- | --- |
@@ -220,6 +252,84 @@ time replaces its value. Then deploy the stack again.
 The provider must accept `no-reply@<mail domain>` as a sender, and the mail
 domain needs the SPF and DKIM records the provider asks for.
 
+## The jobs profile
+
+The jobs service reads job invites, production packs and purchase orders
+forwarded to a mailbox, sent to a Telegram bot or dropped in a SupaMac
+folder, and keeps their details in a Jobs database in SupaMac.
+[`docs/supamac/jobs.md`](../../docs/supamac/jobs.md) is its design, its
+settings and its setup; this is how the stack runs it.
+
+- **Two containers from the ops image**: `jobs`, the service
+  (`/opt/supamac/jobs`), and `jobs-egress`, its proxy
+  (`ops/src/egress-proxy.ts`). Both run as uid 65534 with a read-only root,
+  no capabilities, no new privileges, a process limit and a health check.
+  The image's base, Postgres's, declares a volume at `/var/lib/postgresql`;
+  both mount a small read-only tmpfs there, so Docker gives them no
+  writable anonymous volume in its place.
+- **Its own account, through its own door.** The service calls
+  `http://gateway:8081/dss` with the API key of its own SupaMac account.
+  The gateway's port 8081 serves it the storage API and GET of the object
+  links that API hands out, behind the same deny rules as the public port,
+  and nothing else: not `/unfurl` or `/image-proxy`, which fetch any address
+  and would be a way past the egress gate. It takes no `X-Forwarded-For`
+  from the service, so every service sees the jobs container's own address
+  for its rate limits and audit. The service gets none of `generated.env`
+  and `secrets.env`, and refuses to start if the internal service key or
+  the database URL is in its environment.
+- **Its secrets and its parser.** Files are parsed in a child process that
+  runs as the same user. The service makes itself not dumpable before it
+  starts one, so the child cannot read the service's environment or memory
+  through `/proc` ([`docs/supamac/jobs.md`](../../docs/supamac/jobs.md#security)).
+- **The egress gate.** `jobs` is on the `jobs` network alone, which has no
+  route out and, isolated, no address of the VPS either. HTTPS and the
+  mailbox go through `jobs-egress` (`HTTPS_PROXY`; the gateway, plain HTTP,
+  is reached directly). The proxy opens a tunnel for
+  `CONNECT` to `api.anthropic.com:443`, `api.telegram.org:443` and
+  `SUPAMAC_JOBS_MAIL_HOST:SUPAMAC_JOBS_MAIL_PORT`, exactly, and answers 403 to
+  anything else, an allowed name whose address is private, loopback or
+  link-local included. It logs one line per request (host, port, outcome,
+  bytes each way, never content) and holds no secret. At most 32 tunnels are
+  open; one ends after 10 minutes without traffic or an hour in all.
+- **Settings in three places.** Keys and the owner's choices in `jobs.env`
+  (`add_secret jobs`). The mailbox's host and port in the deploy tool
+  (`SUPAMAC_JOBS_MAIL_HOST`, `SUPAMAC_JOBS_MAIL_PORT`), because the proxy's
+  allow-list is made from them. The wiring in `compose.yaml`:
+  `JOBS_SUPAMAC_URL`, `JOBS_WEB_APP_URL` (the UI's origin and folder),
+  `JOBS_STATE_DIR`, `JOBS_HEALTH_PORT`, `HTTPS_PROXY`, `NO_PROXY`. A name
+  `compose.yaml` sets wins over `jobs.env`, so none of those is read from it.
+- **State** in the volume `supamac_jobs_state`, which `init-volumes` hands
+  to uid 65534 on every deployment and every backup copies.
+- **Start and stop.** It starts once the storage service behind the
+  gateway is healthy: it exits if the Jobs database cannot be verified. A
+  deploy that replaces it waits up to five minutes for an extraction in
+  flight, whose reply streams for minutes; one still running then is cut,
+  and its source is read again, and paid for again, at the next start.
+- **Health.** The service's `/health` answers 503 while any of its loops
+  (the ways in, the folder, edit and resume polls, the Status tick) has not
+  succeeded for five of its intervals. Its body names each loop with its
+  last success and error, and the service's log has a line for each run
+  that failed; with SupaMac down the Status row cannot be written, so those
+  are what say which. The container then shows as unhealthy; nothing
+  depends on it.
+
+To turn it on:
+
+1. Do steps 1 to 3 of the design's [Setup](../../docs/supamac/jobs.md#setup):
+   the mailbox with an app password, the bot, and the service's own SupaMac
+   account with an API key.
+2. Save each setting the design's [Settings](../../docs/supamac/jobs.md#settings)
+   lists with `add_secret jobs`: at least `JOBS_SUPAMAC_API_KEY`,
+   `JOBS_OWNER_EMAIL`, `ANTHROPIC_API_KEY` and `JOBS_MONTHLY_LIMIT_USD`, then
+   those of each way in.
+3. In the deploy tool, set `SUPAMAC_JOBS_MAIL_HOST` (and
+   `SUPAMAC_JOBS_MAIL_PORT` unless it is 993), add `jobs` to
+   `COMPOSE_PROFILES`, and deploy.
+4. Go on with step 5 of the design's Setup: the **Jobs setup** document and
+   the link code.
+
+`jobs-egress`'s log shows every connection the service made or tried.
+
 ## Rotating a secret
 
 `generated.env` is never rewritten by a tool. To rotate, change the value in
@@ -229,6 +339,10 @@ again; the comments in the file group the names. What follows from a change:
 | Secret | Effect, and what else has to happen |
 | --- | --- |
 | Third-party keys | None. Use `add_secret`. |
+| `JOBS_SUPAMAC_API_KEY` (`jobs.env`) | Signed in as the jobs account, create a new key in SupaMac (Settings, API keys), save it with `add_secret jobs`, deploy, then delete the old key there. |
+| `ANTHROPIC_API_KEY` (`jobs.env`) | The jobs service's own Anthropic key: a new one from the Anthropic Console with `add_secret jobs`, deploy, then revoke the old one in the Console. |
+| `JOBS_TELEGRAM_BOT_TOKEN` | Revoke the token in BotFather, which issues the bot a new one; save that with `add_secret jobs` and deploy. Until then the service cannot poll. |
+| `JOBS_MAIL_PASSWORD` | A new app password at the mailbox provider with `add_secret jobs`, deploy, then revoke the old one at the provider. |
 | Redis password (five names) | Redis and the services take the new one together. |
 | Object-store keys (three pairs) | The store and the services take the new pair together. Links signed with the old pair stop working. |
 | `MINIO_NOTIFY_WEBHOOK_AUTH_TOKEN_UPLOADS` | None. |
@@ -251,11 +365,17 @@ holds:
 - `macrodb.dump`, `fusionauth.dump`: `pg_dump` custom format.
 - `objects/<bucket>/`: the bytes of every object under its key, read through
   the object store's API.
-- `dynamodb.tar.gz`, `kms.tar.gz`, `sync-state.tar.gz`, `agent-git.tar.gz`:
-  the four state volumes, copied while their services run. A copy is taken
-  again, up to five times, until no file changed during it; the log has a
-  `warning:` line for a volume that was never quiet, whose copy may then be
-  inconsistent.
+- `dynamodb.tar.gz`, `kms.tar.gz`, `sync-state.tar.gz`, `agent-git.tar.gz`,
+  `jobs-state.tar.gz`: the five state volumes, copied while their services
+  run. A copy is taken again, up to five times, until no file changed during
+  it; the log has a `warning:` line for a volume that was never quiet, whose
+  copy may then be inconsistent. The jobs state (the Telegram link, the
+  pinned ids of the Jobs database, the saved model replies, what the checks
+  know of each detail) is in no database; without the `jobs` profile its
+  volume is empty and is copied all the same. `restore.sh` refuses a folder
+  without any other part; one without `jobs-state.tar.gz` was written before
+  the jobs service, and restores an empty jobs state with a line in the
+  log saying so.
 
 It does **not** hold:
 
@@ -483,6 +603,76 @@ the two tests that hold the stack's queues to the local stack's catalogue
 and to `compose.yaml` are skipped, because the image has neither: they run
 only where someone runs `bun test` from a checkout.
 
+### The jobs service and its proxy
+
+Run on a development machine; no container was started:
+
+- `docker compose config` accepts `compose.yaml` with `jobs`, and as before
+  without it and with `email` and `search`. With `jobs`, the proxy's
+  allow-list holds the mailbox's pair when `SUPAMAC_JOBS_MAIL_HOST` is set
+  and the two API hosts alone when it is not, `jobs.env` reaches the jobs
+  service and nothing else, and neither jobs container is given
+  `generated.env`.
+- The proxy's tests (`ops/src/egress-proxy.test.ts`), over real sockets on
+  127.0.0.1: bytes both ways, including those sent with the request head;
+  other hosts, ports, methods and plain HTTP refused; an allowed name that
+  resolves to a private address refused with nothing dialled; the cap on
+  tunnels, the idle and total limits, a head too large or too slow; nothing
+  of the payload or the headers in the log. Each refusal test fails when its
+  check is taken out of the proxy.
+- Bun's fetch, in versions 1.4.4 and 1.4.5, from a scratch script against
+  the proxy and a local TLS server: with `HTTPS_PROXY` an HTTPS request goes
+  through the proxy as `CONNECT <name>:<port>` and needs no DNS for the name;
+  a host `NO_PROXY` covers, exactly or as a domain suffix, goes direct; an
+  `http://` URL goes direct while `HTTP_PROXY` is unset, and with it is sent
+  to the proxy as a plain request and refused.
+- The jobs package's lockfile installs frozen with Bun 1.4.5 and not with
+  1.3.5, the version the ops image's Bun stage had; the search helpers'
+  lockfile installs frozen with 1.4.5 too, and the ops tests pass on it. The
+  package's tests pass with 1.4.5 in a tree laid out as the image's build
+  stage lays it out, without optional dependencies, and with them; the
+  production install resolves every import of the service and its
+  extraction worker, and the service started from it refuses to run without
+  its key and with the database URL in its environment.
+- The `add_secret` snippet writes both files with mode 600, makes `jobs.env`
+  when it is missing, refuses for `jobs.env` the names `compose.yaml` sets,
+  and writes values Compose reads back unchanged.
+
+After a review of this wiring, on the same machine, again without starting
+a container:
+
+- `docker compose config` (Compose 5.7) accepts `compose.yaml` with each
+  profile and gives both networks without a route out the `isolated`
+  gateway mode, `jobs` a stop grace period of five minutes, a 640 MB limit,
+  the storage service among what it waits for, and both jobs containers a
+  tmpfs at `/var/lib/postgresql`.
+- Caddy 2.11, built from source, validates both Caddy files. A copy of the
+  gateway's file with its ports and upstreams moved to local stand-ins
+  showed port 8081 sending the caller's own address as `X-Forwarded-For`
+  whatever the request carried, where port 8080 passes on what a private
+  caller wrote; serving `/dss` and GET under `/local-storage`, with the
+  object store's Host; and answering 404 to `/unfurl`, `/auth`, a POST
+  under `/local-storage`, the store's own API and the internal and
+  documentation paths.
+- The proxy's tests now also hold that a listed IPv6 literal opens a tunnel
+  to that address without a lookup, and that a request answered 400 for a
+  slow head is never routed, whatever follows it.
+- As uid 65534 with no capabilities, as in the container: an extraction
+  child of a service that has sealed itself cannot open the service's
+  `/proc` environment or memory (`EACCES`), where without the seal it read
+  a test secret from it; the sandbox's tests pass under the seal, and the
+  service, sealed, starts as far as the gateway.
+- A copy of `restore.sh` with stand-ins for the database and object store
+  tools: a folder without `jobs-state.tar.gz` restores an empty jobs state
+  and says so, one with it restores it, and one without another part is
+  refused.
+
+Not run: the ops image was not built with its new stage, and no jobs
+container has started. The `jobs` network's isolation, the state volume's
+ownership, both health checks, the memory and process limits, the stop
+grace period, the seal inside the container, and IMAP through the proxy
+have not been observed.
+
 ## Not covered, not verified
 
 Nothing below has been observed working, unless it says what was observed.
@@ -506,6 +696,14 @@ Nothing below has been observed working, unless it says what was observed.
   do not run again until the next deployment. Not tried.
 - No monitoring and no alerting. The logs are the only signal, 60 MB per
   container.
+- The `jobs` profile has never been started; see
+  [The jobs service and its proxy](#the-jobs-service-and-its-proxy). Its
+  memory limits (640 MB for the service, 128 MB for the proxy) are
+  estimates.
+- Every other container from the ops image also gets an anonymous volume
+  at `/var/lib/postgresql`, which its base image declares. None of their
+  scripts uses it, so the volumes only take a little disk. Read from the
+  base image's Dockerfile, not observed.
 
 **The stand-ins for AWS**
 
@@ -564,8 +762,10 @@ Nothing below has been observed working, unless it says what was observed.
 - The web client also opens a socket at `/websocket`, a service this stack
   does not have. The gateway answers 404 and the client keeps trying.
 - `/unfurl` needs no sign-in upstream and stays an open fetch proxy.
-- It trusts `X-Forwarded-For` from private addresses, read from the right.
-  That is correct if Traefik is the only caller.
+- Port 8080 trusts `X-Forwarded-For` from private addresses, read from the
+  right. That is correct if Traefik is the only caller there; any other
+  container on Traefik's network could name the client address the
+  services see. Port 8081, the jobs service's, trusts none.
 - The response headers on object routes may break a preview that frames an
   object from another origin than the UI's.
 - With the `email` profile, the Gmail push webhook is reachable under
@@ -641,4 +841,5 @@ Nothing below has been observed working, unless it says what was observed.
 - Every service connects to Postgres as the database owner. OpenSearch has no
   authentication; it is on the internal network only. Traffic between
   containers is not encrypted.
-- Every container built by the fork receives all of `generated.env`.
+- Every container built by the fork receives all of `generated.env`, except
+  the jobs service and its egress proxy, which receive none of it.

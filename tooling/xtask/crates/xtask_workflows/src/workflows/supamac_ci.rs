@@ -63,6 +63,14 @@ fn tooling() -> Job {
         .add_step(Step::new("Install locked analysis dependencies").run("bun install --frozen-lockfile --ignore-scripts"))
         .add_step(fork_steps::install_rust(&["--component rustfmt", "--component clippy"]))
         .add_step(Step::new("Check and test fork tooling").run("cargo fmt --all -- --check\ncargo clippy --locked -p xtask_workflows -p gh_workflow -- -D warnings\ncargo test --locked -p xtask_workflows -p gh_workflow\ncargo x workflows --check\nbun test tooling/supamac\nbun test infra/self-hosted/ops/src\nbun node_modules/typescript-native/bin/tsc --noEmit --strict --skipLibCheck --types bun --target es2022 --module esnext --moduleResolution bundler tooling/supamac/*.ts\n"))
+        // The jobs service is a package of its own, with its own lockfile and
+        // type check; the ops image build runs its tests without optional
+        // dependencies, this runs them with.
+        .add_step(
+            Step::new("Test and type-check the jobs service")
+                .run("bun install --frozen-lockfile --ignore-scripts\nbun test\nbun run check\n")
+                .working_directory(xtask_paths::repo_dir!("infra/self-hosted/ops/jobs")),
+        )
 }
 
 fn dependencies() -> Job {

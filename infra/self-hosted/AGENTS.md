@@ -15,8 +15,9 @@ on the box. The Pulumi stacks next to it are upstream's AWS and are not used.
 
 ## Scope
 
-- Owns: the Compose files, the ops image (config, scripts, Bun programs) and,
-  in `images/`, the Dockerfiles of the other images the fork builds.
+- Owns: the Compose files, the ops image (config, scripts, Bun programs,
+  the jobs service in `ops/jobs`) and, in `images/`, the Dockerfiles of the
+  other images the fork builds.
 - Not here: the workflow that builds and pushes the images → the fork's
   workflows; the web bundle → `docs/supamac/static-publishing.md`; developer
   stacks → `xtask_local`.
@@ -39,6 +40,13 @@ on the box. The Pulumi stacks next to it are upstream's AWS and are not used.
   nothing else can rebuild also goes into `ops/scripts/backup.sh`,
   `ops/scripts/restore.sh`, the `backup` container's mounts and
   `restore.compose.yaml`.
+- Let the jobs service reach another internet host: add its `host:port` to
+  `jobs-egress`'s `JOBS_EGRESS_ALLOW` in `compose.yaml`, and to the hosts
+  `docs/supamac/jobs.md` (Security) and README's jobs section name. A
+  setting of the service: a secret or the owner's choice goes into
+  `jobs.env` (`add_secret jobs`, and README's rotation table if it
+  rotates), wiring into the `jobs` service's `environment:`, and the
+  `add_secret` snippet's list of names it refuses for `jobs.env`.
 - Add a public route: `ops/config/gateway/Caddyfile`, with the prefix
   `xtask_local`'s `proxy.rs` and the web client's `servers.ts` use.
 - Change the bootstrap script: it is inline in `bootstrap.compose.yaml` with
@@ -48,8 +56,11 @@ on the box. The Pulumi stacks next to it are upstream's AWS and are not used.
 ## Checks
 
 - `docker compose --env-file example.env -f compose.yaml config`, also with
-  `COMPOSE_PROFILES=email,search`; set `SUPAMAC_SECRETS_DIR` to a directory
-  that holds a `generated.env`.
+  `COMPOSE_PROFILES=email,search` and with `COMPOSE_PROFILES=jobs`; set
+  `SUPAMAC_SECRETS_DIR` to a directory that holds a `generated.env`.
+- `bun test` and `bun run check` in `ops/jobs`, a package of its own: the
+  ops image's build runs its tests without optional dependencies, the
+  fork's CI with them.
 - `bun test` in `ops/src`, from the checkout: only there do the tests reach
   the local stack's queue catalogue and `compose.yaml`. `sh -n` on
   `ops/scripts/*.sh`; Biome through `bun run --cwd infra lint`.
@@ -91,6 +102,24 @@ on the box. The Pulumi stacks next to it are upstream's AWS and are not used.
 - The backup container mounts state volumes read-only. SQLite cannot open a
   write-ahead-log database from there, so `backup.sh` copies files and
   repeats the copy until none changed during it.
+- The jobs service gets `jobs.env` and no other env file, and refuses to
+  start with the internal key or the database URL in its environment. Its
+  mailbox host and port are deploy variables (`SUPAMAC_JOBS_MAIL_HOST`,
+  `SUPAMAC_JOBS_MAIL_PORT`), because `jobs-egress`'s allow-list is made
+  from them and the proxy gets no secret.
+- The `jobs` network is internal and isolated (`x-isolated`: no address on
+  its bridge, Docker Engine 28 or later): a jobs container reaches the
+  gateway and `jobs-egress` and nothing else, the VPS's own listeners
+  included. Set `HTTPS_PROXY` there, never `HTTP_PROXY`: Bun sends an
+  `http://` URL to an `HTTP_PROXY` as a plain request, which the proxy
+  refuses, and the gateway is plain HTTP.
+- The jobs service calls the gateway on port 8081, which serves `/dss` and
+  GET under `/local-storage` only and trusts no `X-Forwarded-For`. A route
+  the service starts to use goes into that site of the Caddyfile too; never
+  point it at port 8080, which trusts any private caller's header.
+- The ops image's base is Postgres's, which declares a volume at
+  `/var/lib/postgresql`. A read-only container of the ops image mounts a
+  tmpfs there, or Docker gives it a writable anonymous volume.
 - No real domain, address, name or secret in any file: the repository is
   public.
 
