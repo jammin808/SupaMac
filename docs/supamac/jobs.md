@@ -1,213 +1,436 @@
 # Jobs: details from invites, production packs and purchase orders
 
-**Status: design under review. Nothing described here is built yet.**
+**Status: design, reviewed once. Nothing described here is built yet.**
 
 The owner receives job invites, production packs and purchase orders by email
 and as attachments. This feature reads them as they arrive and keeps the
 details that matter on the day (where, when, travel, accommodation, who to
-call, the PO) in one place, each detail linked to the page it came from. The
-owner and the assistant then find a detail in seconds instead of searching
-mail and attachments.
+call, the PO) in one place, each linked to the page it came from, so the owner
+and the assistant find a detail in seconds instead of searching mail.
 
-Rule zero: **nothing is invented.** A detail is stored as checked only when the
-server finds the words it came from in the source. Everything else waits for
-the owner. An estimate or projection is only ever written as one, with what it
-is based on.
+**Rule zero: nothing is invented.** The service stores a detail as *found* only
+when its own checks find the words in the source, and says exactly that:
+found in this document, on this page, not yet confirmed by you. Only the owner
+confirms. An estimate or a calculation is only ever shown as one, with what it
+is based on. Where the data does not hold an answer, the answer says so.
 
 ## What the owner does
 
-- Forwards an email (with its attachments) to the jobs mailbox, sends a file,
-  photo or text to the SupaMac bot on Telegram, or drops a file into the
-  **Job intake** folder in SupaMac.
-- Gets a Telegram summary: the job it was filed under, the details checked,
-  and the details that need a look, each with Confirm and Reject buttons.
-- Opens the **Jobs** database in SupaMac to see every job, its details and
-  their sources, and asks the assistant (in SupaMac or on Telegram) things like
-  "where am I staying in Leeds?" or "what time is load-in on the 14th?".
+- Forwards an email with its attachments to the jobs mailbox, sends a file,
+  photo or forwarded message to the SupaMac bot on Telegram, or drops a PDF,
+  spreadsheet or image into the **Job intake** folder in SupaMac.
+- Gets one Telegram message per source: the job it was filed under, how many
+  details were found, what changed (from what to what), and a **Review** button
+  that steps through the details that need a look, one at a time, each with its
+  quote and page, and Confirm, Reject and Skip.
+- Opens the **Jobs** database in SupaMac (shared with the owner) to see every
+  job, its details and their sources, and asks the assistant, in SupaMac or on
+  Telegram, things like "where am I staying in Leeds?".
 
 ## How it works
 
 ```
- forwarded email ─┐                         ┌─ Jobs database (SupaMac)
- Telegram file ───┼─► jobs service ─────────┤    Jobs    one row per job
- Job intake folder┘    │  1 store the source │    Details one row per detail,
-                       │  2 read its text    │            with quote, page,
-                       │  3 ask Claude for   │            source and status
-                       │    details + quotes │    Sources one row per email
-                       │  4 check each quote │            or file received
-                       │    against the text └─ the source files, as documents
-                       │  5 file under a job
-                       └─► Telegram summary, review buttons, answers
+ forwarded email ──┐                             ┌─ Jobs database (SupaMac)
+ Telegram file ────┼─► jobs service ─────────────┤   Jobs     one row per job
+ Job intake folder ┘   1 record the source       │   Details  one row per detail:
+                       2 read its text            │            quote, page, source,
+                       3 ask Claude (no tools)    │            status
+                       4 check every detail       │   Sources  one row per email
+                       5 file under a job, or ask │            or file
+                       6 update the Jobs row      │   Status   the service's health
+                       │                          └─ Job sources folder: originals
+                       └─► Telegram: summary, review, answers   and their text
 ```
 
 The jobs service is a Bun program in the ops image (`infra/self-hosted/ops/jobs`),
-run as its own container. It acts in SupaMac as the owner through a user API
-key and the ordinary storage routes (`POST /documents/upload`,
-`POST /databases/query`), so everything it writes is visible, editable and
-permission-checked like anything the owner makes by hand, and the assistant
-reads it with the tools it already has.
+run as its own container in a `jobs` compose profile. It works in SupaMac as
+**its own account**, not the owner's (see Security), through the ordinary
+storage routes (`POST /documents/upload`, `POST /databases`,
+`POST /databases/query`, `/projects`, `/databases/{id}/tables/{id}/changes`).
+That account owns the Jobs database and the two folders and shares them with
+the owner, so everything is visible and permission-checked like anything made
+by hand.
 
-### 1. Sources
+## 1. Sources
 
-| Way in | How it is read | Who is accepted |
+| Way in | How it is read | Accepted from |
 |---|---|---|
-| Jobs mailbox | IMAP, checked every minute; a processed message moves to a `Processed` folder, a refused one to `Refused` | Senders on `JOBS_MAIL_ALLOWED_SENDERS`, and only when the receiving server's `Authentication-Results` shows DMARC, or DKIM aligned with the From domain, passing |
-| Telegram | Long polling (no public route) | The one Telegram account linked with the link code; every other update is dropped unread |
-| Job intake folder | The service lists the folder every minute and processes documents it has not seen | The owner (it is the owner's folder) |
+| Jobs mailbox | IMAP over TLS, every minute | Allowed senders whose message passes the mail check below |
+| Telegram | Long polling (no public route) | The owner's Telegram account only, in a private chat |
+| Job intake folder | Listed every minute | Documents owned by the owner or the service |
 
-Each source is stored once, by content hash. An email becomes a Markdown
-document holding its headers and text, beside each attachment uploaded as its
-own document. Every source gets a row in **Sources**.
+**What counts as a source.** An email (with each attachment), a file or photo
+sent to the bot, a message forwarded to the bot, `/add <text>`, or a document
+in Job intake. **Plain text typed to the bot is a question, never a source.**
+Text the owner adds with `/add` is filed as "your note", never as found in a
+document, and never replaces a document's value without a confirmation.
 
-### 2. Text
+**The mail check**, made on the headers alone, before the body is fetched:
 
-The service extracts text itself, so it can check quotes against it:
+1. The message has exactly one From header holding one address, and that
+   address (compared case-insensitively) is in `JOBS_MAIL_ALLOWED_SENDERS`.
+2. The topmost `Authentication-Results` header carries the authserv-id of the
+   mailbox provider (`JOBS_MAIL_AUTHSERV_ID`) and shows `dkim=pass` for a
+   domain aligned with the From address. A DMARC or SPF pass alone is not
+   enough. With no such header the message is refused.
+3. The DKIM signature covers To, and To holds the jobs address, so mail
+   signed for someone else cannot be replayed into the mailbox.
 
-| Kind | Text | Sent to Claude as |
+A refused message is moved to a `Refused` folder unread and the owner gets a
+Telegram note with the sender and the check that failed. The check is only as
+strong as the mailbox's password: use a mailbox nothing else uses, with an app
+password.
+
+**Telegram.** Updates are accepted only from a private chat whose id equals the
+sender's id equals the linked owner id, and only messages and button presses
+are requested. The owner links once: on first start with no linked account the
+service writes a single-use code into a **Jobs setup** document in the Job
+sources folder; the owner sends `/start <code>`. The link is stored, the code
+is spent, and every later `/start` is ignored. (`JOBS_TELEGRAM_OWNER_ID` sets
+the id directly instead.) Group joins are turned off in BotFather.
+
+**Each source is recorded once.** A Sources row is written first, with status
+Processing and the source's content hash, Message-ID and thread references;
+a source whose hash is already recorded is not processed again.
+
+## 2. Text
+
+The service extracts text itself, in a child process with a time and memory
+limit, so it can check quotes against what it read:
+
+| Kind | Text | Notes |
 |---|---|---|
-| PDF with a text layer | per page | the page texts, plus the PDF itself |
-| Scanned PDF, photo, image | none | the PDF or image only |
-| Word (`.docx`) | paragraphs and tables | the text |
-| Excel (`.xlsx`), CSV | cells, sheet by sheet, row by row | the text |
-| Email | the plain text part, or the HTML converted to text | the text |
+| PDF | per page, in reading order, by line | A page with little or no text layer, or with invisible text over an image, counts as a scan |
+| Scan, photo, image (JPEG, PNG, WebP, HEIC converted) | none | Read by the model from the image; every detail needs review |
+| Word (`.docx`) | paragraphs; tables cell by cell | Hidden text and deleted tracked changes are dropped |
+| Excel (`.xlsx`), CSV | each cell as `<column header>: <value>`, with the row's first cell | Hidden sheets, rows and columns are dropped; numbers keep their display format |
+| Email | the HTML part as text, else the plain part | Quoted history and forwarded messages become pages of their own, each with its own date |
+| Calendar file (`.ics`) | as text | |
 
-The text sent is numbered by source and page (`[S2 p3]`), so a quote can
-point at where it came from.
+Accepted attachment types are exactly these; anything else is recorded as
+skipped and never parsed. A zip-based file (docx, xlsx) is refused above 500
+entries or 50 MB unpacked, counted while unpacking. A PDF over 600 pages, or a
+file over 25 MiB, is processed from its page text only, and the Sources row
+says so. Telegram bots cannot receive files over 20 MB; the bot says to email
+them instead. Inline images under 20 KB in emails (signatures, logos) are kept
+with the email and not sent to the model.
 
-### 3. Extraction
+The text is numbered by source and page (`[S2 p3]`). For each PDF, Word and
+Excel source the service also stores this text as a Markdown document
+`<file> · text`, so the assistant in SupaMac can read it: on this stack it
+cannot read those originals itself.
 
-One request per source, to `claude-opus-5-5` (setting `JOBS_AI_MODEL`) at
-effort `high`, through the official Anthropic SDK, with structured outputs
-(`output_config.format`) holding the reply to a schema. The request has no
-tools: a document cannot make the model do anything but answer. The schema
-asks for:
+## 3. Extraction
 
-- what the source is (invite, production pack, purchase order, call sheet,
-  travel or accommodation confirmation, other, not about a job);
-- the job it describes: names, references, PO numbers and dates that identify
-  it, and which of the owner's existing jobs it matches, if any, with the words
-  that show it;
-- every detail found, each as `{field, value, day?, quote, source, page?}`,
-  where `quote` is copied character for character from the source and `value`
-  is no more than the quote says.
+One request per source, to `claude-opus-5-5` (`JOBS_AI_MODEL`) at effort
+`high`, through the official Anthropic SDK, with structured outputs
+(`output_config.format`) holding the reply to a schema. **The request has no
+tools**, so a document can only be read, never obeyed. The PDF itself is sent
+only for pages that count as scans; other pages go as text.
 
-The prompt says: copy, never infer; leave out anything not written in the
-source; never fill a gap from what is usual; a detail that is only implied is
-left out. The list of fields is fixed (below); a detail that fits none is
-`Other` with its own label.
+The schema asks for:
 
-A refusal (`stop_reason: "refusal"`) or an answer cut short is recorded on the
-source's row as failed, with the reason, and the owner is told. Nothing is
-saved from it.
+- what the source is: invite, production pack, purchase order, call sheet,
+  travel confirmation, accommodation confirmation, other, or not about a job;
+- the jobs it describes (usually one), each with the names, references and
+  dates that identify it, and the existing job it may be, with the words that
+  show it;
+- the source's own date (the original message's date in a forward, or an
+  issue or revision date written in the document), with its quote;
+- every detail, as `{field, label, value, day?, day_quote?, quote, page}`,
+  where `quote` is copied character for character from one line or table cell
+  of the source, holding the label and the value.
 
-### 4. Checks
+The prompt says: copy, never infer; leave out anything not written; never
+fill a gap from what is usual; keep words such as "TBC", "approx." or "plus
+VAT" in the value; one detail per value.
 
-Run by the service on every detail, without the model:
+The model's reply is saved before anything else is written, keyed by the
+source's hash, so a retry never pays for the same source twice. A refusal,
+an answer cut short, or an invalid one sets the source Failed with the reason;
+an overloaded or unreachable API keeps it Processing and retries with backoff.
+After three failed attempts the source is Failed, the email moves to a
+`Failed` folder, and the owner gets one Telegram message with a Retry button.
 
-1. **The quote is in the source.** After normalising both (Unicode NFKC,
-   case, whitespace, quotes, dashes), the quote must occur in the text of the
-   source it names, on the page it names when it names one.
-2. **The value is in the quote.** Dates, times, amounts and references are
-   parsed from the value and must be parsed from the quote too, to the same
-   result. A text value's words must all appear in the quote, so the model can
-   shorten a quote into a value but not add to it.
-3. **The day, if given, is written in the source** (on the same page, or in
-   the quote).
+## 4. Checks
 
-A detail passing all three is stored **Checked**. Any other is stored **Needs
-review**, with what failed. A detail read from an image or a scan has no text
-to check against and is always **Needs review**. Only the owner moves a detail
-to **Confirmed** or **Rejected**.
+Made by the service on every detail, without the model, against its own
+extracted text (never the rendered document). Text is compared after
+normalising both sides: Unicode NFKC, case, whitespace within a line, quote
+marks and dashes; matches fall on word boundaries; lines are never joined.
 
-### 5. Filing under a job
+1. **The quote is there.** It occurs on the page it names (a paged source must
+   name one), and either once on that page or with the same value every time.
+   It is at least one label word plus the value.
+2. **It names the field.** The quote holds a label word for the detail's field
+   from a fixed list (call, load-in or get-in, PO or purchase order or order
+   no., rate or fee, hotel or accommodation, ...); for `Other`, the model's
+   own label.
+3. **The value is in the quote, and nothing more.**
+   - A text value is one contiguous run of the quote's words. If the quote
+     holds a word that hedges or negates (not, no, without, TBC, TBA, TBD,
+     provisional, approx., likely, option, or, subject to, if, unless,
+     pending) that the value leaves out, the detail needs review.
+   - Dates, times, amounts and references are parsed from the value and from
+     the quote, and must agree. The quote must hold exactly one of that kind.
+     Only what is written counts: a date's missing year, a time's missing
+     am/pm, an amount's missing currency are never filled in. A completion the
+     same page states in full is allowed and named in Check ("year from p1");
+     any other completion needs review. A numeric date that reads two ways
+     (03/04) needs review unless the same source writes that date with the
+     month in words. A bare number is never a time. A weekday that is given
+     must agree with the date. Tax words stay in the value.
+4. **The day is written.** It is in the quote, or the model gives a
+   `day_quote` that is the nearest date heading above the quote on the same
+   page, with no other date between them. A relative day ("Day 2", "the
+   following day") needs review, with the calculation shown as a calculation.
 
-A source joins an existing job when one of these is true, checked by the
-service:
+A detail passing every check is **Found**. Any other is **Needs review**, with
+the check that failed in its Check column. A detail read from an image or a
+scan, or from a PDF's text layer that does not match what the page shows, is
+always Needs review, and its review card carries the page image and the line
+"read by the model from an image; no text was checked".
 
-- it is a reply in an email thread already filed under that job;
-- a checked PO number or job reference equals one already on that job;
-- the model named that job, its quote passes the checks, and the dates overlap.
+**Confirmed and Rejected** come only from the owner: a Review button press on
+Telegram, or the owner's own edit in SupaMac (see Edits in SupaMac). A detail
+that equals one the owner rejected (same job, field, day and value) is stored
+Needs review with "you rejected this on <date>".
 
-Otherwise it starts a new job. When the model names a job the checks do not
-support, the source starts a new job and its row says which job it may
-duplicate, for the owner to merge.
+Every surface words Found as what it is: "found in <source>, p<n>, not
+confirmed by you". The Jobs row marks which of its values are not confirmed.
 
-The **Jobs** row shows, for each field, the value from the newest Checked or
-Confirmed detail; a detail awaiting review never reaches it. When a newer
-source changes a value (a call time moved), the older detail becomes
-**Superseded** and the Telegram summary says what changed, from what to what,
-and where.
+## 5. Filing under a job
+
+The service files a source under an existing job by itself only when:
+
+- it carries a Found PO number or job reference of at least five characters,
+  one of them a digit, equal to one on that job, and the same client (a Found
+  client, or the original sender's domain); or
+- it is a reply in a thread already filed under that job (its References
+  chain holds a filed Message-ID) and it names no dates the job does not have.
+
+An attachment files with its email unless its own references conflict.
+Anything else, including a match the model proposes, becomes a question on
+Telegram ("File under <job>?" with Yes and New job), and its details do not
+touch any Jobs row until the owner answers. A travel or accommodation
+confirmation never starts a job by itself. A source that describes several jobs
+waits for the owner.
+
+## 6. The Jobs row
+
+Each column has one rule, over Found and Confirmed details only:
+
+| Column | Rule |
+|---|---|
+| Venue, Venue address, Client, Production company, Event, Role, PO number, Job reference, Payment terms, Invoice to | The value of the newest detail of that field |
+| Dates | Only from one quote that states a contiguous range; otherwise empty, and the days go in Days |
+| Days | Every day a detail names, as a list |
+| Call times | "day: value" for every Call time detail |
+| Travel | Every Travel detail, by day |
+| Accommodation | Hotel, with Check-in and Check-out |
+| Contacts | Every Contact detail |
+| Rate, Currency, Rate basis | Rate from its detail; Currency and basis only from the Rate quote's own symbol or code and its "/day", "per hour" or "flat"; otherwise empty |
+| Not confirmed | The columns whose value rests on a Found detail the owner has not confirmed |
+| Needs review | The number of details awaiting review |
+| Booking | Written by the owner only (Enquiry, Pencilled, Booked, Completed, Cancelled); empty on a new job |
+
+**Newer means the source's own date**, never processing order. A value
+replaces another only within the same job, field, day and label, only for a
+single-valued field, and only when its source is dated later. When the order
+is unknown, both values stay, the newer one needs review, and the cell shows
+both. A value from quoted history never replaces one from a later message.
+Contacts, travel, nights and call times accumulate. A value that would replace
+one the owner confirmed, and any change to Rate, Per diem, Payment terms,
+Invoice to or Booking reference, waits for review and is shown as "07:00
+(confirmed); a newer source says 08:00, not confirmed".
+
+The service writes a Jobs cell only when it is empty or still holds what the
+service last wrote; a value the owner typed stays, and the summary says a
+source disagrees.
 
 ## The Jobs database
 
-One database named **Jobs**, owned by the owner, created by the service on its
-first run. The service finds it again by name and checks its tables and
-columns before writing; it adds what is missing and never removes or retypes
-anything the owner added.
+Owned by the service's account and shared with the owner with edit access.
+Created on the first run with the tables, columns and saved views below; their
+ids are pinned in the service's state and names are only used on that first
+run, so renaming a column or table is safe. If the pinned database is missing
+or trashed the service stops and says so; it never creates a second one.
 
-**Jobs**: Name (title), Status (select: Enquiry, Pencilled, Confirmed,
-Completed, Cancelled), Dates (date range), Client, Production company, Event,
-Role, Venue, Venue address, Call times, Travel, Accommodation, Contacts, PO
-number, Job reference, Rate, Currency, Rate basis, Payment terms, Needs review
-(number of details awaiting review), Updated (date).
+**Jobs**: Name (title), Booking (select), Dates (date range), Days, Client,
+Production company, Event, Role, Venue, Venue address, Call times, Travel,
+Accommodation, Contacts, PO number, Job reference, Rate (number), Currency,
+Rate basis, Payment terms, Invoice to, Not confirmed (tags), Needs review
+(number), Updated (date). Views: Timeline (Dates), Board (Booking).
 
-**Details**: Name (title, "Field: value"), Job (relation to Jobs), Field
-(select), Value, Day (date), Quote, Source (document), Page (number), Status
-(select: Checked, Needs review, Confirmed, Rejected, Superseded), Check (what
-the checks found), Received (date).
+**Details**: Name (title: "Field: value", starting "Unconfirmed · " unless
+Found or Confirmed), Job (relation), Source row (relation), Field (select),
+Label, Value, Day (date), Quote, Source (document), Page (number), Status
+(select: Found, Needs review, Confirmed, Rejected, Replaced), Check, Received
+(date). View: Needs review.
 
-**Sources**: Name (title: subject or file name), Document (document), Kind
-(select), Via (select: Email, Telegram, Folder), From, Received (date), Job
-(relation to Jobs), Status (select: Processed, Needs review, Not a job,
-Failed), Note.
+**Sources**: Name (title), Document (document), Text (document), Kind (select),
+Via (select: Email, Telegram, Folder, Note), From, Sent (date: the source's own
+date), Received (date), Job (relation), Status (select: Processing, Processed,
+Needs review, Not a job, Skipped, Failed), Hash, Message ID, Thread IDs,
+Attempts (number), Input tokens, Output tokens (numbers), Note. View: Problems.
 
-The fields a detail can have: Event, Client, Production company, Role, Job
-reference, PO number, Dates, Venue, Venue address, Access and parking, Call
-time, Load-in, Show time, Load-out, Finish, Travel, Travel booked by, Hotel,
-Hotel address, Check-in, Check-out, Booking reference, Per diem, Rate,
-Overtime, Payment terms, Invoice to, Contact, Dress code, Catering, Kit to
-bring, Credentials and passes, Health and safety, Other.
+**Status**: one row: last mail check, last Telegram poll, last change poll,
+last error, AI spend this month (computed from token counts at the configured
+prices, labelled as computed).
+
+Dates are calendar dates in the owner's time zone (`JOBS_TIME_ZONE`, default
+`Europe/London`, changed on the go with `/tz`). Times are kept as written, as
+text, and always reported as written in the source (venue local time); a
+converted time is only shown as an estimate naming the zone it assumes.
+
+## Edits in SupaMac
+
+Every minute the service reads each table's changes since the version it last
+saw (`/changes`), skipping the versions its own writes produced. Row history
+says who made each change and whether an agent acted for them:
+
+- **The owner, with no agent**: a Status set to Confirmed or Rejected is
+  recorded as the owner's decision; a changed Value, Quote or Day is the
+  owner's value ("entered by you"), and the job is recomputed.
+- **An agent** (the assistant, a routine): a Status change is undone and a
+  value change is set Needs review with "changed by the assistant"; the owner
+  is told on Telegram. Documents can carry instructions; only the owner
+  decides.
+
+Before acting on a Review button the service re-reads the detail; if it
+changed in SupaMac, the button reports its current state instead.
 
 ## Asking
 
-The assistant in SupaMac reads the Jobs database with the SQL tool it already
-has, and the source documents with its document tools; its instructions say
-to state a detail with its source and status, and to call anything that is not
-Checked or Confirmed unconfirmed.
+**On Telegram** a question goes to Claude (`JOBS_AI_MODEL`, effort `medium`)
+with three fixed tools that the service turns into its own queries over the
+pinned tables: `jobs(from?, to?, name?)`, `details(job, field?, day?)` and
+`source_text(source)`. The model never writes SQL and reads nothing outside the
+Jobs database. Every query is narrowed by job or status, and a result the
+server reports as partial is answered as partial.
 
-On Telegram, a question goes to Claude with read-only tools over the same data
-(a `SELECT` on the Jobs database, the text of one source). The answer comes
-back as statements, each naming the details it rests on. The service checks
-each statement against those details before sending it: a statement whose
-details do not say it is sent marked as unchecked. An estimate is sent only
-labelled as one, with what it is based on. When the data does not hold the
-answer, the answer says so.
+The answer comes back as statements, each a set of detail ids with connecting
+words. The service writes every value itself, verbatim from its detail, with
+its status and source ("the call sheet, p2, says 'Crew call 07:00'; not
+confirmed by you"); the model never types a value. A replaced or rejected
+detail is shown only as "was ...". Any other text the model adds is shown as
+"(not checked)", and a number or date in it is refused unless it is labelled
+as an estimate with its basis. "Nothing found" is decided by the service from
+the query results, and the answer always lists details awaiting review and
+failed sources for that job. "Today", "tomorrow" and weekdays are worked out by
+the service in the owner's time zone. Links in an answer are dropped unless
+they appear verbatim in a cited detail, and messages are sent with link
+previews off.
+
+**In SupaMac** the assistant reads the Jobs database with its SQL tool and the
+`· text` documents with its document tools. The setup document asks the owner
+to add one line to their SupaMac memory: read job details from the Jobs
+database, quote the source and status of each, and call anything that is not
+Confirmed unconfirmed. **These answers are not checked by the service.**
+
+## Security
+
+- **Its own account.** The service signs in as the jobs mailbox's own SupaMac
+  account (added to the sign-up allow-list), and holds that account's API key.
+  The key reaches only what that account owns or is shared: the Jobs database
+  and its two folders, not the owner's mail, CRM or documents.
+- **Its own container and secrets.** It reads only `/etc/supamac/jobs.env`
+  (optional, so the stack deploys without it) and refuses to start if the
+  stack's internal key or database URL is in its environment. It runs as a
+  non-root user with a read-only root, no capabilities, no new privileges, a
+  process and memory limit, and one state volume. It reaches SupaMac through
+  the gateway, never a service directly, and the internet only through an
+  egress proxy that allows `api.anthropic.com`, `api.telegram.org` and the
+  mailbox host.
+- **Documents are data.** Extraction has no tools; questions have only the
+  three read-only tools; nothing the service does sends mail, accepts work,
+  shares, or deletes.
+- **Hostile files.** Parsing runs in a child process with limits, on the type
+  allow-list above; PDF.js runs with `isEvalSupported: false`; XML is parsed
+  with entities off.
+- **Spending.** A dedicated Anthropic key (in its own Console workspace with a
+  monthly limit is best), token counting before each request, `max_tokens` on
+  every request, a cap on tool rounds per question, and
+  `JOBS_MONTHLY_LIMIT_USD`: above it the service stops calling the model and
+  says so.
+- **The bot token** is masked in every log line, files are downloaded by the
+  service and never linked, and a second poller (HTTP 409) or a webhook set on
+  the bot stops the service with a message to revoke the token.
+- **SQL** is built by the service only: one literal function (quotes
+  doubled, NUL and unpaired surrogates removed), batches under 256 KiB,
+  `databaseId` always set, no identifiers or select options taken from model
+  output.
 
 ## Settings
 
-In `/etc/supamac/jobs.env`, read only by the jobs container:
+`/etc/supamac/jobs.env`, read only by the jobs container:
 
 | Setting | What |
 |---|---|
-| `JOBS_SUPAMAC_API_KEY` | A user API key the owner creates in SupaMac (Settings, API keys) |
-| `ANTHROPIC_API_KEY` | The Anthropic key |
+| `JOBS_SUPAMAC_API_KEY` | The jobs account's API key (created in SupaMac, Settings, API keys, signed in as that account) |
+| `ANTHROPIC_API_KEY` | An Anthropic key for this service |
 | `JOBS_AI_MODEL` | `claude-opus-5-5` unless set |
-| `JOBS_TELEGRAM_BOT_TOKEN` | From Telegram's BotFather |
-| `JOBS_TELEGRAM_LINK_CODE` | Generated at bootstrap; sent once as `/start <code>` to link the owner's Telegram account |
-| `JOBS_MAIL_HOST`, `JOBS_MAIL_PORT`, `JOBS_MAIL_USER`, `JOBS_MAIL_PASSWORD` | The jobs mailbox (IMAP over TLS) |
+| `JOBS_MONTHLY_LIMIT_USD` | The AI spend at which the service stops |
+| `JOBS_TELEGRAM_BOT_TOKEN` | From BotFather |
+| `JOBS_TELEGRAM_OWNER_ID` | Optional: the owner's numeric Telegram id, instead of the link code |
+| `JOBS_MAIL_HOST`, `JOBS_MAIL_PORT`, `JOBS_MAIL_USER`, `JOBS_MAIL_PASSWORD` | The jobs mailbox |
+| `JOBS_MAIL_AUTHSERV_ID` | The provider's name in its `Authentication-Results` headers |
 | `JOBS_MAIL_ALLOWED_SENDERS` | The addresses whose forwards are read |
+| `JOBS_OWNER_EMAIL` | The owner's SupaMac account, to share the database and folders with |
+| `JOBS_TIME_ZONE` | `Europe/London` unless set |
 
-Each source can be turned off by leaving its settings out.
+A way in whose settings are missing is off; the Status row says which.
+
+## Setup
+
+1. Create the jobs mailbox with an app password, at a provider that writes
+   `Authentication-Results`.
+2. Create the bot with BotFather and turn its group joins off.
+3. Add the mailbox address to the sign-up allow-list, sign in to SupaMac as it
+   (the sign-in code arrives in that mailbox), and create an API key.
+4. Put the settings in `jobs.env`, add `jobs` to `COMPOSE_PROFILES`, and
+   redeploy.
+5. Open **Jobs setup** in the shared Job sources folder: it lists a check of
+   each setting (SupaMac key, mailbox login, Telegram, Anthropic) and the link
+   code. Send `/start <code>` to the bot.
+6. Forward a test email and see its summary arrive.
+
+## Operations
+
+- **State**: the `jobs_state` volume holds the Telegram link and offset, the
+  pinned ids, the last table versions, the saved model replies and the
+  attempt counts. It is in the backup and restore scripts. The dedupe keys
+  also live in Sources rows, so they survive in the database backup.
+- **Restarts**: every Processing source resumes from what its rows show;
+  details of one source are written in one statement; a Telegram update is
+  acknowledged only after it is handled, and its id is recorded so a repeat is
+  ignored.
+- **Health**: `/health` for the compose healthcheck; the Status row; a Telegram
+  note (at most hourly) when the mailbox, Telegram, SupaMac or Anthropic stops
+  answering, and another when it recovers.
+- **Memory**: 512 MB limit as an estimate, one source at a time; measured at
+  the next rehearsal.
+- **Cost**: computed per source from its token counts and the configured
+  prices, and totalled monthly on the Status row. As an estimate, at $4 per
+  million input and $20 per million output tokens: a 40-page pack sent as text
+  is in the order of 30,000 input tokens (about $0.12), and the reply with its
+  thinking 5,000 to 20,000 output tokens ($0.10 to $0.40). Scanned pages cost
+  more, because they go as images.
 
 ## What it does not do
 
-- It never sends email, accepts or declines a job, or changes a calendar.
-- It never deletes: a rejected detail stays, marked Rejected.
-- It does not read the owner's whole inbox; only what is forwarded or sent.
-- It does not read text in scans and photos with OCR: those details always
-  wait for review.
+- It never sends email, accepts or declines a job, changes a calendar,
+  shares beyond the owner, or deletes; a rejected detail stays, marked Rejected.
+- It does not read the owner's inbox, only what is forwarded or sent.
+- It has no OCR: details from scans and photos always wait for review.
+- On this stack a `.docx` cannot be dropped into Job intake from the browser,
+  and a `.docx` original cannot be opened in SupaMac: forward Word files by
+  email or Telegram; their text document is the source, and the original stays
+  in the service's state.
 
 ## Privacy
 
-Sources go to Anthropic to be read, and Telegram messages and files pass
-through Telegram's servers. Nothing else leaves the server.
+Sources go to Anthropic to be read; Telegram messages and files pass through
+Telegram's servers. Questions asked in SupaMac go to whichever model that chat
+uses: choose an Anthropic model for job questions there. Nothing else leaves the
+server.
