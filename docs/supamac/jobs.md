@@ -394,7 +394,9 @@ A way in whose settings are missing is off; the Status row says which.
 ## Setup
 
 1. Create the jobs mailbox with an app password, at a provider that writes
-   `Authentication-Results`.
+   `Authentication-Results`. The address you forward from must be on a
+   domain that signs its mail (DKIM) and publishes a DMARC record (`p=none`
+   is enough); Gmail and Outlook addresses do.
 2. Create the bot with BotFather and turn its group joins off.
 3. Add the mailbox address to the sign-up allow-list, sign in to SupaMac as it
    (the sign-in code arrives in that mailbox), and create an API key.
